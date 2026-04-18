@@ -1,0 +1,22 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:////data/dealios.db
+      - FRONTEND_ORIGIN=http://localhost:8000
+      - JWT_SECRET=${JWT_SECRET:-change-me}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:-}
+      - PBKDF2_ROUNDS=${PBKDF2_ROUNDS:-60000}
+      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY:-}
+    volumes:
+      - dealos_data:/data
+
+volumes:
+  dealos_data:
+

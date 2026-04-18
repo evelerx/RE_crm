@@ -1,0 +1,39 @@
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+backend/.venv/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+backend/.env
+backend/env
+
+# Databases and local app data
+*.db
+*.sqlite
+*.sqlite3
+backend/data/
+backend/dealios.db
+
+# Node / frontend build
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
