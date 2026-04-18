@@ -2,7 +2,13 @@ export const fallbackHost =
   typeof globalThis !== "undefined" && "location" in globalThis && globalThis.location
     ? globalThis.location.hostname
     : "localhost";
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? `http://${fallbackHost}:8000`;
+const defaultApiBase =
+  typeof globalThis !== "undefined" && "location" in globalThis && globalThis.location
+    ? globalThis.location.hostname === "localhost" || globalThis.location.hostname === "127.0.0.1"
+      ? `http://${fallbackHost}:8000`
+      : `${globalThis.location.origin.replace(/\/$/, "")}`
+    : `http://${fallbackHost}:8000`;
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? defaultApiBase).replace(/\/$/, "");
 const API_KEY = import.meta.env.VITE_API_KEY ?? "";
 
 function getToken() {

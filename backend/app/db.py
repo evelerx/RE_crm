@@ -58,11 +58,15 @@ def _resolve_database_url() -> str:
 
 DATABASE_URL = _resolve_database_url()
 
-connect_args = {}
+engine_kwargs: dict = {"echo": False}
 if DATABASE_URL.startswith("sqlite"):
-    connect_args = {"check_same_thread": False}
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    # Cloud Postgres connections are longer lived and benefit from liveness checks.
+    engine_kwargs["pool_pre_ping"] = True
+    engine_kwargs["pool_recycle"] = 300
 
-engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 
 def _sqlite_table_columns(conn, table: str) -> set[str]:

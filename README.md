@@ -1,8 +1,8 @@
-# Deal Intelligence OS (MVP)
+# Deal Intelligence OS
 
 This repo contains a minimal **Deal Intelligence OS** MVP:
 
-- `backend/`: FastAPI + SQLite (Deals / Contacts / Activities + AI stubs + per-email data)
+- `backend/`: FastAPI + SQLModel API
 - `frontend/`: Responsive React PWA (Pipeline / Grid / Deal detail / ROI)
 
 ## One-click start (Windows)
@@ -31,7 +31,7 @@ Backend runs on `http://localhost:8000`.
 ### Login (email -> token)
 
 - Open the frontend and sign up / sign in using email + password.
-- Data is stored **per email** in `backend/data/dealios.db` and will still be there when you log in again with the same email.
+- In local mode, data is stored in `backend/data/dealios.db` unless `DATABASE_URL` is set to Postgres.
 
 ### Frontend
 
@@ -71,6 +71,90 @@ Rule for big updates: deploy code that is backward compatible first, then run mi
 
 - Current DB: `backend/data/dealios.db`
 - If you have older `dealios.db` files in other folders, the backend will try a best-effort copy into `backend/data/` on startup.
+
+## Production setup: Supabase + Vercel
+
+This project is ready for:
+
+- `Supabase Postgres` for the database
+- `Vercel` for the frontend
+- `Vercel` for the FastAPI backend as a separate project rooted at `backend/`
+
+### 1. Create the Supabase database
+
+In Supabase:
+
+1. Create a new project
+2. Open `Project Settings -> Database`
+3. Copy the **pooler** connection string
+4. Use the SQLAlchemy/psycopg format in `DATABASE_URL`
+5. Run [backend/supabase/init.sql](/c:/Users/nihar/OneDrive/Desktop/new%20re%20CRM/backend/supabase/init.sql) in the Supabase SQL editor
+
+Example:
+
+```env
+DATABASE_URL="postgresql+psycopg://postgres.your-project-ref:your-password@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require"
+```
+
+Supabase recommends pooled connections for hosted apps, and their docs note that application-side poolers like SQLAlchemy are suitable for long-running containers and VMs. For serverless-style deployments, the Supabase pooler connection is the safer default.
+
+### 2. Deploy the backend to Vercel
+
+Create a Vercel project with **Root Directory** set to `backend/`.
+
+Important:
+
+- Vercel supports FastAPI directly when an `app` is exported from `app.py` or `index.py`
+- This repo includes `backend/index.py` for that reason
+
+Set these backend environment variables in Vercel:
+
+```env
+APP_NAME="Deal Intelligence OS"
+JWT_SECRET="your-long-random-secret"
+DATABASE_URL="postgresql+psycopg://postgres.your-project-ref:your-password@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require"
+FRONTEND_ORIGIN="https://your-frontend-project.vercel.app"
+ADMIN_EMAIL="you@example.com"
+ADMIN_PASSWORD_HASH="..."
+DATA_ENCRYPTION_KEY="your-fernet-key"
+OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
+```
+
+Optional:
+
+- `API_KEY`
+- `ADMIN_PASSWORD` if you are not using `ADMIN_PASSWORD_HASH`
+
+### 3. Deploy the frontend to Vercel
+
+Create a second Vercel project with **Root Directory** set to `frontend/`.
+
+Set:
+
+```env
+VITE_API_BASE_URL="https://your-backend-project.vercel.app"
+VITE_API_KEY=""
+```
+
+The frontend already reads `VITE_API_BASE_URL`, so no code changes are needed during deployment.
+
+For a copy-ready list of both Vercel project env sets, use [docs/VERCEL_ENV.md](/c:/Users/nihar/OneDrive/Desktop/new%20re%20CRM/docs/VERCEL_ENV.md).
+
+### 4. Run the backend once so tables are created
+
+On first backend start, `SQLModel.metadata.create_all(...)` creates the tables automatically in Supabase.
+
+### 5. Move existing local SQLite data into Supabase
+
+Recommended safest path:
+
+1. Keep your current local SQLite DB as the source of truth
+2. Start the backend locally against SQLite
+3. Export the data you need using the CSV export endpoints or a one-time migration script
+4. Start the backend against Supabase
+5. Import the data into the new hosted environment
+
+If you want a direct SQLite -> Supabase migration script, that should be done carefully so UUIDs, enterprise ownership, and foreign keys stay intact.
 
 ## iOS usage
 
