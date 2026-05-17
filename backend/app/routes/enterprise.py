@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 
 from ..audit import log_audit_event
 from ..auth import get_or_create_user, hash_password, normalize_email, require_enterprise
+from ..crypto import decrypt_if_configured
 from ..db import get_session
 from ..enterprise_scope import (
     count_org_records,
@@ -20,25 +21,54 @@ from ..enterprise_scope import (
     user_can_access_record,
     user_read_filter,
 )
-from ..models import Activity, AuditEvent, Contact, Deal, Profile, SupportChatMessage, User
+from ..models import AppIntegrationConnection, Activity, AuditEvent, BuilderDocument, Contact, Deal, Profile, SupportChatMessage, User
 from ..schemas import (
+    BuilderDocumentCreateRequest,
+    BuilderDocumentGenerateRequest,
+    BuilderDocumentRead,
     DealScoreResponse,
     EnterpriseEmployeeBlacklistRequest,
     EnterpriseEmployeeCreateRequest,
     EnterpriseEmployeeRead,
+    EnterpriseIntegrationsRead,
     EnterpriseOverviewRead,
+    IntegrationProviderRead,
     SupportChatMessageCreate,
     SupportChatMessageRead,
 )
+from ..settings import settings
+from ..services.openrouter import OpenRouterError, chat_completion
 
 
 router = APIRouter(prefix="/enterprise", tags=["enterprise"])
+
+
+def _utc_now_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _normalize_db_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
 
 
 def require_enterprise_owner(user: User = Depends(require_enterprise)) -> User:
     if not is_enterprise_owner(user):
         raise HTTPException(status_code=403, detail="Enterprise owner only")
     return user
+
+
+def _enterprise_owner_or_404(session: Session, user: User) -> User:
+    owner_id = get_enterprise_owner_id(user)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Enterprise owner not found")
+    owner = session.get(User, owner_id)
+    if not owner:
+        raise HTTPException(status_code=404, detail="Enterprise owner not found")
+    return owner
 
 
 def _employee_rows(session: Session, enterprise_owner_id: UUID) -> list[EnterpriseEmployeeRead]:
@@ -97,6 +127,7 @@ def _overview_payload(session: Session, owner: User) -> EnterpriseOverviewRead:
         company_specialization=company_specialization,
         company_bio=company_bio,
         company_profile_complete=company_profile_complete,
+        owner_plan=(getattr(owner, "plan", "free") or "free"),
         employee_limit=int(getattr(owner, "employee_limit", 0) or 0),
         employee_count=len(employees),
         counts=count_org_records(session, owner.id),
@@ -149,18 +180,88 @@ def _chat_row_payload(session: Session, row: SupportChatMessage) -> SupportChatM
     )
 
 
+def _builder_document_row(row: BuilderDocument) -> BuilderDocumentRead:
+    return BuilderDocumentRead(
+        id=row.id,
+        owner_id=row.owner_id,
+        enterprise_owner_id=row.enterprise_owner_id,
+        created_by_user_id=row.created_by_user_id,
+        doc_type=row.doc_type,
+        project_name=row.project_name,
+        company_name=row.company_name,
+        client_name=row.client_name,
+        project_city=row.project_city,
+        instructions=row.instructions,
+        generated_text=row.generated_text,
+        status=row.status,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _resolve_enterprise_llm_config(session: Session, user: User) -> tuple[str, str]:
+    owner_id = get_enterprise_owner_id(user)
+    provider_user = session.get(User, owner_id) if owner_id else user
+    if not provider_user:
+        raise HTTPException(status_code=400, detail="AI access is not configured for this account")
+    provider = (getattr(provider_user, "llm_provider", "") or "openrouter").strip() or "openrouter"
+    if provider != "openrouter":
+        raise HTTPException(status_code=400, detail="Unsupported AI provider")
+    encrypted_key = (getattr(provider_user, "llm_api_key", "") or "").strip()
+    api_key = decrypt_if_configured(encrypted_key).strip()
+    if not api_key or api_key.startswith("enc:"):
+        raise HTTPException(status_code=400, detail="Admin has not assigned a working OpenRouter AI key to this owner account yet")
+    model = (getattr(provider_user, "llm_model", "") or "openai/gpt-4o-mini").strip() or "openai/gpt-4o-mini"
+    return api_key, model
+
+
+def _provider_configured(provider_group: str) -> tuple[bool, list[str]]:
+    requirements: dict[str, list[tuple[str, str]]] = {
+        "google": [
+            ("GOOGLE_CLIENT_ID", (settings.google_client_id or "").strip()),
+            ("GOOGLE_CLIENT_SECRET", (settings.google_client_secret or "").strip()),
+        ],
+        "microsoft": [
+            ("MICROSOFT_CLIENT_ID", (settings.microsoft_client_id or "").strip()),
+            ("MICROSOFT_CLIENT_SECRET", (settings.microsoft_client_secret or "").strip()),
+            ("MICROSOFT_TENANT_ID", (settings.microsoft_tenant_id or "").strip()),
+        ],
+        "zoom": [
+            ("ZOOM_CLIENT_ID", (settings.zoom_client_id or "").strip()),
+            ("ZOOM_CLIENT_SECRET", (settings.zoom_client_secret or "").strip()),
+        ],
+    }
+    pairs = requirements.get(provider_group, [])
+    missing = [name for name, value in pairs if not value]
+    return not missing, missing
+
+
+def _integration_catalog() -> list[dict[str, str]]:
+    return [
+        {"key": "gmail", "name": "Gmail", "provider_group": "google", "category": "email"},
+        {"key": "google_calendar", "name": "Google Calendar", "provider_group": "google", "category": "scheduling"},
+        {"key": "google_meet", "name": "Google Meet", "provider_group": "google", "category": "meetings"},
+        {"key": "outlook", "name": "Outlook", "provider_group": "microsoft", "category": "email"},
+        {"key": "microsoft_teams", "name": "Microsoft Teams", "provider_group": "microsoft", "category": "meetings"},
+        {"key": "zoom", "name": "Zoom", "provider_group": "zoom", "category": "meetings"},
+    ]
+
+
 @router.get("/market-insights")
 def market_insights(
     window_days: int = Query(default=90, ge=7, le=3650),
     session: Session = Depends(get_session),
     user: User = Depends(require_enterprise),
 ) -> dict[str, Any]:
-    now = datetime.utcnow()
+    now = _utc_now_naive()
     cutoff = now - timedelta(days=window_days)
-    deals = session.exec(select(Deal).where(_deal_scope(user)).where(Deal.created_at >= cutoff)).all()
+    deals = session.exec(select(Deal).where(_deal_scope(user))).all()
 
     by_key: dict[tuple[str, str], dict[str, Any]] = {}
     for d in deals:
+        created_at = _normalize_db_datetime(getattr(d, "created_at", None))
+        if created_at is None or created_at < cutoff:
+            continue
         key = ((d.city or "").strip(), (d.area or "").strip())
         if key not in by_key:
             by_key[key] = {
@@ -185,9 +286,9 @@ def market_insights(
 
         if d.ticket_size is not None:
             row["ticket_sizes"].append(float(d.ticket_size))
-            if d.created_at >= (now - timedelta(days=30)):
+            if created_at >= (now - timedelta(days=30)):
                 row["recent_ticket_sizes"].append(float(d.ticket_size))
-            elif d.created_at >= (now - timedelta(days=60)):
+            elif created_at >= (now - timedelta(days=60)):
                 row["prev_ticket_sizes"].append(float(d.ticket_size))
 
     out: list[dict[str, Any]] = []
@@ -230,6 +331,126 @@ def market_insights(
 
     out.sort(key=lambda r: (-(r.get("deals") or 0), -(r.get("absorption_rate") or 0.0)))
     return {"now": now.isoformat() + "Z", "window_days": window_days, "areas": out[:50]}
+
+
+@router.get("/builder-documents", response_model=list[BuilderDocumentRead])
+def builder_documents(
+    session: Session = Depends(get_session),
+    user: User = Depends(require_enterprise),
+):
+    owner_id = get_enterprise_owner_id(user)
+    rows = session.exec(
+        select(BuilderDocument)
+        .where(BuilderDocument.owner_id == owner_id)
+        .order_by(BuilderDocument.updated_at.desc(), BuilderDocument.created_at.desc())
+        .limit(100)
+    ).all()
+    return [_builder_document_row(row) for row in rows]
+
+
+@router.post("/builder-documents", response_model=BuilderDocumentRead)
+def save_builder_document(
+    payload: BuilderDocumentCreateRequest,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_enterprise_owner),
+):
+    owner_id = get_enterprise_owner_id(user)
+    row = BuilderDocument(
+        owner_id=owner_id,
+        enterprise_owner_id=owner_id,
+        created_by_user_id=user.id,
+        doc_type=payload.doc_type,
+        project_name=payload.project_name.strip(),
+        company_name=payload.company_name.strip(),
+        client_name=payload.client_name.strip(),
+        project_city=payload.project_city.strip(),
+        instructions=payload.instructions.strip(),
+        generated_text="",
+        status="draft",
+    )
+    session.add(row)
+    log_audit_event(
+        session,
+        actor=user,
+        kind="enterprise.builder_document_saved",
+        summary=f"Saved builder document shell: {row.doc_type}",
+        detail=f"project={row.project_name[:120]} company={row.company_name[:120]}",
+        enterprise_owner_id=owner_id,
+        target_user_id=user.id,
+    )
+    session.commit()
+    session.refresh(row)
+    return _builder_document_row(row)
+
+
+@router.post("/builder-documents/generate", response_model=BuilderDocumentRead)
+async def generate_builder_document(
+    payload: BuilderDocumentGenerateRequest,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_enterprise_owner),
+):
+    owner_id = get_enterprise_owner_id(user)
+    api_key, model = _resolve_enterprise_llm_config(session, user)
+    owner_profile = session.exec(select(Profile).where(Profile.owner_id == owner_id)).first()
+    company_name = payload.company_name.strip() or (owner_profile.company if owner_profile else "")
+    city = payload.project_city.strip() or (owner_profile.city if owner_profile else "")
+    specialization = owner_profile.specialization if owner_profile else ""
+
+    system = (
+        "You write polished, human-sounding business documents for Indian builders, developers, and construction companies. "
+        "The writing must feel fully human, commercially credible, and ready for light manual review. "
+        "Avoid robotic phrasing, fluff, and AI disclaimers. Use clean headings and practical wording."
+    )
+    user_msg = (
+        f"Document type: {payload.doc_type}\n"
+        f"Tone: {payload.tone}\n"
+        f"Company: {company_name}\n"
+        f"Project: {payload.project_name.strip()}\n"
+        f"Client or audience: {payload.client_name.strip()}\n"
+        f"City/location: {city}\n"
+        f"Company specialization: {specialization}\n"
+        f"Instructions and facts to include:\n{payload.instructions.strip()}\n\n"
+        "Write a complete first draft that sounds fully human and professional. "
+        "Include relevant sections, but do not invent legal approvals, licenses, numbers, or compliance facts that were not provided. "
+        "If facts are missing, write the document in a safe, ready-to-fill style without placeholders like [insert here] unless absolutely necessary."
+    )
+    try:
+        generated = await chat_completion(
+            api_key=api_key,
+            model=model,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
+            max_tokens=1200,
+        )
+    except OpenRouterError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    row = BuilderDocument(
+        owner_id=owner_id,
+        enterprise_owner_id=owner_id,
+        created_by_user_id=user.id,
+        doc_type=payload.doc_type,
+        project_name=payload.project_name.strip(),
+        company_name=company_name,
+        client_name=payload.client_name.strip(),
+        project_city=city,
+        instructions=payload.instructions.strip(),
+        generated_text=generated,
+        status="generated",
+        updated_at=datetime.utcnow(),
+    )
+    session.add(row)
+    log_audit_event(
+        session,
+        actor=user,
+        kind="enterprise.builder_document_generated",
+        summary=f"Generated AI builder document: {row.doc_type}",
+        detail=f"model={model} project={row.project_name[:120]}",
+        enterprise_owner_id=owner_id,
+        target_user_id=user.id,
+    )
+    session.commit()
+    session.refresh(row)
+    return _builder_document_row(row)
 
 
 @router.post("/deal-score/{deal_id}", response_model=DealScoreResponse)
@@ -296,9 +517,9 @@ def portfolio_analytics(
     session: Session = Depends(get_session),
     user: User = Depends(require_enterprise),
 ) -> dict[str, Any]:
-    now = datetime.utcnow()
+    now = _utc_now_naive()
     cutoff = now - timedelta(days=window_days)
-    deals = session.exec(select(Deal).where(_deal_scope(user)).where(Deal.created_at >= cutoff)).all()
+    deals = session.exec(select(Deal).where(_deal_scope(user))).all()
 
     total = len(deals)
     stages: dict[str, int] = {"lead": 0, "visit": 0, "negotiation": 0, "closed": 0, "lost": 0}
@@ -306,7 +527,16 @@ def portfolio_analytics(
     roi_w_sum = 0.0
     roi_w_den = 0.0
 
+    filtered_deals: list[Deal] = []
     for d in deals:
+        created_at = _normalize_db_datetime(getattr(d, "created_at", None))
+        if created_at is None or created_at < cutoff:
+            continue
+        filtered_deals.append(d)
+
+    total = len(filtered_deals)
+
+    for d in filtered_deals:
         stages[d.stage] = stages.get(d.stage, 0) + 1
         if d.stage not in {"lost"} and d.ticket_size is not None:
             exposure += float(d.ticket_size)
@@ -325,20 +555,70 @@ def portfolio_analytics(
     }
 
 
-@router.get("/integrations")
-def integrations(user: User = Depends(require_enterprise)) -> dict[str, Any]:
-    return {
-        "plan": getattr(user, "plan", "free"),
-        "enterprise_owner_id": get_enterprise_owner_id(user),
-        "is_enterprise_owner": is_enterprise_owner(user),
-        "is_enterprise_member": is_enterprise_member(user),
-        "integrations": [
-            {"key": "crm", "name": "CRM integrations", "status": "coming_soon"},
-            {"key": "api", "name": "API access", "status": "coming_soon"},
-            {"key": "bulk", "name": "Bulk ingestion", "status": "available_via_csv"},
-            {"key": "whatsapp", "name": "WhatsApp automation at scale", "status": "coming_soon"},
-        ],
-    }
+@router.get("/integrations", response_model=EnterpriseIntegrationsRead)
+def integrations(
+    session: Session = Depends(get_session),
+    user: User = Depends(require_enterprise),
+) -> EnterpriseIntegrationsRead:
+    member_role = (getattr(user, "enterprise_member_role", "") or "").strip().lower()
+    access_role = "owner" if is_enterprise_owner(user) else (member_role or "member")
+    owner_id = get_enterprise_owner_id(user)
+    rows = session.exec(
+        select(AppIntegrationConnection).where(AppIntegrationConnection.enterprise_owner_id == owner_id)
+    ).all() if owner_id else []
+    connection_by_group = {row.provider_key: row for row in rows}
+
+    providers: list[IntegrationProviderRead] = []
+    for item in _integration_catalog():
+        provider_group = item["provider_group"]
+        configured, missing_env = _provider_configured(provider_group)
+        connection = connection_by_group.get(provider_group)
+        connected = bool(connection and connection.status == "connected")
+        owner_view = is_enterprise_owner(user)
+
+        if connected:
+            status = "connected" if owner_view else "inherited"
+            next_step = "Ready to use across the organization."
+        elif not configured:
+            status = "configuration_required"
+            next_step = "Add provider credentials in backend env before owners can connect."
+        elif owner_view:
+            status = "ready_to_connect"
+            next_step = "Owner can connect this provider from the integrations panel."
+        else:
+            status = "awaiting_owner_connection"
+            next_step = "Your organization owner must connect this provider first."
+
+        providers.append(
+            IntegrationProviderRead(
+                key=item["key"],
+                name=item["name"],
+                provider_group=provider_group,
+                category=item["category"],
+                status=status,
+                configured=configured,
+                connected=connected,
+                can_connect=owner_view and configured,
+                managed_by_owner=True,
+                connected_account_email=(connection.connected_account_email if connection else ""),
+                inheritance_mode="owner_managed",
+                required_env=missing_env,
+                next_step=next_step,
+                last_error=(connection.last_error if connection else ""),
+            )
+        )
+
+    return EnterpriseIntegrationsRead(
+        plan=getattr(user, "plan", "free"),
+        enterprise_owner_id=owner_id,
+        is_enterprise_owner=is_enterprise_owner(user),
+        is_enterprise_member=is_enterprise_member(user),
+        access_role=access_role,
+        can_manage=is_enterprise_owner(user),
+        can_view=True,
+        owner_managed=True,
+        providers=providers,
+    )
 
 
 @router.post("/reports/investment/{deal_id}")
@@ -402,28 +682,29 @@ def deal_memo(
 @router.get("/overview", response_model=EnterpriseOverviewRead)
 def enterprise_overview(
     session: Session = Depends(get_session),
-    user: User = Depends(require_enterprise_owner),
+    user: User = Depends(require_enterprise),
 ):
-    return _overview_payload(session, user)
+    return _overview_payload(session, _enterprise_owner_or_404(session, user))
 
 
 @router.get("/employees", response_model=list[EnterpriseEmployeeRead])
 def list_employees(
     session: Session = Depends(get_session),
-    user: User = Depends(require_enterprise_owner),
+    user: User = Depends(require_enterprise),
 ):
-    return _employee_rows(session, user.id)
+    return _employee_rows(session, _enterprise_owner_or_404(session, user).id)
 
 
 @router.get("/audit")
 def enterprise_audit(
     limit: int = 40,
     session: Session = Depends(get_session),
-    user: User = Depends(require_enterprise_owner),
+    user: User = Depends(require_enterprise),
 ):
+    owner = _enterprise_owner_or_404(session, user)
     rows = session.exec(
         select(AuditEvent)
-        .where(AuditEvent.enterprise_owner_id == user.id)
+        .where(AuditEvent.enterprise_owner_id == owner.id)
         .order_by(AuditEvent.created_at.desc())
         .limit(max(1, min(limit, 100)))
     ).all()
@@ -433,11 +714,12 @@ def enterprise_audit(
 @router.get("/support-chat", response_model=list[SupportChatMessageRead])
 def enterprise_support_chat(
     session: Session = Depends(get_session),
-    user: User = Depends(require_enterprise_owner),
+    user: User = Depends(require_enterprise),
 ):
+    owner = _enterprise_owner_or_404(session, user)
     rows = session.exec(
         select(SupportChatMessage)
-        .where(SupportChatMessage.enterprise_owner_id == user.id)
+        .where(SupportChatMessage.enterprise_owner_id == owner.id)
         .order_by(SupportChatMessage.created_at.asc())
         .limit(200)
     ).all()
@@ -448,12 +730,13 @@ def enterprise_support_chat(
 def enterprise_send_support_chat(
     payload: SupportChatMessageCreate,
     session: Session = Depends(get_session),
-    user: User = Depends(require_enterprise_owner),
+    user: User = Depends(require_enterprise),
 ):
+    owner = _enterprise_owner_or_404(session, user)
     row = SupportChatMessage(
-        enterprise_owner_id=user.id,
+        enterprise_owner_id=owner.id,
         sender_user_id=user.id,
-        sender_role="enterprise_owner",
+        sender_role="enterprise_member" if is_enterprise_member(user) else "enterprise_owner",
         message=payload.message.strip(),
     )
     session.add(row)
@@ -463,8 +746,8 @@ def enterprise_send_support_chat(
         kind="enterprise.support_chat",
         summary=f"Requested admin support from {user.email}",
         detail=payload.message.strip()[:240],
-        target_user_id=user.id,
-        enterprise_owner_id=user.id,
+        target_user_id=owner.id,
+        enterprise_owner_id=owner.id,
     )
     session.commit()
     session.refresh(row)

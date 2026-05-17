@@ -23,7 +23,7 @@ class User(SQLModel, table=True):
     is_blacklisted: bool = False
     blacklist_reason: str = ""
     blacklisted_at: Optional[datetime] = None
-    plan: str = "free"  # free | enterprise
+    plan: str = "free"  # free | enterprise | builder
     enterprise_enabled_at: Optional[datetime] = None
     enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
     employee_limit: int = 0
@@ -148,3 +148,48 @@ class SupportChatMessage(SQLModel, table=True):
     sender_role: str = Field(default="enterprise_owner", index=True)
     message: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class BuilderDocument(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    owner_id: UUID = Field(foreign_key="user.id", index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    created_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    doc_type: str = Field(default="project_overview", index=True)
+    project_name: str = ""
+    company_name: str = ""
+    client_name: str = ""
+    project_city: str = ""
+    instructions: str = ""
+    generated_text: str = ""
+    status: str = Field(default="draft", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PasswordResetToken(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    user_id: UUID = Field(foreign_key="user.id", index=True)
+    token_hash: str = Field(index=True)
+    expires_at: datetime = Field(index=True)
+    consumed_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class AppIntegrationConnection(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    enterprise_owner_id: UUID = Field(foreign_key="user.id", index=True)
+    provider_key: str = Field(index=True)  # google | microsoft | zoom
+    provider_label: str = ""
+    access_scope: str = Field(default="organization", index=True)
+    status: str = Field(default="disconnected", index=True)
+    connected_account_email: str = ""
+    encrypted_access_token: str = ""
+    encrypted_refresh_token: str = ""
+    token_expires_at: Optional[datetime] = None
+    scopes: str = ""
+    last_sync_at: Optional[datetime] = None
+    last_test_at: Optional[datetime] = None
+    last_error: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)

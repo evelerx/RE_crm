@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from ..audit import log_audit_event, redact_detail
@@ -30,6 +31,40 @@ from ..settings import apply_runtime_settings, current_env_file_path, settings
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _utc_now_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _normalize_db_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
+def _commit_or_http(session: Session, message: str) -> None:
+    try:
+        session.commit()
+    except IntegrityError as e:
+        session.rollback()
+        detail = str(getattr(e, "orig", e))
+        if "chk_user_plan" in detail:
+            raise HTTPException(status_code=400, detail="Invalid plan value for the current database constraint.") from e
+        raise HTTPException(status_code=400, detail=f"{message}: {detail}") from e
+
+
+def _bucket_label(value: datetime, grain: str) -> str:
+    if grain == "day":
+        return value.strftime("%Y-%m-%d")
+    if grain == "week":
+        iso_year, iso_week, _ = value.isocalendar()
+        return f"{iso_year}-W{iso_week:02d}"
+    if grain == "year":
+        return value.strftime("%Y")
+    return value.strftime("%Y-%m")
 
 
 def _write_env_updates(path: Path, updates: dict[str, str]) -> None:
@@ -60,6 +95,7 @@ def _runtime_config_payload() -> AdminRuntimeConfigRead:
     return AdminRuntimeConfigRead(
         env_file_path=str(current_env_file_path()),
         frontend_origin=settings.frontend_origin or "",
+        public_app_url=settings.public_app_url or "",
         openrouter_base_url=settings.openrouter_base_url or "",
         admin_email=settings.admin_email or "",
         jwt_secret_configured=(settings.jwt_secret or "").strip() not in {"", "change-me"},
@@ -70,6 +106,10 @@ def _runtime_config_payload() -> AdminRuntimeConfigRead:
         ),
         pbkdf2_rounds=int(settings.pbkdf2_rounds or 60000),
         data_encryption_key_configured=bool((settings.data_encryption_key or "").strip()),
+        razorpay_key_id_configured=bool((settings.razorpay_key_id or "").strip()),
+        razorpay_key_secret_configured=bool((settings.razorpay_key_secret or "").strip()),
+        formspree_endpoint_configured=bool((settings.formspree_endpoint or "").strip()),
+        formspree_bearer_token_configured=bool((settings.formspree_bearer_token or "").strip()),
         login_max_attempts=int(settings.login_max_attempts or 5),
         login_lockout_minutes=int(settings.login_lockout_minutes or 15),
         jwt_exp_days=int(settings.jwt_exp_days or 30),
@@ -140,13 +180,12 @@ def _enterprise_detail_payload(session: Session, owner: User) -> dict:
 def _user_email_map(session: Session, user_ids: list[UUID]) -> dict[UUID, str]:
     if not user_ids:
         return {}
-    users = session.exec(select(User).where(User.id.in_(user_ids))).all()
+    deduped_user_ids = list(dict.fromkeys(user_ids))
+    users = session.exec(select(User).where(User.id.in_(deduped_user_ids))).all()
     return {user.id: user.email for user in users}
 
 
-def _audit_row_payload(session: Session, row: AuditEvent) -> dict:
-    ids = [uid for uid in [row.actor_user_id, row.target_user_id, row.enterprise_owner_id] if uid]
-    email_by_id = _user_email_map(session, ids)
+def _audit_row_payload(row: AuditEvent, email_by_id: dict[UUID, str]) -> dict:
     actor_email = email_by_id.get(row.actor_user_id, "") if row.actor_user_id else ""
     target_email = email_by_id.get(row.target_user_id, "") if row.target_user_id else ""
     enterprise_email = email_by_id.get(row.enterprise_owner_id, "") if row.enterprise_owner_id else ""
@@ -224,6 +263,7 @@ def update_runtime_config(
         runtime_updates[name] = cleaned
 
     set_text("frontend_origin", "FRONTEND_ORIGIN", payload.frontend_origin)
+    set_text("public_app_url", "PUBLIC_APP_URL", payload.public_app_url)
     set_text("openrouter_base_url", "OPENROUTER_BASE_URL", payload.openrouter_base_url)
     if payload.admin_email is not None:
         normalized = normalize_email(payload.admin_email)
@@ -231,6 +271,10 @@ def update_runtime_config(
         runtime_updates["admin_email"] = normalized
     set_text("jwt_secret", "JWT_SECRET", payload.jwt_secret)
     set_text("data_encryption_key", "DATA_ENCRYPTION_KEY", payload.data_encryption_key)
+    set_text("razorpay_key_id", "RAZORPAY_KEY_ID", payload.razorpay_key_id)
+    set_text("razorpay_key_secret", "RAZORPAY_KEY_SECRET", payload.razorpay_key_secret)
+    set_text("formspree_endpoint", "FORMSPREE_ENDPOINT", payload.formspree_endpoint)
+    set_text("formspree_bearer_token", "FORMSPREE_BEARER_TOKEN", payload.formspree_bearer_token)
 
     if payload.pbkdf2_rounds is not None:
         env_updates["PBKDF2_ROUNDS"] = str(int(payload.pbkdf2_rounds))
@@ -271,7 +315,7 @@ def update_runtime_config(
         summary="Updated admin runtime configuration",
         detail=", ".join(sorted(env_updates.keys())) or "no_changes",
     )
-    session.commit()
+    _commit_or_http(session, "Unable to update runtime configuration")
     return _runtime_config_payload()
 
 
@@ -284,7 +328,15 @@ def security_posture(
     encryption_missing = not (settings.data_encryption_key or "").strip()
     admin_plain_password = bool((settings.admin_password or "").strip()) and not (settings.admin_password_hash or "").strip()
     weak_pbkdf = int(settings.pbkdf2_rounds or 0) < 120_000
-    locked_count = len(session.exec(select(User.id).where(User.locked_until.is_not(None)).where(User.locked_until > datetime.utcnow())).all())
+    now = _utc_now_naive()
+    locked_users = session.exec(select(User).where(User.locked_until.is_not(None))).all()
+    locked_count = len(
+        [
+            user
+            for user in locked_users
+            if (_normalize_db_datetime(getattr(user, "locked_until", None)) or now - timedelta(days=36500)) > now
+        ]
+    )
     return {
         "jwt_secret_default": jwt_default,
         "data_encryption_key_missing": encryption_missing,
@@ -313,7 +365,7 @@ def compliance_report(
     session: Session = Depends(get_session),
     _: User = Depends(require_admin),
 ):
-    now = datetime.utcnow()
+    now = _utc_now_naive()
     users = session.exec(select(User)).all()
     enterprise_owners = [user for user in users if (getattr(user, "plan", "free") or "free") == "enterprise"]
     enterprise_members = [user for user in users if getattr(user, "enterprise_owner_id", None)]
@@ -341,7 +393,13 @@ def compliance_report(
             "enterprise_members": len(enterprise_members),
             "ai_assigned_accounts": len(ai_assigned),
             "blacklisted_users": len([user for user in users if getattr(user, "is_blacklisted", False)]),
-            "locked_users": len([user for user in users if getattr(user, "locked_until", None) and user.locked_until > now]),
+            "locked_users": len(
+                [
+                    user
+                    for user in users
+                    if (_normalize_db_datetime(getattr(user, "locked_until", None)) or now - timedelta(days=36500)) > now
+                ]
+            ),
         },
         "recent_security_events": [
             {
@@ -369,13 +427,13 @@ def users(
     session: Session = Depends(get_session),
     _: User = Depends(require_admin),
 ) -> List[dict]:
-    now = datetime.utcnow()
+    now = _utc_now_naive()
     online_cutoff = now - timedelta(minutes=10)
 
     user_list = session.exec(select(User).order_by(User.created_at.desc())).all()
     out: List[dict] = []
     for u in user_list:
-        last_seen_at: Optional[datetime] = u.last_seen_at
+        last_seen_at: Optional[datetime] = _normalize_db_datetime(u.last_seen_at)
         is_online = bool(last_seen_at and last_seen_at >= online_cutoff)
 
         out.append(
@@ -418,7 +476,7 @@ def enterprise_list(
     session: Session = Depends(get_session),
     _: User = Depends(require_admin),
 ) -> list[dict]:
-    owners = session.exec(select(User).where(User.plan == "enterprise").order_by(User.created_at.desc())).all()
+    owners = session.exec(select(User).where(User.plan.in_(["enterprise", "builder"])).order_by(User.created_at.desc())).all()
     out: list[dict] = []
     for owner in owners:
         detail = _enterprise_detail_payload(session, owner)
@@ -433,8 +491,8 @@ def enterprise_detail(
     _: User = Depends(require_admin),
 ) -> dict:
     owner = session.get(User, enterprise_owner_id)
-    if not owner or (getattr(owner, "plan", "free") or "free") != "enterprise":
-        raise HTTPException(status_code=404, detail="Enterprise owner not found")
+    if not owner or (getattr(owner, "plan", "free") or "free") not in {"enterprise", "builder"}:
+        raise HTTPException(status_code=404, detail="Organization owner not found")
     return _enterprise_detail_payload(session, owner)
 
 
@@ -445,7 +503,67 @@ def audit_feed(
     _: User = Depends(require_admin),
 ) -> list[dict]:
     rows = session.exec(select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(max(1, min(limit, 200)))).all()
-    return [_audit_row_payload(session, row) for row in rows]
+    ids = [uid for row in rows for uid in [row.actor_user_id, row.target_user_id, row.enterprise_owner_id] if uid]
+    email_by_id = _user_email_map(session, ids)
+    return [_audit_row_payload(row, email_by_id) for row in rows]
+
+
+@router.get("/subscription-analytics")
+def subscription_analytics(
+    grain: str = "month",
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> dict:
+    allowed_grains = {"day", "week", "month", "year"}
+    grain = (grain or "month").strip().lower()
+    if grain not in allowed_grains:
+        raise HTTPException(status_code=400, detail="Invalid grain")
+
+    users = session.exec(select(User)).all()
+    owner_users = [user for user in users if not getattr(user, "enterprise_owner_id", None)]
+    subscription_users = [
+        user
+        for user in owner_users
+        if (getattr(user, "plan", "free") or "free") in {"enterprise", "builder"}
+    ]
+
+    activations: dict[str, dict[str, int]] = {}
+    for user in subscription_users:
+        activated_at = _normalize_db_datetime(getattr(user, "enterprise_enabled_at", None)) or _normalize_db_datetime(getattr(user, "created_at", None))
+        if not activated_at:
+            continue
+        bucket = _bucket_label(activated_at, grain)
+        plan = (getattr(user, "plan", "free") or "free").strip().lower()
+        row = activations.setdefault(bucket, {"enterprise": 0, "builder": 0, "total": 0})
+        if plan in {"enterprise", "builder"}:
+            row[plan] += 1
+            row["total"] += 1
+
+    timeline = [
+        {
+            "label": label,
+            "enterprise": values["enterprise"],
+            "builder": values["builder"],
+            "total": values["total"],
+        }
+        for label, values in sorted(activations.items())
+    ]
+
+    current_mix = {
+        "free": len([user for user in owner_users if (getattr(user, "plan", "free") or "free") == "free"]),
+        "enterprise": len([user for user in owner_users if (getattr(user, "plan", "free") or "free") == "enterprise"]),
+        "builder": len([user for user in owner_users if (getattr(user, "plan", "free") or "free") == "builder"]),
+    }
+
+    return {
+        "grain": grain,
+        "timeline": timeline,
+        "current_mix": current_mix,
+        "tracked_subscriptions": len(subscription_users),
+        "revenue_supported": False,
+        "profit_supported": False,
+        "note": "This graph is based on subscription activations and plan state. The app does not yet store payment amounts, invoice dates, refunds, or costs for revenue/profit analytics.",
+    }
 
 
 @router.post("/reset-password")
@@ -460,7 +578,7 @@ def reset_password(
         raise HTTPException(status_code=404, detail="User not found")
     user.password_hash = hash_password(payload.new_password)
     user.token_version = int(getattr(user, "token_version", 0) or 0) + 1
-    user.password_changed_at = datetime.utcnow()
+    user.password_changed_at = _utc_now_naive()
     session.add(user)
     log_audit_event(
         session,
@@ -469,7 +587,7 @@ def reset_password(
         summary=f"Reset password for {user.email}",
         target_user_id=user.id,
     )
-    session.commit()
+    _commit_or_http(session, "Unable to reset password")
     return {"reset": True, "email": user.email}
 
 
@@ -485,7 +603,7 @@ def blacklist(
         raise HTTPException(status_code=404, detail="User not found")
     user.is_blacklisted = bool(payload.blacklisted)
     user.blacklist_reason = (payload.reason or "").strip()
-    user.blacklisted_at = datetime.utcnow() if user.is_blacklisted else None
+    user.blacklisted_at = _utc_now_naive() if user.is_blacklisted else None
     user.token_version = int(getattr(user, "token_version", 0) or 0) + 1
     session.add(user)
     log_audit_event(
@@ -496,7 +614,7 @@ def blacklist(
         detail=user.blacklist_reason,
         target_user_id=user.id,
     )
-    session.commit()
+    _commit_or_http(session, "Unable to update blacklist status")
     return {"ok": True, "email": user.email, "is_blacklisted": user.is_blacklisted}
 
 
@@ -520,7 +638,7 @@ def unlock_user(
         summary=f"Unlocked account for {user.email}",
         target_user_id=user.id,
     )
-    session.commit()
+    _commit_or_http(session, "Unable to unlock user")
     return {"ok": True, "email": user.email}
 
 
@@ -537,8 +655,8 @@ def set_plan(
 
     plan = (payload.plan or "free").strip().lower()
     user.plan = plan
-    if plan == "enterprise":
-        user.enterprise_enabled_at = user.enterprise_enabled_at or datetime.utcnow()
+    if plan in {"enterprise", "builder"}:
+        user.enterprise_enabled_at = user.enterprise_enabled_at or _utc_now_naive()
         user.enterprise_owner_id = None
     else:
         employees = session.exec(select(User).where(User.enterprise_owner_id == user.id)).all()
@@ -555,7 +673,7 @@ def set_plan(
         summary=f"Set plan for {user.email} to {user.plan}",
         target_user_id=user.id,
     )
-    session.commit()
+    _commit_or_http(session, "Unable to update plan")
     return {"ok": True, "email": user.email, "plan": user.plan}
 
 
@@ -569,8 +687,8 @@ def set_employee_limit(
     user = session.exec(select(User).where(User.email == email)).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if (getattr(user, "plan", "free") or "free") != "enterprise":
-        raise HTTPException(status_code=400, detail="User is not an enterprise owner")
+    if (getattr(user, "plan", "free") or "free") not in {"enterprise", "builder"}:
+        raise HTTPException(status_code=400, detail="User is not an organization owner")
     user.employee_limit = int(payload.employee_limit)
     session.add(user)
     log_audit_event(
@@ -581,7 +699,7 @@ def set_employee_limit(
         target_user_id=user.id,
         enterprise_owner_id=user.id,
     )
-    session.commit()
+    _commit_or_http(session, "Unable to update employee limit")
     return {"ok": True, "email": user.email, "employee_limit": user.employee_limit}
 
 
@@ -610,7 +728,7 @@ def set_llm_access(
     user.llm_provider = payload.provider.strip() if enabled else ""
     user.llm_model = (payload.model.strip() or "openai/gpt-4o-mini") if enabled else ""
     user.llm_api_key = encrypt_if_configured(payload.api_key.strip()) if enabled else ""
-    user.llm_allocated_at = datetime.utcnow() if enabled else None
+    user.llm_allocated_at = _utc_now_naive() if enabled else None
     session.add(user)
     log_audit_event(
         session,
@@ -619,9 +737,9 @@ def set_llm_access(
         summary=f"{'Enabled' if enabled else 'Removed'} AI access for {user.email}",
         detail=f"provider={user.llm_provider or '-'} model={user.llm_model or '-'} key={redact_detail(payload.api_key.strip()) if enabled else 'removed'}",
         target_user_id=user.id,
-        enterprise_owner_id=user.id if (getattr(user, 'plan', 'free') or 'free') == "enterprise" else None,
+        enterprise_owner_id=user.id if (getattr(user, 'plan', 'free') or 'free') in {"enterprise", "builder"} else None,
     )
-    session.commit()
+    _commit_or_http(session, "Unable to update AI access")
     return {
         "ok": True,
         "email": user.email,
@@ -668,7 +786,7 @@ def repair_enterprise_sync(
         target_user_id=owner.id,
         enterprise_owner_id=owner.id,
     )
-    session.commit()
+    _commit_or_http(session, "Unable to repair enterprise sync")
     return _enterprise_detail_payload(session, owner)
 
 
@@ -713,6 +831,6 @@ def send_support_chat(
         target_user_id=owner.id,
         enterprise_owner_id=owner.id,
     )
-    session.commit()
+    _commit_or_http(session, "Unable to send support chat")
     session.refresh(row)
     return _chat_row_payload(session, row)

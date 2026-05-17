@@ -11,7 +11,7 @@ type AdminUserRow = {
   is_blacklisted: boolean;
   blacklist_reason: string;
   blacklisted_at: string | null;
-  plan: "free" | "enterprise";
+  plan: "free" | "enterprise" | "builder";
   enterprise_enabled_at: string | null;
   enterprise_owner_id: string;
   enterprise_member_role: string;
@@ -38,7 +38,14 @@ type EnterpriseEmployeeRow = {
   is_blacklisted: boolean;
   blacklist_reason: string;
   blacklisted_at: string | null;
-  counts: { deals: number; contacts: number; activities: number };
+  counts: {
+    deals: number;
+    closed_deals: number;
+    open_deals: number;
+    lost_deals: number;
+    contacts: number;
+    activities: number;
+  };
 };
 
 type EnterpriseDetail = {
@@ -128,6 +135,16 @@ type RuntimeConfig = {
   jwt_exp_days: number;
 };
 
+type SubscriptionAnalytics = {
+  grain: "day" | "week" | "month" | "year";
+  timeline: { label: string; enterprise: number; builder: number; total: number }[];
+  current_mix: { free: number; enterprise: number; builder: number };
+  tracked_subscriptions: number;
+  revenue_supported: boolean;
+  profit_supported: boolean;
+  note: string;
+};
+
 type FallbackEmployeeRow = EnterpriseEmployeeRow;
 
 function fmtDt(value: string | null) {
@@ -135,6 +152,15 @@ function fmtDt(value: string | null) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleString();
+}
+
+function pct(value: number, max: number) {
+  if (max <= 0) return 0;
+  return Math.max(0, Math.min(100, (value / max) * 100));
+}
+
+function formatRupees(value: number) {
+  return `₹${Math.round(value).toLocaleString("en-IN")}`;
 }
 
 function fallbackEmployeesFromUsers(rows: AdminUserRow[], selectedEnterpriseId: string): FallbackEmployeeRow[] {
@@ -151,9 +177,271 @@ function fallbackEmployeesFromUsers(rows: AdminUserRow[], selectedEnterpriseId: 
       is_blacklisted: row.is_blacklisted,
       blacklist_reason: row.blacklist_reason,
       blacklisted_at: row.blacklisted_at,
-      counts: row.counts
+      counts: {
+        deals: row.counts.deals ?? 0,
+        closed_deals: 0,
+        open_deals: row.counts.deals ?? 0,
+        lost_deals: 0,
+        contacts: row.counts.contacts ?? 0,
+        activities: row.counts.activities ?? 0
+      }
     }));
 }
+
+const demoEmployees: EnterpriseEmployeeRow[] = [
+  {
+    id: "demo-emp-broker",
+    email: "broker1@northstonecrm.com",
+    full_name: "Aarav Mehta",
+    company: "Northstone Realty",
+    role_label: "broker",
+    created_at: "2026-05-08T10:00:00Z",
+    is_blacklisted: false,
+    blacklist_reason: "",
+    blacklisted_at: null,
+    counts: { deals: 18, closed_deals: 5, open_deals: 11, lost_deals: 2, contacts: 44, activities: 26 }
+  },
+  {
+    id: "demo-emp-cp",
+    email: "cp1@northstonecrm.com",
+    full_name: "Riya Shah",
+    company: "Northstone Realty",
+    role_label: "cp",
+    created_at: "2026-05-09T11:20:00Z",
+    is_blacklisted: false,
+    blacklist_reason: "",
+    blacklisted_at: null,
+    counts: { deals: 11, closed_deals: 3, open_deals: 6, lost_deals: 2, contacts: 29, activities: 18 }
+  },
+  {
+    id: "demo-emp-employee",
+    email: "ops1@northstonecrm.com",
+    full_name: "Kabir Sethi",
+    company: "Northstone Realty",
+    role_label: "employee",
+    created_at: "2026-05-10T09:10:00Z",
+    is_blacklisted: false,
+    blacklist_reason: "",
+    blacklisted_at: null,
+    counts: { deals: 7, closed_deals: 1, open_deals: 5, lost_deals: 1, contacts: 14, activities: 21 }
+  }
+];
+
+const demoEnterprises: EnterpriseDetail[] = [
+  {
+    enterprise_owner_id: "demo-enterprise-owner",
+    owner_email: "owner@northstonecrm.com",
+    company: "Northstone Realty",
+    llm_provider: "openrouter",
+    llm_model: "openai/gpt-4o-mini",
+    llm_allocated_at: "2026-05-12T08:30:00Z",
+    has_llm_api_key: true,
+    employee_limit: 25,
+    employee_count: demoEmployees.length,
+    counts: { deals: 36, contacts: 87, activities: 65 },
+    employees: demoEmployees
+  }
+];
+
+const demoAuditRows: AuditRow[] = [
+  {
+    id: "demo-audit-1",
+    actor_user_id: "demo-owner",
+    actor_email: "owner@northstonecrm.com",
+    target_user_id: "demo-emp-broker",
+    target_email: "broker1@northstonecrm.com",
+    enterprise_owner_id: "demo-enterprise-owner",
+    enterprise_owner_email: "owner@northstonecrm.com",
+    kind: "enterprise.create_employee",
+    summary: "Created employee broker1@northstonecrm.com",
+    detail: "Role broker assigned under Northstone Realty.",
+    readable_summary: "owner@northstonecrm.com added broker1@northstonecrm.com",
+    created_at: "2026-05-14T09:45:00Z"
+  },
+  {
+    id: "demo-audit-2",
+    actor_user_id: "demo-admin",
+    actor_email: "admin@northstonecrm.com",
+    target_user_id: "demo-owner",
+    target_email: "owner@northstonecrm.com",
+    enterprise_owner_id: "demo-enterprise-owner",
+    enterprise_owner_email: "owner@northstonecrm.com",
+    kind: "admin.set-plan",
+    summary: "Enabled enterprise access for owner@northstonecrm.com",
+    detail: "Plan moved from free to enterprise for demo launch preview.",
+    readable_summary: "Admin enabled enterprise plan for owner@northstonecrm.com",
+    created_at: "2026-05-13T16:15:00Z"
+  }
+];
+
+const demoChatRows: SupportChatRow[] = [
+  {
+    id: "demo-chat-1",
+    enterprise_owner_id: "demo-enterprise-owner",
+    sender_user_id: null,
+    sender_role: "admin",
+    sender_email: "admin@northstonecrm.com",
+    message: "Welcome to the enterprise workspace. Your team setup and AI access are ready for onboarding.",
+    created_at: "2026-05-14T10:30:00Z"
+  },
+  {
+    id: "demo-chat-2",
+    enterprise_owner_id: "demo-enterprise-owner",
+    sender_user_id: "demo-owner",
+    sender_role: "enterprise_owner",
+    sender_email: "owner@northstonecrm.com",
+    message: "Thanks, we are reviewing team progress and assigning brokers today.",
+    created_at: "2026-05-14T11:00:00Z"
+  }
+];
+
+const demoSecurity: SecurityPosture = {
+  jwt_secret_default: false,
+  data_encryption_key_missing: false,
+  admin_uses_plain_password: false,
+  pbkdf2_rounds: 120000,
+  pbkdf2_rounds_weak: false,
+  login_max_attempts: 5,
+  login_lockout_minutes: 15,
+  locked_accounts: 1,
+  recommendations: [
+    "Review the one locked account and confirm it was a legitimate protection event.",
+    "Keep AI key allocation limited to enterprise owners, not member accounts."
+  ]
+};
+
+const demoCompliance: ComplianceReport = {
+  generated_at: "2026-05-14T12:00:00Z",
+  controls: {
+    jwt_secret_configured: true,
+    data_encryption_key_configured: true,
+    admin_password_hashed: true,
+    login_max_attempts: 5,
+    login_lockout_minutes: 15,
+    jwt_exp_days: 30
+  },
+  counts: {
+    users_total: 6,
+    enterprise_owners: 1,
+    enterprise_members: 3,
+    ai_assigned_accounts: 1,
+    blacklisted_users: 1,
+    locked_users: 1
+  },
+  recent_security_events: [
+    {
+      kind: "admin.blacklist",
+      summary: "Blacklisted cp2@northstonecrm.com",
+      detail: "Temporarily blocked after policy review.",
+      created_at: "2026-05-14T08:10:00Z"
+    }
+  ],
+  recent_audit_events: [
+    {
+      kind: "admin.set-llm-access",
+      summary: "Allocated AI access to owner@northstonecrm.com",
+      detail: "Model set to openai/gpt-4o-mini.",
+      created_at: "2026-05-13T15:20:00Z"
+    }
+  ]
+};
+
+const demoSubscriptionAnalytics: SubscriptionAnalytics = {
+  grain: "month",
+  timeline: [
+    { label: "Jan", enterprise: 1, builder: 0, total: 1 },
+    { label: "Feb", enterprise: 2, builder: 0, total: 2 },
+    { label: "Mar", enterprise: 2, builder: 1, total: 3 },
+    { label: "Apr", enterprise: 3, builder: 1, total: 4 },
+    { label: "May", enterprise: 4, builder: 2, total: 6 }
+  ],
+  current_mix: { free: 2, enterprise: 3, builder: 1 },
+  tracked_subscriptions: 6,
+  revenue_supported: false,
+  profit_supported: false,
+  note: "Demo preview mode: sample subscription momentum for admin validation."
+};
+
+const demoRows: AdminUserRow[] = [
+  {
+    id: "demo-admin",
+    email: "admin@northstonecrm.com",
+    created_at: "2026-05-01T08:00:00Z",
+    last_login_at: "2026-05-14T11:05:00Z",
+    last_seen_at: "2026-05-14T11:18:00Z",
+    is_online: true,
+    is_blacklisted: false,
+    blacklist_reason: "",
+    blacklisted_at: null,
+    plan: "free",
+    enterprise_enabled_at: null,
+    enterprise_owner_id: "",
+    enterprise_member_role: "",
+    employee_limit: 0,
+    llm_provider: "",
+    llm_model: "",
+    llm_allocated_at: null,
+    has_llm_api_key: false,
+    llm_access_scope: "direct",
+    login_count: 28,
+    request_count: 194,
+    locked_until: null,
+    counts: { deals: 0, contacts: 0, activities: 0 },
+    is_admin_account: true
+  },
+  {
+    id: "demo-owner",
+    email: "owner@northstonecrm.com",
+    created_at: "2026-05-02T09:10:00Z",
+    last_login_at: "2026-05-14T10:55:00Z",
+    last_seen_at: "2026-05-14T11:12:00Z",
+    is_online: true,
+    is_blacklisted: false,
+    blacklist_reason: "",
+    blacklisted_at: null,
+    plan: "enterprise",
+    enterprise_enabled_at: "2026-05-03T10:00:00Z",
+    enterprise_owner_id: "",
+    enterprise_member_role: "",
+    employee_limit: 25,
+    llm_provider: "openrouter",
+    llm_model: "openai/gpt-4o-mini",
+    llm_allocated_at: "2026-05-12T08:30:00Z",
+    has_llm_api_key: true,
+    llm_access_scope: "direct",
+    login_count: 19,
+    request_count: 132,
+    locked_until: null,
+    counts: { deals: 36, contacts: 87, activities: 65 },
+    is_admin_account: false
+  },
+  {
+    id: "demo-emp-broker",
+    email: "broker1@northstonecrm.com",
+    created_at: "2026-05-08T10:00:00Z",
+    last_login_at: "2026-05-14T09:42:00Z",
+    last_seen_at: "2026-05-14T10:15:00Z",
+    is_online: false,
+    is_blacklisted: false,
+    blacklist_reason: "",
+    blacklisted_at: null,
+    plan: "free",
+    enterprise_enabled_at: null,
+    enterprise_owner_id: "demo-enterprise-owner",
+    enterprise_member_role: "broker",
+    employee_limit: 0,
+    llm_provider: "",
+    llm_model: "",
+    llm_allocated_at: null,
+    has_llm_api_key: false,
+    llm_access_scope: "inherited_enterprise",
+    login_count: 11,
+    request_count: 58,
+    locked_until: null,
+    counts: { deals: 18, contacts: 44, activities: 26 },
+    is_admin_account: false
+  }
+];
 
 export default function AdminPage() {
   const [rows, setRows] = useState<AdminUserRow[]>([]);
@@ -161,13 +449,20 @@ export default function AdminPage() {
   const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string>("");
   const [selectedEnterprise, setSelectedEnterprise] = useState<EnterpriseDetail | null>(null);
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
+  const [auditLimit, setAuditLimit] = useState(30);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [auditListExpanded, setAuditListExpanded] = useState(false);
   const [chatRows, setChatRows] = useState<SupportChatRow[]>([]);
   const [security, setSecurity] = useState<SecurityPosture | null>(null);
   const [compliance, setCompliance] = useState<ComplianceReport | null>(null);
+  const [subscriptionAnalytics, setSubscriptionAnalytics] = useState<SubscriptionAnalytics | null>(null);
+  const [subscriptionGrain, setSubscriptionGrain] = useState<"day" | "week" | "month" | "year">("month");
   const [adminEmail, setAdminEmail] = useState("");
   const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [forceDemoPreview, setForceDemoPreview] = useState(false);
 
   const [resetEmail, setResetEmail] = useState("");
   const [resetPassword, setResetPassword] = useState("");
@@ -181,7 +476,7 @@ export default function AdminPage() {
   const [blMsg, setBlMsg] = useState<string | null>(null);
 
   const [planEmail, setPlanEmail] = useState("");
-  const [planValue, setPlanValue] = useState<"free" | "enterprise">("enterprise");
+  const [planValue, setPlanValue] = useState<"free" | "enterprise" | "builder">("enterprise");
   const [planBusy, setPlanBusy] = useState(false);
   const [planMsg, setPlanMsg] = useState<string | null>(null);
   const [unlockEmail, setUnlockEmail] = useState("");
@@ -219,6 +514,25 @@ export default function AdminPage() {
     store_admin_password_as_hash: true
   });
 
+  const hasLiveSubscriptionData = Boolean(
+    subscriptionAnalytics &&
+      (subscriptionAnalytics.tracked_subscriptions > 0 ||
+        subscriptionAnalytics.timeline.some((item) => item.total > 0))
+  );
+  const autoDemoPreview =
+    !loading &&
+    rows.length === 0 &&
+    enterprises.length === 0 &&
+    auditRows.length === 0 &&
+    !hasLiveSubscriptionData;
+  const showDemoPreview = forceDemoPreview || autoDemoPreview;
+  const displayRows = showDemoPreview ? demoRows : rows;
+  const displayEnterprises = showDemoPreview ? demoEnterprises : enterprises;
+  const displaySecurity = showDemoPreview ? demoSecurity : security;
+  const displayCompliance = showDemoPreview ? demoCompliance : compliance;
+  const displaySubscriptionAnalytics = showDemoPreview ? demoSubscriptionAnalytics : subscriptionAnalytics;
+  const displayAuditRows = showDemoPreview ? demoAuditRows : auditRows;
+
   async function loadEnterpriseDetails(nextId: string, enterpriseRows?: EnterpriseDetail[]) {
     if (!nextId) {
       setSelectedEnterprise(null);
@@ -246,24 +560,47 @@ export default function AdminPage() {
     }
   }
 
+  async function loadAuditFeed(limit = auditLimit) {
+    setAuditLoading(true);
+    setAuditError(null);
+    try {
+      const audits = await api<AuditRow[]>(`/admin/audit?limit=${limit}`);
+      setAuditRows(audits);
+      setExpandedAuditIds({});
+    } catch (e) {
+      setAuditError(e instanceof Error ? e.message : "Failed to load recent audits");
+    } finally {
+      setAuditLoading(false);
+    }
+  }
+
+  async function loadSubscriptionAnalytics(grain = subscriptionGrain) {
+    try {
+      const analytics = await api<SubscriptionAnalytics>(`/admin/subscription-analytics?grain=${grain}`);
+      setSubscriptionAnalytics(analytics);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load subscription analytics");
+    }
+  }
+
   async function load(selectedId?: string) {
     setLoading(true);
     setError(null);
     try {
-      const [users, enterpriseRows, audits, securityPosture, complianceReport, runtime] = await Promise.all([
+        const [users, enterpriseRows, securityPosture, complianceReport, runtime, subscriptionData] = await Promise.all([
         api<AdminUserRow[]>("/admin/users"),
         api<EnterpriseDetail[]>("/admin/enterprises"),
-        api<AuditRow[]>("/admin/audit?limit=30"),
         api<SecurityPosture>("/admin/security-posture"),
         api<ComplianceReport>("/admin/compliance-report"),
-        api<RuntimeConfig>("/admin/runtime-config")
+        api<RuntimeConfig>("/admin/runtime-config"),
+        api<SubscriptionAnalytics>(`/admin/subscription-analytics?grain=${subscriptionGrain}`)
       ]);
       const adminMe = await api<{ is_admin: boolean; email: string }>("/admin/me");
       setRows(users);
       setEnterprises(enterpriseRows);
-      setAuditRows(audits);
       setSecurity(securityPosture);
       setCompliance(complianceReport);
+      setSubscriptionAnalytics(subscriptionData);
       setRuntimeConfig(runtime);
       setAdminEmail(adminMe.email || "");
       setConfigForm((prev) => ({
@@ -290,6 +627,7 @@ export default function AdminPage() {
         setLimitEmail((prev) => prev || picked.owner_email);
       }
       await loadEnterpriseDetails(nextId, enterpriseRows);
+      void loadAuditFeed(auditLimit);
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) {
         setError("Admin access only. Set ADMIN_EMAIL in backend/.env to your email.");
@@ -302,16 +640,16 @@ export default function AdminPage() {
   }
 
   const selectedEnterpriseView =
-    (selectedEnterprise && selectedEnterprise.enterprise_owner_id === selectedEnterpriseId
+        (selectedEnterprise && selectedEnterprise.enterprise_owner_id === selectedEnterpriseId
       ? selectedEnterprise
       : null) ??
-    enterprises.find((enterprise) => enterprise.enterprise_owner_id === selectedEnterpriseId) ??
+    displayEnterprises.find((enterprise) => enterprise.enterprise_owner_id === selectedEnterpriseId) ??
     null;
   const selectedChatEnterpriseView =
     (selectedEnterprise && selectedEnterprise.enterprise_owner_id === chatEnterpriseId
       ? selectedEnterprise
       : null) ??
-    enterprises.find((enterprise) => enterprise.enterprise_owner_id === chatEnterpriseId) ??
+    displayEnterprises.find((enterprise) => enterprise.enterprise_owner_id === chatEnterpriseId) ??
     null;
   const selectedEnterpriseEmployees =
     (selectedEnterpriseView?.employees?.length ? selectedEnterpriseView.employees : []) ||
@@ -319,12 +657,54 @@ export default function AdminPage() {
   const selectedEnterpriseEmployeesResolved =
     selectedEnterpriseEmployees.length > 0
       ? selectedEnterpriseEmployees
-      : fallbackEmployeesFromUsers(rows, selectedEnterpriseId);
+      : fallbackEmployeesFromUsers(displayRows, selectedEnterpriseId);
+  const visibleAuditRows = auditListExpanded ? displayAuditRows : displayAuditRows.slice(0, 1);
+  const complianceBars = displayCompliance
+    ? [
+        { label: "Enterprise owners", value: displayCompliance.counts.enterprise_owners, tone: "brand" as const },
+        { label: "Enterprise members", value: displayCompliance.counts.enterprise_members, tone: "brand" as const },
+        { label: "AI assigned", value: displayCompliance.counts.ai_assigned_accounts, tone: "success" as const },
+        { label: "Blacklisted", value: displayCompliance.counts.blacklisted_users, tone: "warning" as const },
+        { label: "Locked", value: displayCompliance.counts.locked_users, tone: "warning" as const }
+      ]
+    : [];
+  const complianceBarMax = Math.max(1, ...complianceBars.map((item) => item.value));
+  const securityBars = displaySecurity
+    ? [
+        { label: "PBKDF2 rounds", value: pct(displaySecurity.pbkdf2_rounds, 180000), display: displaySecurity.pbkdf2_rounds.toLocaleString(), tone: "brand" as const },
+        { label: "Login max attempts", value: pct(displaySecurity.login_max_attempts, 10), display: String(displaySecurity.login_max_attempts), tone: "warning" as const },
+        { label: "Lockout minutes", value: pct(displaySecurity.login_lockout_minutes, 30), display: `${displaySecurity.login_lockout_minutes}m`, tone: "success" as const },
+        { label: "Locked accounts", value: pct(displaySecurity.locked_accounts, Math.max(1, displaySecurity.locked_accounts, 5)), display: String(displaySecurity.locked_accounts), tone: "warning" as const }
+      ]
+    : [];
+  const subscriptionPoints = displaySubscriptionAnalytics?.timeline ?? [];
+  const subscriptionMax = Math.max(
+    1,
+    ...subscriptionPoints.map((item) => item.total),
+    displaySubscriptionAnalytics?.tracked_subscriptions ?? 1
+  );
+  const demoEnterpriseMonthlyPrice = 20000;
+  const demoBuilderMonthlyPrice = 35000;
+  const demoEstimatedMrr = showDemoPreview && displaySubscriptionAnalytics
+    ? (displaySubscriptionAnalytics.current_mix.enterprise * demoEnterpriseMonthlyPrice) +
+      (displaySubscriptionAnalytics.current_mix.builder * demoBuilderMonthlyPrice)
+    : 0;
+  const demoEstimatedArr = demoEstimatedMrr * 12;
 
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    void loadAuditFeed(auditLimit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auditLimit]);
+
+  useEffect(() => {
+    void loadSubscriptionAnalytics(subscriptionGrain);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscriptionGrain]);
 
   return (
     <div className="page">
@@ -333,47 +713,72 @@ export default function AdminPage() {
           <div className="h1">Admin Portal</div>
           <div className="muted">Users, access, and enterprise oversight.</div>
         </div>
-        <button className="btn ghost" onClick={() => void load()} type="button">
-          Refresh
-        </button>
+        <div className="row">
+          <button className="btn ghost" onClick={() => setForceDemoPreview((value) => !value)} type="button">
+            {showDemoPreview ? "Hide demo preview" : "Show demo preview"}
+          </button>
+          <button className="btn ghost" onClick={() => void load()} type="button">
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error ? <div className="alert">{error}</div> : null}
       {loading ? <div className="muted">Loading...</div> : null}
 
-      {security ? (
+      {showDemoPreview ? <div className="alert ok">Demo preview mode is active because live admin data is still empty. These sample numbers help you validate the admin layout without changing the real database.</div> : null}
+
+      {displaySecurity ? (
         <section className="card premiumPanel">
           <div className="cardTitle">Security posture</div>
           <div className="statsGrid">
             <div className="statCard">
               <div className="statLabel">JWT secret</div>
-              <div className="statValue">{security.jwt_secret_default ? "Risk" : "Strong"}</div>
+              <div className="statValue">{displaySecurity.jwt_secret_default ? "Risk" : "Strong"}</div>
               <div className="statHint">Default JWT secrets make session forgery far easier.</div>
             </div>
             <div className="statCard">
               <div className="statLabel">Data encryption</div>
-              <div className="statValue">{security.data_encryption_key_missing ? "Missing" : "Enabled"}</div>
+              <div className="statValue">{displaySecurity.data_encryption_key_missing ? "Missing" : "Enabled"}</div>
               <div className="statHint">Sensitive profile fields and AI keys should stay encrypted at rest.</div>
             </div>
             <div className="statCard">
               <div className="statLabel">Admin password mode</div>
-              <div className="statValue">{security.admin_uses_plain_password ? "Plain" : "Hashed"}</div>
+              <div className="statValue">{displaySecurity.admin_uses_plain_password ? "Plain" : "Hashed"}</div>
               <div className="statHint">Production should run on hashed admin credentials only.</div>
             </div>
             <div className="statCard">
               <div className="statLabel">PBKDF2 rounds</div>
-              <div className="statValue">{security.pbkdf2_rounds.toLocaleString()}</div>
-              <div className="statHint">{security.pbkdf2_rounds_weak ? "Raise this further for stronger password hashing." : "Hashing rounds are in a healthier range."}</div>
+              <div className="statValue">{displaySecurity.pbkdf2_rounds.toLocaleString()}</div>
+              <div className="statHint">{displaySecurity.pbkdf2_rounds_weak ? "Raise this further for stronger password hashing." : "Hashing rounds are in a healthier range."}</div>
             </div>
             <div className="statCard">
               <div className="statLabel">Login lockout</div>
-              <div className="statValue">{security.login_max_attempts}/{security.login_lockout_minutes}m</div>
-              <div className="statHint">{security.locked_accounts} account(s) currently locked after failed-login protection.</div>
+              <div className="statValue">{displaySecurity.login_max_attempts}/{displaySecurity.login_lockout_minutes}m</div>
+              <div className="statHint">{displaySecurity.locked_accounts} account(s) currently locked after failed-login protection.</div>
             </div>
           </div>
-          {security.recommendations.length ? (
+          <div className="miniChartsGrid">
+            <div className="miniChartCard">
+              <div className="miniChartTitle">Security controls graph</div>
+              <div className="miniChartList">
+                {securityBars.map((item) => (
+                  <div key={item.label} className="miniBarRow">
+                    <div className="miniBarMeta">
+                      <span>{item.label}</span>
+                      <b>{item.display}</b>
+                    </div>
+                    <div className="miniBarTrack">
+                      <div className={`miniBarFill ${item.tone}`} style={{ width: `${item.value}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          {displaySecurity.recommendations.length ? (
             <div className="list">
-              {security.recommendations.map((item) => (
+              {displaySecurity.recommendations.map((item) => (
                 <div key={item} className="listItem">{item}</div>
               ))}
             </div>
@@ -544,57 +949,95 @@ export default function AdminPage() {
         </section>
       ) : null}
 
-      {compliance ? (
+      {displaySubscriptionAnalytics ? (
         <section className="card premiumPanel">
-          <div className="cardTitle">Compliance evidence</div>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <div className="cardTitle">Subscription trend graph</div>
+              <div className="muted small">{displaySubscriptionAnalytics.note}</div>
+            </div>
+            <label className="muted small">
+              View by
+              <select
+                value={subscriptionGrain}
+                onChange={(e) => setSubscriptionGrain((e.target.value as "day" | "week" | "month" | "year") || "month")}
+              >
+                <option value="day">Day</option>
+                <option value="week">Week</option>
+                <option value="month">Month</option>
+                <option value="year">Year</option>
+              </select>
+            </label>
+          </div>
           <div className="statsGrid">
             <div className="statCard">
-              <div className="statLabel">Users</div>
-              <div className="statValue">{compliance.counts.users_total}</div>
-              <div className="statHint">{compliance.counts.enterprise_owners} enterprise owners, {compliance.counts.enterprise_members} enterprise members.</div>
+              <div className="statLabel">Tracked subscriptions</div>
+              <div className="statValue">{displaySubscriptionAnalytics.tracked_subscriptions}</div>
+              <div className="statHint">Enterprise and builder owner activations tracked in the current database.</div>
             </div>
             <div className="statCard">
-              <div className="statLabel">Protected AI</div>
-              <div className="statValue">{compliance.counts.ai_assigned_accounts}</div>
-              <div className="statHint">Accounts with centrally managed AI access.</div>
+              <div className="statLabel">Current free</div>
+              <div className="statValue">{displaySubscriptionAnalytics.current_mix.free}</div>
+              <div className="statHint">Owner accounts currently on the free plan.</div>
             </div>
             <div className="statCard">
-              <div className="statLabel">Restricted</div>
-              <div className="statValue">{compliance.counts.blacklisted_users + compliance.counts.locked_users}</div>
-              <div className="statHint">{compliance.counts.blacklisted_users} blacklisted, {compliance.counts.locked_users} temporarily locked.</div>
+              <div className="statLabel">Current enterprise</div>
+              <div className="statValue">{displaySubscriptionAnalytics.current_mix.enterprise}</div>
+              <div className="statHint">Owner accounts currently on enterprise.</div>
             </div>
             <div className="statCard">
-              <div className="statLabel">Session lifetime</div>
-              <div className="statValue">{compliance.controls.jwt_exp_days}d</div>
-              <div className="statHint">Token expiry window currently configured.</div>
+              <div className="statLabel">Current builder</div>
+              <div className="statValue">{displaySubscriptionAnalytics.current_mix.builder}</div>
+              <div className="statHint">Owner accounts currently on builder.</div>
             </div>
           </div>
-          <div className="muted small">Generated {fmtDt(compliance.generated_at)}</div>
-          <div className="tableWrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Recent security event</th>
-                  <th>Detail</th>
-                  <th>When</th>
-                </tr>
-              </thead>
-              <tbody>
-                {compliance.recent_security_events.map((item, idx) => (
-                  <tr key={`${item.kind}-${item.created_at}-${idx}`}>
-                    <td className="tdTitle">{item.summary}</td>
-                    <td>{item.detail || "-"}</td>
-                    <td>{fmtDt(item.created_at)}</td>
-                  </tr>
-                ))}
-                {compliance.recent_security_events.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="muted">No recent security events.</td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+          <div className="miniChartsGrid">
+            <div className="miniChartCard">
+              <div className="miniChartTitle">Subscription sales over time</div>
+              {subscriptionPoints.length === 0 ? (
+                <div className="muted">No subscription activations have been recorded yet.</div>
+              ) : (
+                <div className="miniChartList">
+                  {subscriptionPoints.map((point) => (
+                    <div key={point.label} className="miniBarRow">
+                      <div className="miniBarMeta">
+                        <span>{point.label}</span>
+                        <b>{point.total} total</b>
+                      </div>
+                      <div className="miniBarTrack">
+                        <div className="miniBarFill brand" style={{ width: `${pct(point.total, subscriptionMax)}%` }} />
+                      </div>
+                      <div className="muted small">
+                        Enterprise: {point.enterprise} | Builder: {point.builder}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {showDemoPreview ? (
+              <div className="miniChartCard">
+                <div className="miniChartTitle">Estimated billing preview</div>
+                <div className="list">
+                  <div className="listItem">
+                    <div className="statLabel">Estimated MRR</div>
+                    <div className="statValue">{formatRupees(demoEstimatedMrr)}</div>
+                    <div className="statHint">Sample assumption only for presentation: Enterprise {formatRupees(demoEnterpriseMonthlyPrice)}/month, Builder {formatRupees(demoBuilderMonthlyPrice)}/month.</div>
+                  </div>
+                  <div className="listItem">
+                    <div className="statLabel">Estimated ARR</div>
+                    <div className="statValue">{formatRupees(demoEstimatedArr)}</div>
+                    <div className="statHint">This preview helps validate the admin layout only. It is not connected to real billing or payment records.</div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
+          {!showDemoPreview && (!displaySubscriptionAnalytics.revenue_supported || !displaySubscriptionAnalytics.profit_supported) ? (
+            <div className="muted small">
+              Billing revenue and net profit reporting will appear here after real payment records, charge timestamps, refund events, and operating cost data are stored.
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -723,8 +1166,8 @@ export default function AdminPage() {
       </section>
 
       <section className="card">
-        <div className="cardTitle">Enterprise access</div>
-        <div className="muted">Grant enterprise mode to an owner account, or return it to a regular free account.</div>
+        <div className="cardTitle">Organization access</div>
+        <div className="muted">Grant enterprise or builder mode to an owner account, or return it to a regular free account.</div>
         <form
           className="form"
           onSubmit={async (e) => {
@@ -737,7 +1180,13 @@ export default function AdminPage() {
                 method: "POST",
                 body: JSON.stringify({ email: planEmail, plan: planValue })
               });
-              setPlanMsg(planValue === "enterprise" ? "Enterprise enabled." : "Enterprise disabled.");
+              setPlanMsg(
+                planValue === "enterprise"
+                  ? "Enterprise enabled."
+                  : planValue === "builder"
+                    ? "Builder subscription enabled."
+                    : "Organization mode removed."
+              );
               await load();
             } catch (err) {
               setPlanMsg(err instanceof Error ? err.message : "Action failed");
@@ -753,8 +1202,16 @@ export default function AdminPage() {
             </label>
             <label>
               Plan
-              <select value={planValue} onChange={(e) => setPlanValue(e.target.value === "free" ? "free" : "enterprise")}>
+              <select
+                value={planValue}
+                onChange={(e) =>
+                  setPlanValue(
+                    e.target.value === "free" ? "free" : e.target.value === "builder" ? "builder" : "enterprise"
+                  )
+                }
+              >
                 <option value="enterprise">Enterprise</option>
+                <option value="builder">Builder / Construction</option>
                 <option value="free">Free</option>
               </select>
             </label>
@@ -767,8 +1224,8 @@ export default function AdminPage() {
       </section>
 
       <section className="card">
-        <div className="cardTitle">Set enterprise employee limit</div>
-        <div className="muted">This controls how many broker / CP / employee IDs an enterprise owner can create.</div>
+        <div className="cardTitle">Set organization employee limit</div>
+        <div className="muted">This controls how many broker / CP / employee IDs an enterprise or builder owner can create.</div>
         <form
           className="form"
           onSubmit={async (e) => {
@@ -792,7 +1249,7 @@ export default function AdminPage() {
         >
           <div className="grid2">
             <label>
-              Enterprise owner email
+              Organization owner email
               <input value={limitEmail} onChange={(e) => setLimitEmail(e.target.value)} placeholder="owner@example.com" list="admin-user-emails" />
             </label>
             <label>
@@ -809,7 +1266,7 @@ export default function AdminPage() {
 
       <section className="card">
         <div className="cardTitle">Allocate AI key</div>
-        <div className="muted">Assign one API key to a solo user, to yourself as admin, or to an enterprise owner. Enterprise underlings inherit the owner allocation automatically.</div>
+        <div className="muted">Assign one API key to a solo user, to yourself as admin, or to an enterprise / builder owner. Team underlings inherit the owner allocation automatically.</div>
         <form
           className="form"
           onSubmit={async (e) => {
@@ -845,7 +1302,7 @@ export default function AdminPage() {
               <datalist id="admin-user-emails">
                 {rows.map((row) => (
                   <option key={row.id} value={row.email}>
-                    {row.is_admin_account ? "Admin" : row.enterprise_owner_id ? "Enterprise member" : row.plan === "enterprise" ? "Enterprise owner" : "Solo user"}
+                    {row.is_admin_account ? "Admin" : row.enterprise_owner_id ? "Organization member" : row.plan === "builder" ? "Builder owner" : row.plan === "enterprise" ? "Enterprise owner" : "Solo user"}
                   </option>
                 ))}
               </datalist>
@@ -883,7 +1340,7 @@ export default function AdminPage() {
               </button>
             ) : null}
           </div>
-          <div className="muted small">Do not assign keys to enterprise employee IDs directly. Give the key to the enterprise owner account and their whole team will inherit it.</div>
+          <div className="muted small">Do not assign keys to employee IDs directly. Give the key to the enterprise or builder owner account and their whole team will inherit it.</div>
           {llmMsg ? <div className="alert ok">{llmMsg}</div> : null}
           <button className="btn" type="submit" disabled={llmBusy || !llmEmail.trim() || (llmEnabled && !llmApiKey.trim())}>
             {llmBusy ? "Saving..." : llmEnabled ? "Save AI access" : "Remove AI access"}
@@ -901,25 +1358,27 @@ export default function AdminPage() {
               onChange={async (e) => {
                 const nextId = e.target.value;
                 setSelectedEnterpriseId(nextId);
-                const picked = enterprises.find((enterprise) => enterprise.enterprise_owner_id === nextId) ?? null;
+                const picked = displayEnterprises.find((enterprise) => enterprise.enterprise_owner_id === nextId) ?? null;
                 if (picked) {
                   setSelectedEnterprise(picked);
                   setLlmEmail(picked.owner_email);
                   setLimitEmail(picked.owner_email);
                 }
-                try {
-                  await loadEnterpriseDetails(nextId);
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : "Failed to load enterprise details");
+                if (!showDemoPreview) {
+                  try {
+                    await loadEnterpriseDetails(nextId);
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Failed to load enterprise details");
+                  }
                 }
               }}
             >
-              {enterprises.map((enterprise) => (
+              {displayEnterprises.map((enterprise) => (
                 <option key={enterprise.enterprise_owner_id} value={enterprise.enterprise_owner_id}>
                   {enterprise.owner_email}
                 </option>
               ))}
-              {enterprises.length === 0 ? <option value="">No enterprise owners yet</option> : null}
+              {displayEnterprises.length === 0 ? <option value="">No enterprise owners yet</option> : null}
             </select>
           </label>
           {selectedEnterpriseView ? (
@@ -956,36 +1415,40 @@ export default function AdminPage() {
                 <div>
                   <b>AI assigned at:</b> {fmtDt(selectedEnterpriseView.llm_allocated_at ?? null)}
                 </div>
-                <div className="row" style={{ marginTop: 10 }}>
-                  <button className="btn ghost" type="button" onClick={() => setLlmEmail(selectedEnterpriseView.owner_email)}>
-                    Use for AI key form
-                  </button>
-                  <button className="btn ghost" type="button" onClick={() => setLimitEmail(selectedEnterpriseView.owner_email)}>
-                    Use for limit form
-                  </button>
-                  <button
-                    className="btn ghost"
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const repaired = await api<EnterpriseDetail>(`/admin/repair-enterprise-sync/${selectedEnterpriseView.enterprise_owner_id}`, {
-                          method: "POST"
-                        });
-                        setSelectedEnterprise(repaired);
-                        setEnterprises((prev) =>
-                          prev.map((enterprise) =>
-                            enterprise.enterprise_owner_id === repaired.enterprise_owner_id ? repaired : enterprise
-                          )
-                        );
-                        await loadEnterpriseDetails(selectedEnterpriseView.enterprise_owner_id);
-                      } catch (err) {
-                        setError(err instanceof Error ? err.message : "Failed to repair enterprise sync");
-                      }
-                    }}
-                  >
-                    Repair employee sync
-                  </button>
-                </div>
+                {showDemoPreview ? (
+                  <div className="alert ok" style={{ marginTop: 10 }}>Demo enterprise preview only. Live enterprise actions will appear here once real owner accounts are created.</div>
+                ) : (
+                  <div className="row" style={{ marginTop: 10 }}>
+                    <button className="btn ghost" type="button" onClick={() => setLlmEmail(selectedEnterpriseView.owner_email)}>
+                      Use for AI key form
+                    </button>
+                    <button className="btn ghost" type="button" onClick={() => setLimitEmail(selectedEnterpriseView.owner_email)}>
+                      Use for limit form
+                    </button>
+                    <button
+                      className="btn ghost"
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const repaired = await api<EnterpriseDetail>(`/admin/repair-enterprise-sync/${selectedEnterpriseView.enterprise_owner_id}`, {
+                            method: "POST"
+                          });
+                          setSelectedEnterprise(repaired);
+                          setEnterprises((prev) =>
+                            prev.map((enterprise) =>
+                              enterprise.enterprise_owner_id === repaired.enterprise_owner_id ? repaired : enterprise
+                            )
+                          );
+                          await loadEnterpriseDetails(selectedEnterpriseView.enterprise_owner_id);
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : "Failed to repair enterprise sync");
+                        }
+                      }}
+                    >
+                      Repair employee sync
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -1006,6 +1469,9 @@ export default function AdminPage() {
                 <th>Role</th>
                 <th>Status</th>
                 <th>Deals</th>
+                <th>Closed</th>
+                <th>Open</th>
+                <th>Lost</th>
                 <th>Contacts</th>
                 <th>Activities</th>
                 <th>Created</th>
@@ -1020,6 +1486,9 @@ export default function AdminPage() {
                   <td>{employee.role_label}</td>
                   <td>{employee.is_blacklisted ? `Blacklisted${employee.blacklist_reason ? `: ${employee.blacklist_reason}` : ""}` : "Active"}</td>
                   <td>{employee.counts.deals}</td>
+                  <td>{employee.counts.closed_deals ?? 0}</td>
+                  <td>{employee.counts.open_deals ?? 0}</td>
+                  <td>{employee.counts.lost_deals ?? 0}</td>
                   <td>{employee.counts.contacts}</td>
                   <td>{employee.counts.activities}</td>
                   <td>{fmtDt(employee.created_at)}</td>
@@ -1027,7 +1496,7 @@ export default function AdminPage() {
               ))}
               {!selectedEnterpriseEmployeesResolved.length && !loading ? (
                 <tr>
-                  <td colSpan={9} className="muted">
+                  <td colSpan={12} className="muted">
                     No employees under this enterprise yet.
                   </td>
                 </tr>
@@ -1049,18 +1518,20 @@ export default function AdminPage() {
                 setChatEnterpriseId(nextId);
                 if (nextId) setSelectedEnterpriseId(nextId);
                 try {
-                  await loadEnterpriseDetails(nextId);
+                  if (!showDemoPreview) {
+                    await loadEnterpriseDetails(nextId);
+                  }
                 } catch (err) {
                   setError(err instanceof Error ? err.message : "Failed to load private conversation");
                 }
               }}
             >
-              {enterprises.map((enterprise) => (
+              {displayEnterprises.map((enterprise) => (
                 <option key={enterprise.enterprise_owner_id} value={enterprise.enterprise_owner_id}>
                   {enterprise.owner_email}
                 </option>
               ))}
-              {enterprises.length === 0 ? <option value="">No enterprise owners yet</option> : null}
+              {displayEnterprises.length === 0 ? <option value="">No enterprise owners yet</option> : null}
             </select>
           </label>
           {selectedChatEnterpriseView ? (
@@ -1090,8 +1561,8 @@ export default function AdminPage() {
               Messages here are only between admin and {selectedChatEnterpriseView.owner_email}.
             </div>
             <div className="chatList">
-              {chatRows.length === 0 ? <div className="muted">No conversation yet.</div> : null}
-              {chatRows.map((item) => (
+              {(showDemoPreview ? demoChatRows : chatRows).length === 0 ? <div className="muted">No conversation yet.</div> : null}
+              {(showDemoPreview ? demoChatRows : chatRows).map((item) => (
                 <div key={item.id} className={`chatBubble ${item.sender_role === "admin" ? "chatBubbleAdmin" : ""}`}>
                   <div className="chatMeta">
                     <b>{item.sender_role === "admin" ? "Admin" : "Enterprise owner"}</b>
@@ -1102,6 +1573,7 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+            {!showDemoPreview ? (
             <form
               className="form"
               onSubmit={async (e) => {
@@ -1131,17 +1603,44 @@ export default function AdminPage() {
                 {chatBusy ? "Sending..." : "Send message"}
               </button>
             </form>
+            ) : (
+              <div className="muted small">Demo conversation preview only. Live admin-to-enterprise messaging appears here once real enterprise owners are active.</div>
+            )}
           </>
         )}
       </section>
 
       <section className="card">
-        <div className="cardTitle">Recent audit feed</div>
-        {auditRows.length === 0 ? (
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
+          <div className="cardTitle">Recent audit feed</div>
+          <div className="row">
+            <label className="muted small">
+              Show
+              <select value={auditLimit} onChange={(e) => setAuditLimit(Number(e.target.value) || 30)}>
+                <option value={10}>10 logs</option>
+                <option value={30}>30 logs</option>
+                <option value={50}>50 logs</option>
+                <option value={100}>100 logs</option>
+              </select>
+            </label>
+            <button className="btn ghost" type="button" onClick={() => void loadAuditFeed(auditLimit)} disabled={auditLoading}>
+              {auditLoading ? "Loading..." : "Reload logs"}
+            </button>
+            {displayAuditRows.length > 1 ? (
+              <button className="btn ghost" type="button" onClick={() => setAuditListExpanded((value) => !value)}>
+                {auditListExpanded ? "Show less" : `Show all ${displayAuditRows.length}`}
+              </button>
+            ) : null}
+          </div>
+        </div>
+        {auditError ? <div className="alert">{auditError}</div> : null}
+        {auditLoading && displayAuditRows.length === 0 ? (
+          <div className="muted">Loading recent audit logs...</div>
+        ) : !auditLoading && displayAuditRows.length === 0 ? (
           <div className="muted">No tracked admin or enterprise actions yet.</div>
         ) : (
           <div className="list">
-            {auditRows.map((item) => (
+            {visibleAuditRows.map((item) => (
               <div key={item.id} className="listItem auditItem">
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" }}>
                   <div className="grow">
@@ -1179,6 +1678,78 @@ export default function AdminPage() {
         )}
       </section>
 
+      {displayCompliance ? (
+        <section className="card premiumPanel">
+          <div className="cardTitle">Compliance evidence</div>
+          <div className="statsGrid">
+            <div className="statCard">
+              <div className="statLabel">Users</div>
+              <div className="statValue">{displayCompliance.counts.users_total}</div>
+              <div className="statHint">{displayCompliance.counts.enterprise_owners} enterprise owners, {displayCompliance.counts.enterprise_members} enterprise members.</div>
+            </div>
+            <div className="statCard">
+              <div className="statLabel">Protected AI</div>
+              <div className="statValue">{displayCompliance.counts.ai_assigned_accounts}</div>
+              <div className="statHint">Accounts with centrally managed AI access.</div>
+            </div>
+            <div className="statCard">
+              <div className="statLabel">Restricted</div>
+              <div className="statValue">{displayCompliance.counts.blacklisted_users + displayCompliance.counts.locked_users}</div>
+              <div className="statHint">{displayCompliance.counts.blacklisted_users} blacklisted, {displayCompliance.counts.locked_users} temporarily locked.</div>
+            </div>
+            <div className="statCard">
+              <div className="statLabel">Session lifetime</div>
+              <div className="statValue">{displayCompliance.controls.jwt_exp_days}d</div>
+              <div className="statHint">Token expiry window currently configured.</div>
+            </div>
+          </div>
+          <div className="miniChartsGrid">
+            <div className="miniChartCard">
+              <div className="miniChartTitle">Account mix graph</div>
+              <div className="miniChartList">
+                {complianceBars.map((item) => (
+                  <div key={item.label} className="miniBarRow">
+                    <div className="miniBarMeta">
+                      <span>{item.label}</span>
+                      <b>{item.value}</b>
+                    </div>
+                    <div className="miniBarTrack">
+                      <div className={`miniBarFill ${item.tone}`} style={{ width: `${pct(item.value, complianceBarMax)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="muted small">Generated {fmtDt(displayCompliance.generated_at)}</div>
+          <div className="tableWrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Recent security event</th>
+                  <th>Detail</th>
+                  <th>When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayCompliance.recent_security_events.map((item, idx) => (
+                  <tr key={`${item.kind}-${item.created_at}-${idx}`}>
+                    <td className="tdTitle">{item.summary}</td>
+                    <td>{item.detail || "-"}</td>
+                    <td>{fmtDt(item.created_at)}</td>
+                  </tr>
+                ))}
+                {displayCompliance.recent_security_events.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="muted">No recent security events.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
       <div className="tableWrap">
         <table className="table">
           <thead>
@@ -1204,7 +1775,7 @@ export default function AdminPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {displayRows.map((r) => (
               <tr key={r.id}>
                 <td className="tdTitle">{r.email}</td>
                 <td>{r.is_admin_account ? "Admin" : r.enterprise_owner_id ? "Enterprise member" : r.plan === "enterprise" ? "Enterprise owner" : "Solo user"}</td>
@@ -1232,7 +1803,7 @@ export default function AdminPage() {
                 <td>{r.counts.activities}</td>
               </tr>
             ))}
-            {rows.length === 0 && !loading ? (
+            {displayRows.length === 0 && !loading ? (
               <tr>
                 <td colSpan={17} className="muted">
                   No users yet.

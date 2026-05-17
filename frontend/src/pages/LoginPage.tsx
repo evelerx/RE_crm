@@ -12,6 +12,12 @@ type LoginResponse = {
   enterprise_owner_id?: string | null;
 };
 
+type ForgotPasswordResponse = {
+  ok: boolean;
+  message: string;
+  preview_reset_url?: string;
+};
+
 export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const backend = useBackendStatus();
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -22,6 +28,15 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [hint, setHint] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotBusy, setForgotBusy] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState<string | null>(null);
+  const [previewResetUrl, setPreviewResetUrl] = useState<string | null>(null);
+  const [resetOpen, setResetOpen] = useState(() => Boolean(new URLSearchParams(window.location.search).get("reset_token")));
+  const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get("reset_token") ?? "");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
 
   const canSubmit = backend.status === "up" && email.trim().includes("@") && password.length >= 8 && !busy;
 
@@ -31,7 +46,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
         <div className="brand">
           <div className="logo" />
           <div>
-            <div className="brandTitle">Deal Intelligence OS</div>
+            <div className="brandTitle">Northstone</div>
             <div className="brandSub">Secure sign-in for your pipeline, reporting, and team workflows.</div>
           </div>
         </div>
@@ -143,18 +158,118 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
           <button className="linkBtn" type="button" onClick={() => setForgotOpen(true)}>
             Forgot password?
           </button>
+          {resetToken ? (
+            <button className="linkBtn" type="button" onClick={() => setResetOpen(true)}>
+              Open reset password form
+            </button>
+          ) : null}
         </form>
       </div>
 
       <Modal title="Forgot password" open={forgotOpen} onClose={() => setForgotOpen(false)}>
         <div className="form">
-          <div className="muted">Password recovery is currently handled by the admin team.</div>
-          <div className="muted">
-            Share your login email with the admin, get a reset completed, then return here and sign in with the new password.
-          </div>
+          <div className="muted">Enter your login email and we will start the password reset process for that account.</div>
+          <label>
+            Login email
+            <input value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+          </label>
+          {forgotMsg ? <div className="alert ok">{forgotMsg}</div> : null}
+          {previewResetUrl ? (
+            <div className="alert ok">
+              Test reset link:
+              <div className="muted small" style={{ marginTop: 8, wordBreak: "break-all" }}>{previewResetUrl}</div>
+            </div>
+          ) : null}
           <div className="row right">
+            <button
+              className="btn ghost"
+              type="button"
+              onClick={() => {
+                setForgotOpen(false);
+                setResetOpen(true);
+              }}
+            >
+              I already have a reset link
+            </button>
+            <button
+              className="btn"
+              type="button"
+              disabled={forgotBusy || !forgotEmail.trim().includes("@")}
+              onClick={async () => {
+                setForgotBusy(true);
+                setForgotMsg(null);
+                setPreviewResetUrl(null);
+                try {
+                  const resp = await api<ForgotPasswordResponse>("/auth/forgot-password", {
+                    method: "POST",
+                    body: JSON.stringify({ email: forgotEmail })
+                  });
+                  setForgotMsg(resp.message);
+                  setPreviewResetUrl(resp.preview_reset_url ?? null);
+                } catch (err) {
+                  setForgotMsg(err instanceof Error ? err.message : "Could not start password reset");
+                } finally {
+                  setForgotBusy(false);
+                }
+              }}
+            >
+              {forgotBusy ? "Please wait..." : "Request reset"}
+            </button>
             <button className="btn" type="button" onClick={() => setForgotOpen(false)}>
               OK
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal title="Reset password" open={resetOpen} onClose={() => setResetOpen(false)}>
+        <div className="form">
+          <div className="muted">Paste the reset token from your reset link, then choose a new password.</div>
+          <label>
+            Reset token
+            <input value={resetToken} onChange={(e) => setResetToken(e.target.value.trim())} placeholder="Paste reset token" />
+          </label>
+          <label>
+            New password
+            <input
+              value={resetPassword}
+              onChange={(e) => setResetPassword(e.target.value)}
+              type="password"
+              placeholder="Minimum 8 characters"
+              autoComplete="new-password"
+            />
+          </label>
+          {resetMsg ? <div className="alert ok">{resetMsg}</div> : null}
+          <div className="row right">
+            <button
+              className="btn"
+              type="button"
+              disabled={resetBusy || !resetToken.trim() || resetPassword.length < 8}
+              onClick={async () => {
+                setResetBusy(true);
+                setResetMsg(null);
+                try {
+                  const resp = await api<{ ok: boolean; message: string }>("/auth/reset-password", {
+                    method: "POST",
+                    body: JSON.stringify({ token: resetToken, new_password: resetPassword })
+                  });
+                  setResetMsg(resp.message);
+                  setPassword("");
+                  setResetPassword("");
+                  setResetOpen(false);
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete("reset_token");
+                  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+                  setResetToken("");
+                  setMode("login");
+                } catch (err) {
+                  setResetMsg(err instanceof Error ? err.message : "Could not reset password");
+                } finally {
+                  setResetBusy(false);
+                }
+              }}
+            >
+              {resetBusy ? "Saving..." : "Reset password"}
             </button>
           </div>
         </div>

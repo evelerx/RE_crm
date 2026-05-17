@@ -6,8 +6,8 @@ Create Date: 2026-03-26
 
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "20260326_0001"
 down_revision = None
@@ -17,6 +17,12 @@ depends_on = None
 
 def upgrade() -> None:
     # This migration is intended for NEW databases.
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_tables = set(inspector.get_table_names())
+    if "user" in existing_tables:
+        return
+
     op.create_table(
         "user",
         sa.Column("id", sa.String(), primary_key=True),
@@ -110,4 +116,3 @@ def downgrade() -> None:
     op.drop_index("ix_user_id", table_name="user")
     op.drop_index("ix_user_email", table_name="user")
     op.drop_table("user")
-

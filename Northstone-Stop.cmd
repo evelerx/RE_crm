@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-REM Deal Intelligence OS - Stop helper (double-click)
+REM Northstone - Stop helper (double-click)
 REM Kills dev servers listening on default ports.
 REM Pass /quiet to suppress output.
 

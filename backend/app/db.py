@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlmodel import Session, SQLModel, create_engine
 from sqlalchemy import text
+from sqlalchemy.pool import NullPool
+from sqlmodel import Session, SQLModel, create_engine
 
 from .enterprise_scope import normalize_existing_enterprise_data
 from .settings import app_base_dir, settings
@@ -27,7 +28,7 @@ def _resolve_database_url() -> str:
     base = app_base_dir()
     data_dir = base / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
-    target_db = data_dir / "dealios.db"
+    target_db = data_dir / "northstonecrm.db"
 
     # If user provided an absolute sqlite path, keep it.
     raw_path = _sqlite_path_from_url(url) or ""
@@ -37,8 +38,10 @@ def _resolve_database_url() -> str:
 
     # Migrate from legacy locations if present.
     legacy_candidates: list[Path] = []
+    legacy_candidates.append(base / "northstonecrm.db")  # backend/northstonecrm.db
     legacy_candidates.append(base / "dealios.db")  # backend/dealios.db
     try:
+        legacy_candidates.append(Path.cwd() / "northstonecrm.db")  # where server was started
         legacy_candidates.append(Path.cwd() / "dealios.db")  # where server was started
     except Exception:
         pass
@@ -62,9 +65,10 @@ engine_kwargs: dict = {"echo": False}
 if DATABASE_URL.startswith("sqlite"):
     engine_kwargs["connect_args"] = {"check_same_thread": False}
 else:
-    # Cloud Postgres connections are longer lived and benefit from liveness checks.
-    engine_kwargs["pool_pre_ping"] = True
-    engine_kwargs["pool_recycle"] = 300
+    # Supabase transaction poolers behave best without app-side pooling or prepared statements.
+    if "pooler.supabase.com" in DATABASE_URL:
+        engine_kwargs["poolclass"] = NullPool
+    engine_kwargs["connect_args"] = {"prepare_threshold": None}
 
 engine = create_engine(DATABASE_URL, **engine_kwargs)
 
@@ -210,8 +214,51 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "user", "llm_allocated_at DATETIME")
 
 
+def _postgres_best_effort_migrate() -> None:
+    if DATABASE_URL.startswith("sqlite"):
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                  IF to_regclass('"user"') IS NULL THEN
+                    RETURN;
+                  END IF;
+
+                  UPDATE "user"
+                  SET plan = 'enterprise'
+                  WHERE lower(coalesce(plan, '')) = 'pro';
+
+                  UPDATE "user"
+                  SET plan = 'free'
+                  WHERE btrim(coalesce(plan, '')) = '';
+
+                  IF EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'chk_user_plan'
+                      AND conrelid = '"user"'::regclass
+                  ) THEN
+                    ALTER TABLE "user" DROP CONSTRAINT chk_user_plan;
+                  END IF;
+
+                  ALTER TABLE "user"
+                  ADD CONSTRAINT chk_user_plan
+                  CHECK (plan IN ('free', 'enterprise', 'builder'));
+                EXCEPTION
+                  WHEN duplicate_object THEN NULL;
+                END
+                $$;
+                """
+            )
+        )
+
+
 def init_db() -> None:
     _sqlite_best_effort_migrate()
+    _postgres_best_effort_migrate()
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         normalize_existing_enterprise_data(session)

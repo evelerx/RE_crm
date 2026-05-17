@@ -1,6 +1,6 @@
-# Deal Intelligence OS
+# Northstone CRM
 
-This repo contains a minimal **Deal Intelligence OS** MVP:
+This repo contains a minimal **Northstone CRM** MVP:
 
 - `backend/`: FastAPI + SQLModel API
 - `frontend/`: Responsive React PWA (Pipeline / Grid / Deal detail / ROI)
@@ -8,8 +8,8 @@ This repo contains a minimal **Deal Intelligence OS** MVP:
 ## One-click start (Windows)
 
 Double-click:
-- `DealOS-Start.cmd`
-- `DealOS-Stop.cmd` (if ports are stuck/in use)
+- `Northstone-Start.cmd`
+- `Northstone-Stop.cmd` (if ports are stuck/in use)
 
 It opens 2 terminal windows (backend + frontend) and then opens `http://localhost:5173`.
 
@@ -31,7 +31,7 @@ Backend runs on `http://localhost:8000`.
 ### Login (email -> token)
 
 - Open the frontend and sign up / sign in using email + password.
-- In local mode, data is stored in `backend/data/dealios.db` unless `DATABASE_URL` is set to Postgres.
+- In local mode, data is stored in `backend/data/northstonecrm.db` unless `DATABASE_URL` is set to Postgres.
 
 ### Frontend
 
@@ -60,7 +60,7 @@ This project now includes **Alembic migrations** in `backend/alembic/`.
   - `alembic -c alembic.ini upgrade head`
   - start backend normally
 - Existing database (already created by running the app before):
-  - keep using it at `backend/data/dealios.db`
+  - keep using it at `backend/data/northstonecrm.db`
   - when you add new migrations later, run:
     - `cd backend`
     - `alembic -c alembic.ini upgrade head`
@@ -69,7 +69,7 @@ Rule for big updates: deploy code that is backward compatible first, then run mi
 
 ## Database location
 
-- Current DB: `backend/data/dealios.db`
+- Current DB: `backend/data/northstonecrm.db`
 - If you have older `dealios.db` files in other folders, the backend will try a best-effort copy into `backend/data/` on startup.
 
 ## Production setup: Supabase + Vercel
@@ -110,7 +110,7 @@ Important:
 Set these backend environment variables in Vercel:
 
 ```env
-APP_NAME="Deal Intelligence OS"
+APP_NAME="Northstone"
 JWT_SECRET="your-long-random-secret"
 DATABASE_URL="postgresql+psycopg://postgres.your-project-ref:your-password@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require"
 FRONTEND_ORIGIN="https://your-frontend-project.vercel.app"

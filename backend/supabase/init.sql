@@ -1,4 +1,4 @@
--- Deal Intelligence OS
+-- Northstone
 -- Supabase Postgres bootstrap SQL
 -- Run this in Supabase SQL Editor before pointing the backend at Supabase.
 
@@ -32,6 +32,25 @@ create table if not exists "user" (
   llm_model varchar not null default '',
   llm_allocated_at timestamptz
 );
+
+do $$
+begin
+  if exists (
+    select 1
+    from pg_constraint
+    where conname = 'chk_user_plan'
+      and conrelid = '"user"'::regclass
+  ) then
+    alter table "user" drop constraint chk_user_plan;
+  end if;
+
+  alter table "user"
+  add constraint chk_user_plan
+  check (plan in ('free', 'enterprise', 'builder'));
+exception
+  when duplicate_object then null;
+end
+$$;
 
 create index if not exists ix_user_email on "user"(email);
 create index if not exists ix_user_enterprise_owner_id on "user"(enterprise_owner_id);
@@ -179,3 +198,27 @@ create index if not exists ix_supportchatmessage_enterprise_owner_id on supportc
 create index if not exists ix_supportchatmessage_sender_user_id on supportchatmessage(sender_user_id);
 create index if not exists ix_supportchatmessage_sender_role on supportchatmessage(sender_role);
 create index if not exists ix_supportchatmessage_created_at on supportchatmessage(created_at);
+
+create table if not exists builderdocument (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references "user"(id),
+  enterprise_owner_id uuid references "user"(id),
+  created_by_user_id uuid references "user"(id),
+  doc_type varchar not null default 'project_overview',
+  project_name varchar not null default '',
+  company_name varchar not null default '',
+  client_name varchar not null default '',
+  project_city varchar not null default '',
+  instructions varchar not null default '',
+  generated_text text not null default '',
+  status varchar not null default 'draft',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists ix_builderdocument_owner_id on builderdocument(owner_id);
+create index if not exists ix_builderdocument_enterprise_owner_id on builderdocument(enterprise_owner_id);
+create index if not exists ix_builderdocument_created_by_user_id on builderdocument(created_by_user_id);
+create index if not exists ix_builderdocument_doc_type on builderdocument(doc_type);
+create index if not exists ix_builderdocument_status on builderdocument(status);
+create index if not exists ix_builderdocument_created_at on builderdocument(created_at);

@@ -4,16 +4,18 @@ export const fallbackHost =
     : "localhost";
 const defaultApiBase =
   typeof globalThis !== "undefined" && "location" in globalThis && globalThis.location
-    ? globalThis.location.hostname === "localhost" || globalThis.location.hostname === "127.0.0.1"
-      ? `http://${fallbackHost}:8000`
-      : `${globalThis.location.origin.replace(/\/$/, "")}`
+    ? `http://${fallbackHost}:8000`
     : `http://${fallbackHost}:8000`;
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? defaultApiBase).replace(/\/$/, "");
 const API_KEY = import.meta.env.VITE_API_KEY ?? "";
+const TOKEN_KEY = "northstonecrm_token";
+const EMAIL_KEY = "northstonecrm_email";
+const LEGACY_TOKEN_KEY = "dealios_token";
+const LEGACY_EMAIL_KEY = "dealios_email";
 
 function getToken() {
   try {
-    return localStorage.getItem("dealios_token") ?? "";
+    return localStorage.getItem(TOKEN_KEY) ?? localStorage.getItem(LEGACY_TOKEN_KEY) ?? "";
   } catch {
     return "";
   }
@@ -26,6 +28,13 @@ export class ApiError extends Error {
     super(message);
     this.status = status;
   }
+}
+
+function backendFailureMessage(path: string, timeoutMs: number, error: unknown) {
+  if (error && typeof error === "object" && "name" in error && (error as { name?: string }).name === "AbortError") {
+    return `Request to ${path} timed out after ${Math.round(timeoutMs / 1000)}s. Backend may still be starting or processing a slow request.`;
+  }
+  return `Request to ${API_BASE_URL}${path} failed before the browser received a usable response. Check the backend logs for a 500/CORS-side crash.`;
 }
 
 function buildHeaders(init: RequestInit, contentType: string | null) {
@@ -51,8 +60,10 @@ async function throwIfNotOk(res: Response) {
   if (res.ok) return;
   if (res.status === 401) {
     try {
-      localStorage.removeItem("dealios_email");
-      localStorage.removeItem("dealios_token");
+      localStorage.removeItem(EMAIL_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(LEGACY_EMAIL_KEY);
+      localStorage.removeItem(LEGACY_TOKEN_KEY);
     } catch {
       // ignore
     }
@@ -78,16 +89,17 @@ async function throwIfNotOk(res: Response) {
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = buildHeaders(init, "application/json");
-  const timeoutMs = path.startsWith("/auth/") ? 20000 : 8000;
+  const timeoutMs =
+    path.startsWith("/enterprise/builder-documents/generate")
+      ? 60000
+      : path.startsWith("/auth/") || path.startsWith("/admin/audit") || path.startsWith("/enterprise/audit")
+        ? 20000
+        : 8000;
   let res: Response;
   try {
     res = await request(path, { ...init, headers }, timeoutMs);
   } catch (e) {
-    const msg =
-      e && typeof e === "object" && "name" in e && (e as { name?: string }).name === "AbortError"
-        ? `Request timed out after ${Math.round(timeoutMs / 1000)}s. Backend may still be starting.`
-        : `Cannot reach backend at ${API_BASE_URL}. Make sure backend is running.`;
-    throw new ApiError(0, msg);
+    throw new ApiError(0, backendFailureMessage(path, timeoutMs, e));
   }
   await throwIfNotOk(res);
   if (res.status === 204) return undefined as T;
@@ -101,11 +113,7 @@ export async function apiBlob(path: string, init: RequestInit = {}): Promise<Blo
   try {
     res = await request(path, { ...init, headers }, timeoutMs);
   } catch (e) {
-    const msg =
-      e && typeof e === "object" && "name" in e && (e as { name?: string }).name === "AbortError"
-        ? `Request timed out after ${Math.round(timeoutMs / 1000)}s.`
-        : `Cannot reach backend at ${API_BASE_URL}. Make sure backend is running.`;
-    throw new ApiError(0, msg);
+    throw new ApiError(0, backendFailureMessage(path, timeoutMs, e));
   }
   await throwIfNotOk(res);
   return await res.blob();
@@ -118,11 +126,7 @@ export async function apiForm<T>(path: string, formData: FormData, init: Request
   try {
     res = await request(path, { ...init, method: init.method ?? "POST", headers, body: formData }, timeoutMs);
   } catch (e) {
-    const msg =
-      e && typeof e === "object" && "name" in e && (e as { name?: string }).name === "AbortError"
-        ? `Request timed out after ${Math.round(timeoutMs / 1000)}s.`
-        : `Cannot reach backend at ${API_BASE_URL}. Make sure backend is running.`;
-    throw new ApiError(0, msg);
+    throw new ApiError(0, backendFailureMessage(path, timeoutMs, e));
   }
   await throwIfNotOk(res);
   if (res.status === 204) return undefined as T;

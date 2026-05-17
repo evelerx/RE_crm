@@ -18,7 +18,7 @@ def get_enterprise_owner_id(user: User) -> UUID | None:
     plan = (getattr(user, "plan", "") or "free").strip().lower()
     if owner_id:
         return owner_id
-    if plan == "enterprise":
+    if plan in {"enterprise", "builder"}:
         return user.id
     return None
 
@@ -70,11 +70,33 @@ def count_org_records(session: Session, enterprise_owner_id: UUID) -> dict[str, 
 
 def employee_record_counts(session: Session, employee_ids: Iterable[UUID]) -> dict[UUID, dict[str, int]]:
     ids = list(employee_ids)
-    base = {employee_id: {"deals": 0, "contacts": 0, "activities": 0} for employee_id in ids}
+    base = {
+        employee_id: {
+            "deals": 0,
+            "closed_deals": 0,
+            "open_deals": 0,
+            "lost_deals": 0,
+            "contacts": 0,
+            "activities": 0,
+        }
+        for employee_id in ids
+    }
     if not ids:
         return base
 
-    for model, key in ((Deal, "deals"), (Contact, "contacts"), (Activity, "activities")):
+    deal_rows = session.exec(select(Deal.owner_id, Deal.stage).where(Deal.owner_id.in_(ids))).all()
+    for owner_id, stage in deal_rows:
+        if owner_id not in base:
+            continue
+        base[owner_id]["deals"] += 1
+        if stage == "closed":
+            base[owner_id]["closed_deals"] += 1
+        elif stage == "lost":
+            base[owner_id]["lost_deals"] += 1
+        else:
+            base[owner_id]["open_deals"] += 1
+
+    for model, key in ((Contact, "contacts"), (Activity, "activities")):
         rows = session.exec(select(model.owner_id).where(model.owner_id.in_(ids))).all()
         for owner_id in rows:
             if owner_id in base:

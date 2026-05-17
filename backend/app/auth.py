@@ -7,6 +7,7 @@ from uuid import UUID
 import jwt
 from fastapi import Depends, Header, HTTPException, Request
 from passlib.context import CryptContext
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from .db import get_session
@@ -82,6 +83,18 @@ def decode_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid token") from e
 
 
+def _utc_now_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _normalize_db_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
 def get_current_user(
     request: Request,
     authorization: Optional[str] = Header(default=None),
@@ -109,8 +122,9 @@ def get_current_user(
         if reason:
             msg = f"You are blacklisted by admin: {reason}"
         raise HTTPException(status_code=403, detail=msg)
-    if getattr(user, "locked_until", None) and user.locked_until > datetime.utcnow():
-        raise HTTPException(status_code=423, detail=f"Account temporarily locked until {user.locked_until.isoformat()}Z")
+    locked_until = _normalize_db_datetime(getattr(user, "locked_until", None))
+    if locked_until and locked_until > _utc_now_naive():
+        raise HTTPException(status_code=423, detail=f"Account temporarily locked until {locked_until.isoformat()}Z")
     if int(data.get("token_version", 0) or 0) != int(getattr(user, "token_version", 0) or 0):
         raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
 
@@ -128,12 +142,13 @@ def get_current_user(
             raise HTTPException(status_code=403, detail="RERA ID required. Complete your profile to continue.")
 
     # Lightweight usage tracking: throttle DB writes to at most once/minute/user.
-    now = datetime.utcnow()
+    now = _utc_now_naive()
+    last_seen_at = _normalize_db_datetime(user.last_seen_at)
     should_write = False
-    if not user.last_seen_at:
+    if not last_seen_at:
         should_write = True
     else:
-        if (now - user.last_seen_at).total_seconds() >= 60:
+        if (now - last_seen_at).total_seconds() >= 60:
             should_write = True
 
     if should_write:
@@ -141,14 +156,25 @@ def get_current_user(
         user.last_seen_ip = request.client.host if request.client else ""
         user.request_count = (user.request_count or 0) + 1
         session.add(user)
-        session.commit()
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
     return user
 
 
 def require_enterprise(user: User = Depends(get_current_user)) -> User:
     plan = (getattr(user, "plan", "") or "free").strip().lower()
-    if plan != "enterprise" and not getattr(user, "enterprise_owner_id", None):
-        raise HTTPException(status_code=403, detail="Enterprise feature")
+    member_role = (getattr(user, "enterprise_member_role", "") or "").strip().lower()
+    is_member = bool(getattr(user, "enterprise_owner_id", None))
+    if plan in {"enterprise", "builder"}:
+        return user
+    if is_member and member_role in {"broker", "cp"}:
+        return user
+    if is_member and member_role == "employee":
+        raise HTTPException(status_code=403, detail="Enterprise workspace is not enabled for employee accounts")
+    if not is_member:
+        raise HTTPException(status_code=403, detail="Organization feature")
     return user
 
 

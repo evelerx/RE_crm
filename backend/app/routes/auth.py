@@ -1,7 +1,13 @@
-from datetime import datetime, timedelta
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
+
+import httpx
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from ..auth import (
@@ -17,14 +23,84 @@ from ..auth import (
     verify_password,
 )
 from ..audit import log_audit_event
-from ..db import get_session
+from ..db import DATABASE_URL, get_session
 from ..auth import get_current_user
-from ..models import Profile, User
-from ..schemas import ChangePasswordRequest, LoginRequest, LoginResponse, SignupRequest
+from ..models import PasswordResetToken, Profile, User
+from ..schemas import (
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    LoginRequest,
+    LoginResponse,
+    ResetPasswordRequest,
+    SignupRequest,
+)
 from ..settings import settings
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _utc_now_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _normalize_db_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
+def _commit_or_http(session: Session, message: str) -> None:
+    try:
+        session.commit()
+    except IntegrityError as e:
+        session.rollback()
+        detail = str(getattr(e, "orig", e))
+        if "chk_user_plan" in detail:
+            raise HTTPException(
+                status_code=400,
+                detail="Database plan constraint is stale for this user record. Restart the backend so the latest schema repair runs, then try again.",
+            ) from e
+        raise HTTPException(status_code=400, detail=f"{message}: {detail}") from e
+
+
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _reset_base_url() -> str:
+    return (settings.public_app_url or settings.frontend_origin or "http://localhost:5173").rstrip("/")
+
+
+def _reset_url(token: str) -> str:
+    return f"{_reset_base_url()}/?reset_token={quote(token)}"
+
+
+async def _notify_password_reset_request(email: str, reset_url: str) -> None:
+    endpoint = (settings.formspree_endpoint or "").strip()
+    if not endpoint:
+        return
+    headers: dict[str, str] = {}
+    bearer = (settings.formspree_bearer_token or "").strip()
+    if bearer:
+        headers["Authorization"] = f"Bearer {bearer}"
+    payload = {
+        "subject": f"Password reset requested for {email}",
+        "email": email,
+        "message": (
+            f"A password reset was requested for {email}.\n\n"
+            f"Reset link:\n{reset_url}\n\n"
+            "If this was unexpected, ignore this request."
+        ),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.post(endpoint, data=payload, headers=headers)
+    except Exception:
+        # Delivery is best-effort so password requests don't become another crash path.
+        return
 
 
 def _rera_completed(session: Session, user: User) -> bool:
@@ -68,6 +144,105 @@ def exists(email: str = Query(...), session: Session = Depends(get_session)):
     return {"exists": bool(user), "has_password": bool(user and user.password_hash)}
 
 
+@router.post("/forgot-password")
+async def forgot_password(payload: ForgotPasswordRequest, session: Session = Depends(get_session)):
+    email = normalize_email(payload.email)
+    generic = {
+        "ok": True,
+        "message": "If the account exists, password reset instructions have been started.",
+    }
+    if is_admin_email(email):
+        return generic
+
+    user = get_user_by_email(email=email, session=session)
+    if not user:
+        return generic
+
+    now = _utc_now_naive()
+    pending = session.exec(
+        select(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.consumed_at.is_(None),
+        )
+    ).all()
+    for row in pending:
+        row.consumed_at = now
+        session.add(row)
+
+    raw_token = secrets.token_urlsafe(32)
+    token_row = PasswordResetToken(
+        user_id=user.id,
+        token_hash=_hash_reset_token(raw_token),
+        expires_at=now + timedelta(minutes=30),
+    )
+    session.add(token_row)
+    log_audit_event(
+        session,
+        actor=None,
+        kind="auth.forgot_password",
+        summary=f"Password reset requested for {user.email}",
+        target_user_id=user.id,
+    )
+    _commit_or_http(session, "Unable to create password reset request")
+
+    reset_url = _reset_url(raw_token)
+    await _notify_password_reset_request(user.email, reset_url)
+
+    response = dict(generic)
+    if _reset_base_url().startswith(("http://localhost", "http://127.0.0.1", "http://192.168.", "http://10.", "http://172.")):
+        response["preview_reset_url"] = reset_url
+    return response
+
+
+@router.get("/reset-password/validate")
+def validate_reset_password_token(token: str = Query(...), session: Session = Depends(get_session)):
+    hashed = _hash_reset_token(token)
+    row = session.exec(select(PasswordResetToken).where(PasswordResetToken.token_hash == hashed)).first()
+    now = _utc_now_naive()
+    ok = bool(row and row.consumed_at is None and _normalize_db_datetime(row.expires_at) and _normalize_db_datetime(row.expires_at) > now)
+    return {"ok": ok}
+
+
+@router.post("/reset-password")
+def reset_password(payload: ResetPasswordRequest, session: Session = Depends(get_session)):
+    hashed = _hash_reset_token(payload.token)
+    row = session.exec(select(PasswordResetToken).where(PasswordResetToken.token_hash == hashed)).first()
+    now = _utc_now_naive()
+    if not row or row.consumed_at is not None:
+        raise HTTPException(status_code=400, detail="This reset link is no longer valid.")
+    expires_at = _normalize_db_datetime(row.expires_at)
+    if not expires_at or expires_at <= now:
+        row.consumed_at = now
+        session.add(row)
+        _commit_or_http(session, "Unable to expire password reset token")
+        raise HTTPException(status_code=400, detail="This reset link has expired.")
+
+    user = session.get(User, row.user_id)
+    if not user:
+        row.consumed_at = now
+        session.add(row)
+        _commit_or_http(session, "Unable to invalidate password reset token")
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    user.password_hash = hash_password(payload.new_password)
+    user.token_version = int(getattr(user, "token_version", 0) or 0) + 1
+    user.password_changed_at = now
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    row.consumed_at = now
+    session.add(user)
+    session.add(row)
+    log_audit_event(
+        session,
+        actor=None,
+        kind="auth.reset_password",
+        summary=f"Password reset completed for {user.email}",
+        target_user_id=user.id,
+    )
+    _commit_or_http(session, "Unable to reset password")
+    return {"ok": True, "message": "Password reset complete. You can sign in with the new password now."}
+
+
 @router.post("/signup", response_model=LoginResponse)
 def signup(payload: SignupRequest, request: Request, session: Session = Depends(get_session)):
     email = normalize_email(payload.email)
@@ -79,13 +254,13 @@ def signup(payload: SignupRequest, request: Request, session: Session = Depends(
 
     user = existing or get_or_create_user(email=email, session=session)
     user.password_hash = hash_password(payload.password)
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = _utc_now_naive()
     user.last_seen_at = user.last_login_at
     user.last_login_ip = request.client.host if request.client else ""
     user.last_seen_ip = user.last_login_ip
     user.failed_login_attempts = 0
     user.locked_until = None
-    user.password_changed_at = datetime.utcnow()
+    user.password_changed_at = _utc_now_naive()
     user.login_count = (user.login_count or 0) + 1
     session.add(user)
     log_audit_event(
@@ -96,7 +271,7 @@ def signup(payload: SignupRequest, request: Request, session: Session = Depends(
         detail=f"ip={user.last_login_ip}",
         target_user_id=user.id,
     )
-    session.commit()
+    _commit_or_http(session, "Unable to sign up account")
 
     token = create_access_token(user=user, is_admin=False)
     return LoginResponse(
@@ -117,7 +292,7 @@ def login(payload: LoginRequest, request: Request, session: Session = Depends(ge
         if not verify_admin_password(payload.password):
             raise HTTPException(status_code=401, detail="Invalid email or password")
         admin_user = get_user_by_email(email=email, session=session) or get_or_create_user(email=email, session=session)
-        admin_user.last_login_at = datetime.utcnow()
+        admin_user.last_login_at = _utc_now_naive()
         admin_user.last_seen_at = admin_user.last_login_at
         admin_user.last_login_ip = client_ip
         admin_user.last_seen_ip = client_ip
@@ -133,7 +308,7 @@ def login(payload: LoginRequest, request: Request, session: Session = Depends(ge
             detail=f"ip={client_ip}",
             target_user_id=admin_user.id,
         )
-        session.commit()
+        _commit_or_http(session, "Unable to complete admin login")
         token = create_access_token(user=admin_user, is_admin=True)
         return LoginResponse(
             email=admin_user.email,
@@ -147,8 +322,9 @@ def login(payload: LoginRequest, request: Request, session: Session = Depends(ge
     user = get_user_by_email(email=email, session=session)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    if getattr(user, "locked_until", None) and user.locked_until and user.locked_until > datetime.utcnow():
-        raise HTTPException(status_code=423, detail=f"Account temporarily locked until {user.locked_until.isoformat()}Z")
+    locked_until = _normalize_db_datetime(getattr(user, "locked_until", None))
+    if locked_until and locked_until > _utc_now_naive():
+        raise HTTPException(status_code=423, detail=f"Account temporarily locked until {locked_until.isoformat()}Z")
     if getattr(user, "is_blacklisted", False):
         reason = (getattr(user, "blacklist_reason", "") or "").strip()
         msg = "You are blacklisted by admin."
@@ -165,7 +341,7 @@ def login(payload: LoginRequest, request: Request, session: Session = Depends(ge
             user.failed_login_attempts = int(getattr(user, "failed_login_attempts", 0) or 0) + 1
             max_attempts = max(3, int(settings.login_max_attempts or 5))
             if user.failed_login_attempts >= max_attempts:
-                user.locked_until = datetime.utcnow() + timedelta(minutes=max(1, int(settings.login_lockout_minutes or 15)))
+                user.locked_until = _utc_now_naive() + timedelta(minutes=max(1, int(settings.login_lockout_minutes or 15)))
                 user.failed_login_attempts = 0
                 detail = f"ip={client_ip}; lockout_until={user.locked_until.isoformat()}Z"
             else:
@@ -179,7 +355,7 @@ def login(payload: LoginRequest, request: Request, session: Session = Depends(ge
                 detail=detail,
                 target_user_id=user.id,
             )
-            session.commit()
+            _commit_or_http(session, "Unable to record failed login")
             if user.password_hash.startswith("$2"):
                 raise HTTPException(
                     status_code=409,
@@ -189,7 +365,7 @@ def login(payload: LoginRequest, request: Request, session: Session = Depends(ge
         if password_hash_needs_update(user.password_hash):
             user.password_hash = hash_password(payload.password)
 
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = _utc_now_naive()
     user.last_seen_at = user.last_login_at
     user.last_login_ip = client_ip
     user.last_seen_ip = client_ip
@@ -205,43 +381,45 @@ def login(payload: LoginRequest, request: Request, session: Session = Depends(ge
         detail=f"ip={client_ip}",
         target_user_id=user.id,
     )
-    session.commit()
+    _commit_or_http(session, "Unable to complete login")
 
     # Legacy migration (best-effort): if you had data before per-user ownership existed,
     # assign any rows with NULL/empty owner_id to this user. Only runs if needed.
-    try:
-        needs = session.exec(
-            text(
-                "SELECT "
-                "(SELECT COUNT(1) FROM deal WHERE owner_id IS NULL OR owner_id = '') + "
-                "(SELECT COUNT(1) FROM contact WHERE owner_id IS NULL OR owner_id = '') + "
-                "(SELECT COUNT(1) FROM activity WHERE owner_id IS NULL OR owner_id = '') AS c"
-            )
-        ).first()
-        count = int(needs[0]) if needs else 0
-        if count > 0:
-            session.exec(
+    if DATABASE_URL.startswith("sqlite"):
+        try:
+            needs = session.exec(
                 text(
-                    "UPDATE deal SET owner_id = :uid WHERE owner_id IS NULL OR owner_id = ''"
-                ),
-                {"uid": str(user.id)},
-            )
-            session.exec(
-                text(
-                    "UPDATE contact SET owner_id = :uid WHERE owner_id IS NULL OR owner_id = ''"
-                ),
-                {"uid": str(user.id)},
-            )
-            session.exec(
-                text(
-                    "UPDATE activity SET owner_id = :uid WHERE owner_id IS NULL OR owner_id = ''"
-                ),
-                {"uid": str(user.id)},
-            )
-            session.commit()
-    except Exception:
-        # best-effort only
-        pass
+                    "SELECT "
+                    "(SELECT COUNT(1) FROM deal WHERE owner_id IS NULL OR owner_id = '') + "
+                    "(SELECT COUNT(1) FROM contact WHERE owner_id IS NULL OR owner_id = '') + "
+                    "(SELECT COUNT(1) FROM activity WHERE owner_id IS NULL OR owner_id = '') AS c"
+                )
+            ).first()
+            count = int(needs[0]) if needs else 0
+            if count > 0:
+                session.exec(
+                    text(
+                        "UPDATE deal SET owner_id = :uid WHERE owner_id IS NULL OR owner_id = ''"
+                    ),
+                    {"uid": str(user.id)},
+                )
+                session.exec(
+                    text(
+                        "UPDATE contact SET owner_id = :uid WHERE owner_id IS NULL OR owner_id = ''"
+                    ),
+                    {"uid": str(user.id)},
+                )
+                session.exec(
+                    text(
+                        "UPDATE activity SET owner_id = :uid WHERE owner_id IS NULL OR owner_id = ''"
+                    ),
+                    {"uid": str(user.id)},
+                )
+                _commit_or_http(session, "Unable to complete legacy ownership backfill")
+        except HTTPException:
+            raise
+        except Exception:
+            session.rollback()
 
     token = create_access_token(user=user, is_admin=False)
     return LoginResponse(
@@ -270,7 +448,7 @@ def me(
             is_admin = False
     enterprise_owner_id = getattr(user, "enterprise_owner_id", None)
     company_owner_id = enterprise_owner_id or (
-        user.id if (getattr(user, "plan", "free") or "free") == "enterprise" else None
+        user.id if (getattr(user, "plan", "free") or "free") in {"enterprise", "builder"} else None
     )
     enterprise_company_name = ""
     profile = session.exec(select(Profile).where(Profile.owner_id == user.id)).first()
@@ -307,7 +485,7 @@ def change_password(
         raise HTTPException(status_code=401, detail="Invalid current password")
     user.password_hash = hash_password(payload.new_password)
     user.token_version = int(getattr(user, "token_version", 0) or 0) + 1
-    user.password_changed_at = datetime.utcnow()
+    user.password_changed_at = _utc_now_naive()
     session.add(user)
     log_audit_event(
         session,
@@ -316,5 +494,5 @@ def change_password(
         summary=f"Changed password for {user.email}",
         target_user_id=user.id,
     )
-    session.commit()
+    _commit_or_http(session, "Unable to change password")
     return {"changed": True}

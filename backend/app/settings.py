@@ -19,17 +19,30 @@ def _pick_env_file() -> str:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_pick_env_file(), env_ignore_empty=True)
 
-    app_name: str = "Deal Intelligence OS"
+    app_name: str = "Northstone"
     api_key: str = ""
     jwt_secret: str = "change-me"
-    database_url: str = "sqlite:///./dealios.db"
+    database_url: str = "sqlite:///./northstonecrm.db"
     frontend_origin: str = "http://localhost:5173"
+    public_app_url: str = "http://localhost:5173"
+    backend_public_url: str = "http://localhost:8000"
     admin_email: str = ""  # single email
     admin_password: str = ""  # optional (prefer ADMIN_PASSWORD_HASH)
     admin_password_hash: str = ""  # optional (recommended)
     pbkdf2_rounds: int = 60_000
     data_encryption_key: str = ""  # Fernet key (base64), optional but recommended
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    microsoft_client_id: str = ""
+    microsoft_client_secret: str = ""
+    microsoft_tenant_id: str = ""
+    zoom_client_id: str = ""
+    zoom_client_secret: str = ""
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    formspree_endpoint: str = ""
+    formspree_bearer_token: str = ""
     login_max_attempts: int = 5
     login_lockout_minutes: int = 15
     jwt_exp_days: int = 30

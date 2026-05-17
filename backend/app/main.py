@@ -16,6 +16,7 @@ from .routes import (
     csvio,
     deals,
     enterprise,
+    integrations,
     insights,
     llm,
     meta,
@@ -62,6 +63,7 @@ def _startup():
 
 app.include_router(meta.router)
 app.include_router(auth.router)
+app.include_router(integrations.router)
 
 # Protected routers (API key optional, but if set it must match)
 deps = [Depends(require_api_key)]

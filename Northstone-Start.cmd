@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-REM Deal Intelligence OS - Start (double-click)
+REM Northstone - Start (double-click)
 REM Starts backend + frontend and opens the app.
 
 cd /d "%~dp0"
@@ -13,15 +13,15 @@ set "FRONTEND_URL=http://localhost:%FRONTEND_PORT%/"
 
 echo.
 echo ==========================================
-echo   Deal Intelligence OS - Starting...
+echo   Northstone - Starting...
 echo ==========================================
 echo.
 
-call "%~dp0DealOS-Stop.cmd" /quiet >nul 2>&1
+call "%~dp0Northstone-Stop.cmd" /quiet >nul 2>&1
 
 REM Start backend + frontend in separate windows
-start "DealOS Backend" cmd /k ""%~dp0backend\\run_backend.cmd""
-start "DealOS Frontend" cmd /k ""%~dp0frontend\\run_frontend.cmd""
+start "Northstone Backend" cmd /k ""%~dp0backend\\run_backend.cmd""
+start "Northstone Frontend" cmd /k ""%~dp0frontend\\run_frontend.cmd""
 
 echo Waiting for backend: %BACKEND_HEALTH%
 set "BACKEND_OK=0"
@@ -32,7 +32,7 @@ for /L %%i in (1,1,240) do (
 :backend_fail
 echo.
 echo ERROR: Backend did not become ready on port %BACKEND_PORT%.
-echo Check the "DealOS Backend" window for errors.
+echo Check the "Northstone Backend" window for errors.
 echo.
 pause
 exit /b 1
@@ -49,8 +49,8 @@ for /L %%i in (1,1,240) do (
 :frontend_fail
 echo.
 echo ERROR: Frontend did not become ready on port %FRONTEND_PORT%.
-echo Check the "DealOS Frontend" window for errors.
-echo Tip: If you see "port in use", close old Vite windows or run DealOS-Stop.cmd.
+echo Check the "Northstone Frontend" window for errors.
+echo Tip: If you see "port in use", close old Vite windows or run Northstone-Stop.cmd.
 echo.
 pause
 exit /b 1

@@ -31,6 +31,15 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=8)
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8)
+
+
 class AdminResetPasswordRequest(BaseModel):
     email: str
     new_password: str = Field(min_length=8)
@@ -44,7 +53,7 @@ class AdminBlacklistRequest(BaseModel):
 
 class AdminSetPlanRequest(BaseModel):
     email: str
-    plan: str = Field(pattern="^(free|enterprise)$")
+    plan: str = Field(pattern="^(free|enterprise|builder)$")
 
 
 class AdminSetEmployeeLimitRequest(BaseModel):
@@ -67,12 +76,17 @@ class AdminUnlockUserRequest(BaseModel):
 class AdminRuntimeConfigRead(BaseModel):
     env_file_path: str
     frontend_origin: str = ""
+    public_app_url: str = ""
     openrouter_base_url: str = ""
     admin_email: str = ""
     jwt_secret_configured: bool = False
     admin_password_mode: str = "missing"
     pbkdf2_rounds: int = 60000
     data_encryption_key_configured: bool = False
+    razorpay_key_id_configured: bool = False
+    razorpay_key_secret_configured: bool = False
+    formspree_endpoint_configured: bool = False
+    formspree_bearer_token_configured: bool = False
     login_max_attempts: int = 5
     login_lockout_minutes: int = 15
     jwt_exp_days: int = 30
@@ -80,11 +94,16 @@ class AdminRuntimeConfigRead(BaseModel):
 
 class AdminRuntimeConfigUpdateRequest(BaseModel):
     frontend_origin: str | None = None
+    public_app_url: str | None = None
     openrouter_base_url: str | None = None
     admin_email: str | None = None
     jwt_secret: str | None = None
     admin_password: str | None = None
     data_encryption_key: str | None = None
+    razorpay_key_id: str | None = None
+    razorpay_key_secret: str | None = None
+    formspree_endpoint: str | None = None
+    formspree_bearer_token: str | None = None
     pbkdf2_rounds: int | None = Field(default=None, ge=60000, le=1000000)
     login_max_attempts: int | None = Field(default=None, ge=1, le=20)
     login_lockout_minutes: int | None = Field(default=None, ge=1, le=1440)
@@ -149,10 +168,122 @@ class EnterpriseOverviewRead(BaseModel):
     company_specialization: str = ""
     company_bio: str = ""
     company_profile_complete: bool = False
+    owner_plan: str = "enterprise"
     employee_limit: int
     employee_count: int
     counts: dict[str, int]
     employees: list[EnterpriseEmployeeRead]
+
+
+class IntegrationProviderRead(BaseModel):
+    key: str
+    name: str
+    provider_group: str
+    category: str
+    status: str
+    configured: bool = False
+    connected: bool = False
+    can_connect: bool = False
+    managed_by_owner: bool = True
+    connected_account_email: str = ""
+    inheritance_mode: str = "owner_managed"
+    required_env: list[str] = []
+    next_step: str = ""
+    last_error: str = ""
+
+
+class EnterpriseIntegrationsRead(BaseModel):
+    plan: str = "free"
+    enterprise_owner_id: Optional[UUID] = None
+    is_enterprise_owner: bool = False
+    is_enterprise_member: bool = False
+    access_role: str = "member"
+    can_manage: bool = False
+    can_view: bool = True
+    owner_managed: bool = True
+    providers: list[IntegrationProviderRead]
+
+
+class GoogleConnectionTestResponse(BaseModel):
+    ok: bool
+    connected_account_email: str = ""
+    expires_at: Optional[datetime] = None
+    scopes: list[str] = []
+
+
+class GoogleSendEmailRequest(BaseModel):
+    to_email: str
+    subject: str = Field(min_length=1, max_length=200)
+    body_text: str = Field(min_length=1, max_length=10000)
+
+
+class GoogleSendEmailResponse(BaseModel):
+    ok: bool
+    to_email: str
+    subject: str
+    provider_message_id: str = ""
+
+
+class GoogleCalendarEventCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=4000)
+    start_at: datetime
+    end_at: datetime
+    attendee_email: str = ""
+    timezone: str = "Asia/Kolkata"
+    create_meet_link: bool = True
+
+
+class GoogleCalendarEventResponse(BaseModel):
+    ok: bool
+    event_id: str
+    html_link: str = ""
+    meet_link: str = ""
+
+
+class ZoomMeetingCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    agenda: str = Field(default="", max_length=4000)
+    start_at: datetime
+    duration_minutes: int = Field(default=30, ge=15, le=480)
+    timezone: str = "Asia/Kolkata"
+
+
+class ZoomMeetingResponse(BaseModel):
+    ok: bool
+    meeting_id: str
+    join_url: str = ""
+    start_url: str = ""
+
+
+class BuilderDocumentCreateRequest(BaseModel):
+    doc_type: str = Field(default="project_overview", pattern="^(project_overview|company_profile|project_update|sales_offer|compliance_cover_letter|construction_summary|builder_brochure)$")
+    project_name: str = ""
+    company_name: str = ""
+    client_name: str = ""
+    project_city: str = ""
+    instructions: str = Field(default="", min_length=10, max_length=6000)
+
+
+class BuilderDocumentGenerateRequest(BuilderDocumentCreateRequest):
+    tone: str = Field(default="professional", pattern="^(professional|premium|sales|compliance)$")
+
+
+class BuilderDocumentRead(BaseModel):
+    id: UUID
+    owner_id: UUID
+    enterprise_owner_id: Optional[UUID] = None
+    created_by_user_id: Optional[UUID] = None
+    doc_type: str
+    project_name: str = ""
+    company_name: str = ""
+    client_name: str = ""
+    project_city: str = ""
+    instructions: str = ""
+    generated_text: str = ""
+    status: str = "draft"
+    created_at: datetime
+    updated_at: datetime
 
 
 class SupportChatMessageCreate(BaseModel):

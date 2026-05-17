@@ -21,7 +21,7 @@ async def chat_completion(*, api_key: str, model: str, messages: list[dict], max
         "Content-Type": "application/json",
         # Optional but recommended by OpenRouter:
         "HTTP-Referer": "http://localhost",
-        "X-Title": "Deal Intelligence OS",
+        "X-Title": "Northstone",
     }
     payload = {
         "model": model,

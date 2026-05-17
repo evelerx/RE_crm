@@ -10,7 +10,7 @@ Use two separate Vercel projects:
 Set these in the Vercel project whose root directory is `backend/`.
 
 ```env
-APP_NAME=Deal Intelligence OS
+APP_NAME=Northstone
 API_KEY=
 JWT_SECRET=replace-with-a-long-random-secret
 DATABASE_URL=postgresql+psycopg://postgres.your-project-ref:your-password@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require
@@ -57,4 +57,3 @@ VITE_API_KEY=
 3. Copy the pooler connection string into backend `DATABASE_URL`
 4. Deploy the backend Vercel project
 5. Deploy the frontend Vercel project
-

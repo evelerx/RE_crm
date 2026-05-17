@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { api } from "./api/client";
 import { clearSession, getEmail, getToken } from "./auth";
+import TutorialBubble from "./components/TutorialBubble";
 import AdminPage from "./pages/AdminPage";
 import AccountPage from "./pages/AccountPage";
+import AppsPage from "./pages/AppsPage";
 import CalculatorPage from "./pages/CalculatorPage";
 import ContactsPage from "./pages/ContactsPage";
 import DealDetailPage from "./pages/DealDetailPage";
@@ -17,15 +19,11 @@ import TodayPage from "./pages/TodayPage";
 
 function TopBar({
   isAdmin,
-  isEnterprise,
   enterpriseBadge,
-  reraCompleted,
   onLogout
 }: {
   isAdmin: boolean;
-  isEnterprise: boolean;
   enterpriseBadge: string | null;
-  reraCompleted: boolean;
   onLogout: () => void;
 }) {
   const email = getEmail();
@@ -34,7 +32,7 @@ function TopBar({
       <div className="brand">
         <div className="logo" />
         <div>
-          <div className="brandTitle">Deal Intelligence OS</div>
+          <div className="brandTitle">Northstone</div>
           <div className="brandSub">
             Pipeline | Grid | ROI <span className="brandBy">by Nihar Lakhani</span>
           </div>
@@ -43,38 +41,37 @@ function TopBar({
         {enterpriseBadge ? <div className="pill enterprisePill">{enterpriseBadge}</div> : null}
       </div>
       <nav className="navDesktop">
-        {reraCompleted ? (
-          <>
-            <NavLink to="/today" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-              Today
-            </NavLink>
-            <NavLink to="/" end className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-              Pipeline
-            </NavLink>
-            <NavLink to="/deals" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-              Deals
-            </NavLink>
-            <NavLink to="/contacts" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-              Contacts
-            </NavLink>
-            <NavLink to="/calc" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-              ROI
-            </NavLink>
-            <NavLink to="/insights" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-              Insights
-            </NavLink>
-            {isEnterprise ? (
-              <NavLink to="/enterprise" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-                Enterprise
-              </NavLink>
-            ) : null}
-          </>
-        ) : null}
+        <>
+          <NavLink to="/today" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+            Today
+          </NavLink>
+          <NavLink to="/" end className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+            Pipeline
+          </NavLink>
+          <NavLink to="/deals" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+            Deals
+          </NavLink>
+          <NavLink to="/contacts" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+            Contacts
+          </NavLink>
+          <NavLink to="/calc" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+            ROI
+          </NavLink>
+          <NavLink to="/insights" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+            Insights
+          </NavLink>
+          <NavLink to="/enterprise" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+            Enterprise
+          </NavLink>
+        </>
         <NavLink to="/account" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
           Account
         </NavLink>
         <NavLink to="/settings" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
           Settings
+        </NavLink>
+        <NavLink to="/apps" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+          Apps
         </NavLink>
         {isAdmin ? (
           <NavLink to="/admin" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
@@ -86,38 +83,37 @@ function TopBar({
         </button>
       </nav>
       <div className="navMobile">
-        {reraCompleted ? (
-          <>
-            <NavLink to="/today" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-              Today
-            </NavLink>
-            <NavLink to="/" end className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-              Pipeline
-            </NavLink>
-            <NavLink to="/deals" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-              Deals
-            </NavLink>
-            <NavLink to="/contacts" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-              Contacts
-            </NavLink>
-            <NavLink to="/calc" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-              ROI
-            </NavLink>
-            <NavLink to="/insights" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-              Insights
-            </NavLink>
-            {isEnterprise ? (
-              <NavLink to="/enterprise" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-                Enterprise
-              </NavLink>
-            ) : null}
-          </>
-        ) : null}
+        <>
+          <NavLink to="/today" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+            Today
+          </NavLink>
+          <NavLink to="/" end className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+            Pipeline
+          </NavLink>
+          <NavLink to="/deals" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+            Deals
+          </NavLink>
+          <NavLink to="/contacts" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+            Contacts
+          </NavLink>
+          <NavLink to="/calc" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+            ROI
+          </NavLink>
+          <NavLink to="/insights" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+            Insights
+          </NavLink>
+          <NavLink to="/enterprise" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+            Enterprise
+          </NavLink>
+        </>
         <NavLink to="/account" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
           Account
         </NavLink>
         <NavLink to="/settings" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
           Settings
+        </NavLink>
+        <NavLink to="/apps" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+          Apps
         </NavLink>
         {isAdmin ? (
           <NavLink to="/admin" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
@@ -165,7 +161,7 @@ export default function App() {
 
   useEffect(() => {
     function handleStorageChange(e: StorageEvent) {
-      if (e.key === "dealios_token" && !e.newValue) {
+      if ((e.key === "northstonecrm_token" || e.key === "dealios_token") && !e.newValue) {
         setAuthed(false);
         setIsAdmin(false);
         setIsEnterprise(false);
@@ -194,13 +190,30 @@ export default function App() {
           is_admin: boolean;
           enterprise_owner_id?: string | null;
           enterprise_company_name?: string;
+          enterprise_member_role?: string;
           rera_completed?: boolean;
         }>("/auth/me");
         if (!cancelled) {
           setIsAdmin(Boolean(me.is_admin));
-          const ownerMode = (me.plan || "free").toLowerCase() === "enterprise";
-          setIsEnterprise(ownerMode);
-          setEnterpriseBadge(me.enterprise_company_name?.trim() || (ownerMode ? "Enterprise" : null));
+          const plan = (me.plan || "free").toLowerCase();
+          const ownerMode = plan === "enterprise" || plan === "builder";
+          const memberRole = (me.enterprise_member_role || "").toLowerCase();
+          const memberMode = Boolean(me.enterprise_owner_id) && (memberRole === "broker" || memberRole === "cp");
+          setIsEnterprise(ownerMode || memberMode);
+          setEnterpriseBadge(
+            me.enterprise_company_name?.trim() ||
+              (
+                plan === "builder"
+                  ? "Builder"
+                  : ownerMode
+                    ? "Enterprise"
+                    : memberRole === "broker"
+                      ? "Broker"
+                      : memberRole === "cp"
+                        ? "CP"
+                        : null
+              )
+          );
           setReraCompleted(Boolean(me.is_admin || me.rera_completed));
         }
       } catch {
@@ -237,33 +250,38 @@ export default function App() {
     );
   }
 
-  const showBottomNav = !isAdmin && reraCompleted && !location.pathname.startsWith("/enterprise") && !location.pathname.startsWith("/admin");
+  const showBottomNav = !isAdmin && !location.pathname.startsWith("/enterprise") && !location.pathname.startsWith("/admin");
 
   return (
     <div className="appShell">
       <TopBar
         isAdmin={isAdmin}
-        isEnterprise={isEnterprise}
         enterpriseBadge={enterpriseBadge}
-        reraCompleted={reraCompleted || isAdmin}
         onLogout={handleLogout}
       />
       <main className="content">
         <Routes>
-          <Route path="/today" element={reraCompleted || isAdmin ? <TodayPage /> : <Navigate to="/account" replace />} />
-          <Route path="/" element={reraCompleted || isAdmin ? <PipelinePage /> : <Navigate to="/account" replace />} />
-          <Route path="/deals" element={reraCompleted || isAdmin ? <DealsGridPage /> : <Navigate to="/account" replace />} />
-          <Route path="/deals/:dealId" element={reraCompleted || isAdmin ? <DealDetailPage /> : <Navigate to="/account" replace />} />
-          <Route path="/contacts" element={reraCompleted || isAdmin ? <ContactsPage /> : <Navigate to="/account" replace />} />
-          <Route path="/calc" element={reraCompleted || isAdmin ? <CalculatorPage /> : <Navigate to="/account" replace />} />
-          <Route path="/insights" element={reraCompleted || isAdmin ? <InsightsPage /> : <Navigate to="/account" replace />} />
+          <Route path="/today" element={<TodayPage />} />
+          <Route path="/" element={<PipelinePage />} />
+          <Route path="/deals" element={<DealsGridPage />} />
+          <Route path="/deals/:dealId" element={<DealDetailPage />} />
+          <Route path="/contacts" element={<ContactsPage />} />
+          <Route path="/calc" element={<CalculatorPage />} />
+          <Route path="/insights" element={<InsightsPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/apps" element={<AppsPage />} />
           <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/" replace />} />
-          <Route path="/enterprise" element={isEnterprise && (reraCompleted || isAdmin) ? <EnterprisePage /> : <Navigate to="/account" replace />} />
-          <Route path="*" element={<Navigate to={reraCompleted || isAdmin ? "/" : "/account"} replace />} />
+          <Route path="/enterprise" element={<EnterprisePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <TutorialBubble
+        isAdmin={isAdmin}
+        isEnterprise={isEnterprise}
+        reraCompleted={reraCompleted || isAdmin}
+        email={getEmail() || ""}
+      />
       {showBottomNav ? <BottomNav /> : null}
     </div>
   );

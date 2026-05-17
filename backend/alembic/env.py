@@ -20,7 +20,7 @@ target_metadata = SQLModel.metadata
 
 
 def get_url() -> str:
-    # Prefer runtime resolved URL (pinned to backend/data/dealios.db)
+    # Prefer runtime resolved URL (pinned to backend/data/northstonecrm.db)
     return DATABASE_URL
 
 
@@ -58,4 +58,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-
