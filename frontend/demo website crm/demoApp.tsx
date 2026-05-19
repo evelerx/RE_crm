@@ -715,28 +715,25 @@ function EnterprisePreviewPage({ showNotice }: { showNotice: (title: string, mes
 }
 
 function AppsPreviewPage({ showNotice }: { showNotice: (title: string, message?: string) => void }) {
-  const [selectedTab, setSelectedTab] = useState<"communication" | "meetings" | "calendar" | "ads" | "coming_soon">("communication");
+  const [selectedTab, setSelectedTab] = useState<"communication" | "meetings" | "calendar" | "ads">("communication");
   const tabs = [
     { key: "communication", label: "Communication", iconUrl: "https://cdn.simpleicons.org/gmail/EA4335" },
     { key: "meetings", label: "Meetings", iconUrl: "https://cdn.simpleicons.org/googlemeet/00897B" },
     { key: "calendar", label: "Calendar", iconUrl: "https://cdn.simpleicons.org/googlecalendar/4285F4" },
     { key: "ads", label: "Ads", iconUrl: "https://cdn.simpleicons.org/googleads/4285F4" },
-    { key: "coming_soon", label: "Coming soon", iconUrl: "https://cdn.simpleicons.org/clockify/03A9F4" },
   ] as const;
   const providerCards = [
-    { name: "Gmail", tab: "communication", category: "Email", rollout: "Phase 1", purpose: "Send client follow-ups and log outbound communication to the CRM timeline.", iconUrl: "https://cdn.simpleicons.org/gmail/EA4335" },
-    { name: "Google Meet", tab: "meetings", category: "Meetings", rollout: "Phase 1", purpose: "Generate meeting links for walkthroughs, client reviews, and partner calls from Northstone.", iconUrl: "https://cdn.simpleicons.org/googlemeet/00897B" },
-    { name: "Google Calendar", tab: "calendar", category: "Scheduling", rollout: "Phase 1", purpose: "Create site visits, callbacks, launches, and review meetings from deal and contact context.", iconUrl: "https://cdn.simpleicons.org/googlecalendar/4285F4" },
+    { name: "Gmail", tab: "communication", category: "Email", rollout: "Phase 1", purpose: "Send client follow-ups and log outbound communication to the CRM timeline.", iconUrl: "https://cdn.simpleicons.org/gmail/EA4335", status: "coming_soon" },
+    { name: "Outlook", tab: "communication", category: "Email", rollout: "Coming soon", purpose: "Outlook support stays queued behind Microsoft tenant setup so mail workflows go live cleanly.", iconUrl: "https://cdn.simpleicons.org/microsoftoutlook/0078D4", status: "coming_soon" },
+    { name: "Google Meet", tab: "meetings", category: "Meetings", rollout: "Phase 1", purpose: "Generate meeting links for walkthroughs, client reviews, and partner calls from Northstone.", iconUrl: "https://cdn.simpleicons.org/googlemeet/00897B", status: "coming_soon" },
+    { name: "Zoom", tab: "meetings", category: "Meetings", rollout: "Phase 3", purpose: "Create Zoom sessions for sales calls, investor meetings, and remote walkthroughs.", iconUrl: "https://cdn.simpleicons.org/zoom/0B5CFF", status: "coming_soon" },
+    { name: "Microsoft Teams", tab: "meetings", category: "Meetings", rollout: "Coming soon", purpose: "Microsoft workspace rollout is prepared, but tenant and permission setup stays behind the official website flow.", iconUrl: "https://cdn.simpleicons.org/microsoftteams/6264A7", status: "coming_soon" },
+    { name: "Google Calendar", tab: "calendar", category: "Scheduling", rollout: "Phase 1", purpose: "Create site visits, callbacks, launches, and review meetings from deal and contact context.", iconUrl: "https://cdn.simpleicons.org/googlecalendar/4285F4", status: "coming_soon" },
   ];
   const ads = [
     { name: "Google Ads", desc: "Create campaigns for property launches, lead capture, project awareness, branded search, and location-targeted buyer demand.", iconUrl: "https://cdn.simpleicons.org/googleads/4285F4", status: "ready" },
+    { name: "Meta Ads", desc: "Run visual campaigns for builders, broker teams, and luxury inventory across Facebook and Instagram audiences.", iconUrl: "https://cdn.simpleicons.org/meta/0866FF", status: "coming_soon" },
     { name: "TikTok Ads", desc: "Promote projects, walkthroughs, and branded launch content with short-form campaign distribution for newer audiences.", iconUrl: "https://cdn.simpleicons.org/tiktok/000000", status: "coming_soon" },
-  ];
-  const comingSoon = [
-    { name: "Zoom", category: "Meetings", description: "Zoom meeting creation is already part of the official CRM rollout and will appear in this public demo soon.", iconUrl: "https://cdn.simpleicons.org/zoom/0B5CFF" },
-    { name: "Meta Ads", category: "Ads", description: "Meta campaign launch surfaces are active in the official CRM path and will be connected into this demo soon.", iconUrl: "https://cdn.simpleicons.org/meta/0866FF" },
-    { name: "Microsoft Teams", category: "Meetings", description: "Microsoft workspace rollout is prepared, but tenant and permission setup stays behind the official website flow.", iconUrl: "https://cdn.simpleicons.org/microsoftteams/6264A7" },
-    { name: "Outlook", category: "Email", description: "Outlook support stays queued behind the same Microsoft tenant setup so mail and meeting workflows go live together.", iconUrl: "https://cdn.simpleicons.org/microsoftoutlook/0078D4" },
   ];
 
   return (
@@ -798,7 +795,7 @@ function AppsPreviewPage({ showNotice }: { showNotice: (title: string, message?:
                     <div className="muted">Publish</div>
                   </div>
                 </div>
-                <div className="pill">Coming soon</div>
+                <div className="pill">{card.status === "coming_soon" ? "Coming soon" : "Ready"}</div>
               </div>
               <div>{card.desc}</div>
               <button className="btn" type="button" onClick={() => showNotice(card.name)}>
@@ -806,28 +803,6 @@ function AppsPreviewPage({ showNotice }: { showNotice: (title: string, message?:
               </button>
             </section>
           )) : null}
-          {selectedTab === "coming_soon" ? (
-            <>
-              {comingSoon.map((card) => (
-                <section key={card.name} className="card">
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div className="row" style={{ alignItems: "center", gap: 12 }}>
-                      <img src={card.iconUrl} alt={`${card.name} icon`} style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.94)", padding: 4, flex: "0 0 auto" }} />
-                      <div>
-                        <div className="cardTitle">{card.name}</div>
-                        <div className="muted">{card.category} | Coming soon</div>
-                      </div>
-                    </div>
-                    <div className="pill">Coming soon</div>
-                  </div>
-                  <div>{card.description}</div>
-                  <button className="btn ghost" type="button" onClick={() => showNotice(card.name)}>
-                    Show demo notice
-                  </button>
-                </section>
-              ))}
-            </>
-          ) : null}
         </div>
       </div>
     </div>
