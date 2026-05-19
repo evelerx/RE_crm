@@ -334,6 +334,493 @@ function LockedFeaturePage({
   );
 }
 
+function PreviewActionRow({
+  primaryLabel,
+  secondaryLabel,
+  onPrimary,
+  onSecondary,
+}: {
+  primaryLabel: string;
+  secondaryLabel?: string;
+  onPrimary: () => void;
+  onSecondary?: () => void;
+}) {
+  return (
+    <div className="row">
+      <button className="btn" type="button" onClick={onPrimary}>
+        {primaryLabel}
+      </button>
+      {secondaryLabel && onSecondary ? (
+        <button className="btn ghost" type="button" onClick={onSecondary}>
+          {secondaryLabel}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function TodayPreviewPage({ showNotice }: { showNotice: (title: string, message?: string) => void }) {
+  return (
+    <div className="page">
+      <div className="pageHeader">
+        <div>
+          <div className="h1">Today</div>
+          <div className="muted">Daily priorities, reminders, stuck deals, and AI follow-up execution.</div>
+        </div>
+        <button className="btn ghost" type="button" onClick={() => showNotice("Today refresh")}>
+          Refresh
+        </button>
+      </div>
+      <DemoBanner />
+      <div className="detailGrid">
+        <section className="card premiumPanel">
+          <div className="cardTitle">AI follow-up queue</div>
+          <div className="list">
+            <div className="listItem">
+              <div><b>Shlok (buyer)</b></div>
+              <div className="muted small">Residency Phase 2 | warm lead | follow-up due today</div>
+              <textarea className="textarea" readOnly value="I hope this message finds you well. Following up regarding the updated layout and next steps for your visit." />
+              <PreviewActionRow
+                primaryLabel="Generate"
+                secondaryLabel="Send on WhatsApp"
+                onPrimary={() => showNotice("AI Follow-up")}
+                onSecondary={() => showNotice("WhatsApp send")}
+              />
+            </div>
+          </div>
+        </section>
+        <section className="card">
+          <div className="cardTitle">Activities</div>
+          <div className="list">
+            <div className="listItem">
+              <div className="muted">Meeting | 19/5/2026, 2:53:54 pm</div>
+              <div className="row">
+                <div className="grow">Meet investor team for yield review.</div>
+                <button className="btn" type="button" onClick={() => showNotice("Activity update")}>
+                  Mark done
+                </button>
+              </div>
+            </div>
+            <div className="listItem">
+              <div className="muted">Reminder | due tomorrow</div>
+              <div className="row">
+                <div className="grow">Push builder launch draft for approval.</div>
+                <button className="btn ghost" type="button" onClick={() => showNotice("Reminder action")}>
+                  Open
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function RoiPreviewPage() {
+  const [buyPrice, setBuyPrice] = useState("10000000");
+  const [rentMonthly, setRentMonthly] = useState("40000");
+  const [annualCosts, setAnnualCosts] = useState("60000");
+  const [sellPrice, setSellPrice] = useState("12000000");
+  const [holdYears, setHoldYears] = useState("2");
+
+  const out = useMemo(() => {
+    const buy = Number(buyPrice) || 0;
+    const rent = Number(rentMonthly) || 0;
+    const costs = Number(annualCosts) || 0;
+    const sell = Number(sellPrice) || 0;
+    const years = Math.max(1, Math.floor(Number(holdYears) || 1));
+    const annualRent = rent * 12;
+    const netAnnual = annualRent - costs;
+    const yieldPct = buy > 0 ? (netAnnual / buy) * 100 : 0;
+    const totalNetRent = netAnnual * years;
+    const flipProfit = sell - buy;
+    const totalProfit = totalNetRent + flipProfit;
+    const roiPct = buy > 0 ? (totalProfit / buy) * 100 : 0;
+    return { annualRent, netAnnual, yieldPct, totalNetRent, flipProfit, totalProfit, roiPct, years };
+  }, [annualCosts, buyPrice, holdYears, rentMonthly, sellPrice]);
+
+  return (
+    <div className="page">
+      <div className="pageHeader">
+        <div>
+          <div className="h1">ROI Calculator</div>
+          <div className="muted">Estimate rental yield, hold profit, and resale upside before you push a deal forward.</div>
+        </div>
+      </div>
+      <DemoBanner />
+      <div className="calcGrid">
+        <section className="card">
+          <div className="cardTitle">Inputs</div>
+          <div className="form">
+            <label>Buy Price (Rs)<input inputMode="numeric" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} /></label>
+            <label>Monthly Rent (Rs)<input inputMode="numeric" value={rentMonthly} onChange={(e) => setRentMonthly(e.target.value)} /></label>
+            <label>Annual Costs (Rs)<input inputMode="numeric" value={annualCosts} onChange={(e) => setAnnualCosts(e.target.value)} /></label>
+            <label>Sell Price (Rs)<input inputMode="numeric" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} /></label>
+            <label>Hold Period (years)<input inputMode="numeric" value={holdYears} onChange={(e) => setHoldYears(e.target.value)} /></label>
+          </div>
+        </section>
+        <section className="card premiumPanel">
+          <div className="cardTitle">Results</div>
+          <div className="kv">
+            <div className="k">Annual Rent</div><div className="v">{formatMoney(out.annualRent)}</div>
+            <div className="k">Net Annual Income</div><div className="v">{formatMoney(out.netAnnual)}</div>
+            <div className="k">Rental Yield</div><div className="v">{out.yieldPct.toFixed(2)}%</div>
+            <div className="k">Hold Period</div><div className="v">{out.years} year(s)</div>
+            <div className="k">Total Net Rent</div><div className="v">{formatMoney(out.totalNetRent)}</div>
+            <div className="k">Resale Profit</div><div className="v">{formatMoney(out.flipProfit)}</div>
+            <div className="k">Total Profit</div><div className="v">{formatMoney(out.totalProfit)}</div>
+            <div className="k">ROI</div><div className="v">{out.roiPct.toFixed(2)}%</div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function InsightsPreviewPage({ showNotice }: { showNotice: (title: string, message?: string) => void }) {
+  const summary = {
+    open_pipeline_value: 71300000,
+    weighted_open_pipeline_value: 48600000,
+    followup_completion_rate_7d: 0.74,
+    completed_activities_7d: 17,
+    activities_7d: 23,
+    avg_close_probability_open: 56,
+    total_deals: 24,
+    win_rate: 0.28,
+    stuck_deals: 5,
+    overdue_reminders: 4,
+    upcoming_reminders_3d: 7,
+    lead_to_close_rate: 0.18,
+    visit_to_negotiation_rate: 0.42,
+  };
+  const stages = [
+    { stage: "lead", count: 9 },
+    { stage: "visit", count: 6 },
+    { stage: "negotiation", count: 5 },
+    { stage: "closed", count: 3 },
+    { stage: "lost", count: 1 },
+  ];
+  const transitions = [
+    { from: "lead", to: "visit", count: 8 },
+    { from: "visit", to: "negotiation", count: 5 },
+    { from: "negotiation", to: "closed", count: 3 },
+  ];
+  const leaderboard = [
+    { name: "Northstone Demo User", email: "owner@northstonecrm.com", role: "Owner", deals: 11, closed: 2, activities: 9, pipeline: 32800000 },
+    { name: "Builder Demo Rep", email: "builder@northstonecrm.com", role: "Builder", deals: 7, closed: 1, activities: 8, pipeline: 21400000 },
+    { name: "Broker Demo Rep", email: "broker@northstonecrm.com", role: "Broker", deals: 6, closed: 0, activities: 6, pipeline: 17100000 },
+  ];
+
+  const pct = (v: number | null) => (v == null ? "-" : `${Math.round(v * 100)}%`);
+
+  return (
+    <div className="page">
+      <div className="pageHeader">
+        <div>
+          <div className="h1">Insights</div>
+          <div className="muted">Manager view for pipeline value, conversion momentum, and execution discipline.</div>
+        </div>
+        <button className="btn ghost" type="button" onClick={() => showNotice("Insights refresh")}>
+          Refresh
+        </button>
+      </div>
+      <DemoBanner />
+      <div className="detailGrid">
+        <section className="card" style={{ gridColumn: "1 / -1" }}>
+          <div className="cardTitle">Revenue view</div>
+          <div className="statsGrid">
+            <div className="statCard">
+              <div className="statLabel">Open pipeline</div>
+              <div className="statValue">{formatMoney(summary.open_pipeline_value)}</div>
+              <div className="statHint">Live value still being worked by the team.</div>
+            </div>
+            <div className="statCard">
+              <div className="statLabel">Weighted pipeline</div>
+              <div className="statValue">{formatMoney(summary.weighted_open_pipeline_value)}</div>
+              <div className="statHint">Risk-adjusted pipeline based on current close probability.</div>
+            </div>
+            <div className="statCard">
+              <div className="statLabel">Follow-up completion</div>
+              <div className="statValue">{pct(summary.followup_completion_rate_7d)}</div>
+              <div className="statHint">{summary.completed_activities_7d} completed out of {summary.activities_7d} activities in the last 7 days.</div>
+            </div>
+            <div className="statCard">
+              <div className="statLabel">Avg close probability</div>
+              <div className="statValue">{summary.avg_close_probability_open}%</div>
+              <div className="statHint">Average confidence across all open deals.</div>
+            </div>
+          </div>
+        </section>
+        <section className="card">
+          <div className="cardTitle">KPI</div>
+          <div className="kv">
+            <div className="k">Deals</div><div className="v">{summary.total_deals}</div>
+            <div className="k">Win rate</div><div className="v">{pct(summary.win_rate)}</div>
+            <div className="k">Stuck (7d)</div><div className="v">{summary.stuck_deals}</div>
+            <div className="k">Overdue</div><div className="v">{summary.overdue_reminders}</div>
+            <div className="k">Upcoming (3d)</div><div className="v">{summary.upcoming_reminders_3d}</div>
+            <div className="k">Activities (7d)</div><div className="v">{summary.activities_7d}</div>
+            <div className="k">Lead to close</div><div className="v">{pct(summary.lead_to_close_rate)}</div>
+            <div className="k">Visit to negotiation</div><div className="v">{pct(summary.visit_to_negotiation_rate)}</div>
+          </div>
+        </section>
+        <section className="card">
+          <div className="cardTitle">Pipeline</div>
+          <div className="kv">
+            {stages.map((s) => (
+              <div key={s.stage} className="row" style={{ justifyContent: "space-between" }}>
+                <div className="k" style={{ width: 140, textTransform: "capitalize" }}>{s.stage}</div>
+                <div className="v">{s.count}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="card" style={{ gridColumn: "1 / -1" }}>
+          <div className="cardTitle">Top stage moves (30 days)</div>
+          <div className="tableWrap">
+            <table className="table">
+              <thead><tr><th>From</th><th>To</th><th>Count</th></tr></thead>
+              <tbody>
+                {transitions.map((t) => (
+                  <tr key={`${t.from}-${t.to}`}>
+                    <td style={{ textTransform: "capitalize" }}>{t.from}</td>
+                    <td style={{ textTransform: "capitalize" }}>{t.to}</td>
+                    <td>{t.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section className="card" style={{ gridColumn: "1 / -1" }}>
+          <div className="cardTitle">Team leaderboard</div>
+          <div className="tableWrap">
+            <table className="table">
+              <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Deals</th><th>Closed</th><th>Activities (7d)</th><th>Open pipeline</th></tr></thead>
+              <tbody>
+                {leaderboard.map((member) => (
+                  <tr key={member.email}>
+                    <td className="tdTitle">{member.name}</td>
+                    <td>{member.email}</td>
+                    <td>{member.role}</td>
+                    <td>{member.deals}</td>
+                    <td>{member.closed}</td>
+                    <td>{member.activities}</td>
+                    <td>{formatMoney(member.pipeline)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function EnterprisePreviewPage({ showNotice }: { showNotice: (title: string, message?: string) => void }) {
+  return (
+    <div className="page">
+      <div className="pageHeader">
+        <div>
+          <div className="h1">Organization</div>
+          <div className="muted">Team management, builder operations, and rollups.</div>
+        </div>
+        <button className="btn ghost" type="button" onClick={() => showNotice("Enterprise refresh")}>
+          Refresh
+        </button>
+      </div>
+      <DemoBanner />
+      <section className="card premiumPanel">
+        <div className="cardTitle">Organization overview</div>
+        <div className="statsGrid">
+          <div className="statCard">
+            <div className="statLabel">Owner</div>
+            <div className="statValue">owner@northstonecrm.com</div>
+            <div className="statHint">Northstone Demo Realty</div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">Employee capacity</div>
+            <div className="statValue">3/5</div>
+            <div className="statHint">Team visibility and licensing control.</div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">Combined deals</div>
+            <div className="statValue">24</div>
+            <div className="statHint">All employee pipeline rolled into one manager view.</div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">Combined activities</div>
+            <div className="statValue">33</div>
+            <div className="statHint">Operational velocity across the enterprise team.</div>
+          </div>
+        </div>
+      </section>
+      <div className="detailGrid">
+        <section className="card">
+          <div className="cardTitle">Company setup</div>
+          <div className="mini">
+            <div><b>Company:</b> Northstone Demo Realty</div>
+            <div><b>City:</b> Pune</div>
+            <div><b>Areas served:</b> Baner, Hinjewadi, Kharadi</div>
+            <div><b>Specialization:</b> residential + builder operations</div>
+          </div>
+          <PreviewActionRow
+            primaryLabel="Save company setup"
+            secondaryLabel="Manage employees"
+            onPrimary={() => showNotice("Company setup")}
+            onSecondary={() => showNotice("Employee management")}
+          />
+        </section>
+        <section className="card">
+          <div className="cardTitle">Builder and construction document desk</div>
+          <div className="muted">Generate AI-drafted project overviews, sales offers, and company-facing construction summaries.</div>
+          <div className="grid2">
+            <label>Document type<select defaultValue="project_overview"><option value="project_overview">Project overview</option><option value="sales_offer">Sales offer</option></select></label>
+            <label>Tone<select defaultValue="professional"><option value="professional">Professional</option><option value="premium">Premium</option></select></label>
+          </div>
+          <label>Project name<input defaultValue="Skyline Residency Phase 2" readOnly /></label>
+          <label>Facts and instructions<textarea className="textarea" defaultValue="Write the exact facts, project details, construction status, approvals already available, target buyer, commercial points, and anything the draft must include." readOnly /></label>
+          <PreviewActionRow
+            primaryLabel="Generate AI draft"
+            secondaryLabel="Save brief only"
+            onPrimary={() => showNotice("Builder AI documents")}
+            onSecondary={() => showNotice("Builder draft save")}
+          />
+        </section>
+        <section className="card" style={{ gridColumn: "1 / -1" }}>
+          <div className="cardTitle">Team leaderboard and governance</div>
+          <div className="tableWrap">
+            <table className="table">
+              <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Deals</th><th>Closed</th><th>Activities</th><th>Action</th></tr></thead>
+              <tbody>
+                {[
+                  ["Northstone Demo User", "owner@northstonecrm.com", "Owner", 11, 2, 9],
+                  ["Builder Demo Rep", "builder@northstonecrm.com", "Builder", 7, 1, 8],
+                  ["Broker Demo Rep", "broker@northstonecrm.com", "Broker", 6, 0, 6],
+                ].map(([name, email, role, deals, closed, activities]) => (
+                  <tr key={String(email)}>
+                    <td>{name}</td><td>{email}</td><td>{role}</td><td>{deals}</td><td>{closed}</td><td>{activities}</td>
+                    <td><button className="btn ghost" type="button" onClick={() => showNotice("Governance actions")}>Manage</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function AppsPreviewPage({ showNotice }: { showNotice: (title: string, message?: string) => void }) {
+  const [selectedTab, setSelectedTab] = useState<"communication" | "meetings" | "calendar" | "ads" | "coming_soon">("communication");
+  const tabs = [
+    { key: "communication", label: "Communication" },
+    { key: "meetings", label: "Meetings" },
+    { key: "calendar", label: "Calendar" },
+    { key: "ads", label: "Ads" },
+    { key: "coming_soon", label: "Coming soon" },
+  ] as const;
+  const providerCards = [
+    { name: "Gmail", tab: "communication", category: "Email", rollout: "Phase 1", purpose: "Send client follow-ups and log outbound communication to the CRM timeline." },
+    { name: "Google Meet", tab: "meetings", category: "Meetings", rollout: "Phase 1", purpose: "Generate meeting links for walkthroughs, client reviews, and partner calls from Northstone." },
+    { name: "Zoom", tab: "meetings", category: "Meetings", rollout: "Phase 3", purpose: "Create Zoom sessions for sales calls, investor meetings, and remote walkthroughs." },
+    { name: "Google Calendar", tab: "calendar", category: "Scheduling", rollout: "Phase 1", purpose: "Create site visits, callbacks, launches, and review meetings from deal and contact context." },
+  ];
+  const ads = [
+    { name: "Google Ads", desc: "Create campaigns for property launches, lead capture, project awareness, branded search, and location-targeted buyer demand." },
+    { name: "Meta Ads", desc: "Run visual campaigns for builders, broker teams, and luxury inventory across Facebook and Instagram audiences." },
+    { name: "TikTok Ads", desc: "Promote projects, walkthroughs, and branded launch content with short-form campaign distribution for newer audiences." },
+  ];
+
+  return (
+    <div className="page">
+      <div className="pageHeader">
+        <div>
+          <div className="h1">Apps</div>
+          <div className="muted">Connection and publishing surfaces for communication, meetings, scheduling, and ads.</div>
+        </div>
+      </div>
+      <DemoBanner />
+      <div className="grid2" style={{ alignItems: "start" }}>
+        <section className="card">
+          <div className="cardTitle">Apps library</div>
+          <div className="list">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                className={selectedTab === tab.key ? "btn" : "btn ghost"}
+                onClick={() => setSelectedTab(tab.key)}
+                style={{ justifyContent: "flex-start", textAlign: "left" }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </section>
+        <div className="page">
+          {providerCards.filter((card) => card.tab === selectedTab).map((card) => (
+            <section key={card.name} className="card">
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <div className="cardTitle">{card.name}</div>
+                  <div className="muted">{card.category} | {card.rollout}</div>
+                </div>
+                <div className="pill">Ready to connect</div>
+              </div>
+              <div>{card.purpose}</div>
+              <PreviewActionRow
+                primaryLabel={`Connect ${card.name}`}
+                secondaryLabel="Test connection"
+                onPrimary={() => showNotice(card.name)}
+                onSecondary={() => showNotice(`${card.name} test`)}
+              />
+            </section>
+          ))}
+          {selectedTab === "ads" ? ads.map((card) => (
+            <section key={card.name} className="card">
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <div className="cardTitle">{card.name}</div>
+                  <div className="muted">Publish</div>
+                </div>
+                <div className="pill">Ready</div>
+              </div>
+              <div>{card.desc}</div>
+              <button className="btn" type="button" onClick={() => showNotice(card.name)}>
+                Open {card.name}
+              </button>
+            </section>
+          )) : null}
+          {selectedTab === "coming_soon" ? (
+            <>
+              <section className="card">
+                <div className="cardTitle">Microsoft Teams</div>
+                <div className="muted">Meetings | Coming soon</div>
+                <div>Microsoft workspace rollout is prepared, but tenant and permission setup stays behind the official website flow.</div>
+                <button className="btn ghost" type="button" onClick={() => showNotice("Microsoft Teams")}>
+                  Show demo notice
+                </button>
+              </section>
+              <section className="card">
+                <div className="cardTitle">Outlook</div>
+                <div className="muted">Email | Coming soon</div>
+                <div>Outlook support stays queued behind the same Microsoft tenant setup so mail and meeting workflows go live together.</div>
+                <button className="btn ghost" type="button" onClick={() => showNotice("Outlook")}>
+                  Show demo notice
+                </button>
+              </section>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PipelinePage({
   deals,
   contacts,
@@ -887,13 +1374,13 @@ export default function DemoApp() {
           <Route path="/deals" element={<DealsPage deals={state.deals} deleteDeal={deleteDeal} />} />
           <Route path="/deals/:dealId" element={<DealDetailPage state={state} updateDeal={updateDeal} addActivity={addActivity} toggleActivity={toggleActivity} showNotice={showNotice} />} />
           <Route path="/contacts" element={<ContactsPage contacts={state.contacts} deals={state.deals} addContact={addContact} updateContact={updateContact} />} />
-          <Route path="/today" element={<LockedFeaturePage title="Today" description="Daily priorities, reminders, and AI execution." showNotice={showNotice} />} />
-          <Route path="/calc" element={<LockedFeaturePage title="ROI" description="Return, yield, and comparison tooling." showNotice={showNotice} />} />
-          <Route path="/insights" element={<LockedFeaturePage title="Insights" description="Performance reporting and market intelligence." showNotice={showNotice} />} />
-          <Route path="/enterprise" element={<LockedFeaturePage title="Enterprise" description="Org controls, builder workflows, and governance." showNotice={showNotice} />} />
+          <Route path="/today" element={<TodayPreviewPage showNotice={showNotice} />} />
+          <Route path="/calc" element={<RoiPreviewPage />} />
+          <Route path="/insights" element={<InsightsPreviewPage showNotice={showNotice} />} />
+          <Route path="/enterprise" element={<EnterprisePreviewPage showNotice={showNotice} />} />
           <Route path="/account" element={<LockedFeaturePage title="Account" description="Profile, ownership, and personal workspace settings." showNotice={showNotice} />} />
           <Route path="/settings" element={<LockedFeaturePage title="Settings" description="AI, install, and runtime preferences." showNotice={showNotice} />} />
-          <Route path="/apps" element={<LockedFeaturePage title="Apps" description="Google Workspace, Zoom, ads, and other integrations." showNotice={showNotice} />} />
+          <Route path="/apps" element={<AppsPreviewPage showNotice={showNotice} />} />
           <Route path="/admin" element={<LockedFeaturePage title="Admin" description="Admin-only controls and oversight." showNotice={showNotice} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
