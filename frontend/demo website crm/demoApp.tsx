@@ -730,7 +730,7 @@ function AppsPreviewPage({ showNotice }: { showNotice: (title: string, message?:
   ];
   const ads = [
     { name: "Google Ads", desc: "Create campaigns for property launches, lead capture, project awareness, branded search, and location-targeted buyer demand.", iconUrl: "https://cdn.simpleicons.org/googleads/4285F4" },
-    { name: "TikTok Ads", desc: "Promote projects, walkthroughs, and branded launch content with short-form campaign distribution for newer audiences.", iconUrl: "https://cdn.simpleicons.org/tiktok/000000" },
+    { name: "TikTok Ads", desc: "Promote projects, walkthroughs, and branded launch content with short-form campaign distribution for newer audiences.", iconUrl: "https://cdn.simpleicons.org/tiktok/000000", status: "coming_soon" },
   ];
   const comingSoon = [
     { name: "Zoom", category: "Meetings", description: "Zoom meeting creation is already part of the official CRM rollout and will appear in this public demo soon.", iconUrl: "https://cdn.simpleicons.org/zoom/0B5CFF" },
@@ -777,7 +777,7 @@ function AppsPreviewPage({ showNotice }: { showNotice: (title: string, message?:
                     <div className="muted">{card.category} | {card.rollout}</div>
                   </div>
                 </div>
-                <div className="pill">Coming soon</div>
+                <div className="pill">{card.status === "coming_soon" ? "Coming soon" : "Ready"}</div>
               </div>
               <div>{card.purpose}</div>
               <PreviewActionRow
