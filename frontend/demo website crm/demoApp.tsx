@@ -777,7 +777,7 @@ function AppsPreviewPage({ showNotice }: { showNotice: (title: string, message?:
                     <div className="muted">{card.category} | {card.rollout}</div>
                   </div>
                 </div>
-                <div className="pill">Ready to connect</div>
+                <div className="pill">Coming soon</div>
               </div>
               <div>{card.purpose}</div>
               <PreviewActionRow
@@ -798,7 +798,7 @@ function AppsPreviewPage({ showNotice }: { showNotice: (title: string, message?:
                     <div className="muted">Publish</div>
                   </div>
                 </div>
-                <div className="pill">Ready</div>
+                <div className="pill">Coming soon</div>
               </div>
               <div>{card.desc}</div>
               <button className="btn" type="button" onClick={() => showNotice(card.name)}>
