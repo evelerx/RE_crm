@@ -729,7 +729,7 @@ function AppsPreviewPage({ showNotice }: { showNotice: (title: string, message?:
     { name: "Google Calendar", tab: "calendar", category: "Scheduling", rollout: "Phase 1", purpose: "Create site visits, callbacks, launches, and review meetings from deal and contact context.", iconUrl: "https://cdn.simpleicons.org/googlecalendar/4285F4" },
   ];
   const ads = [
-    { name: "Google Ads", desc: "Create campaigns for property launches, lead capture, project awareness, branded search, and location-targeted buyer demand.", iconUrl: "https://cdn.simpleicons.org/googleads/4285F4" },
+    { name: "Google Ads", desc: "Create campaigns for property launches, lead capture, project awareness, branded search, and location-targeted buyer demand.", iconUrl: "https://cdn.simpleicons.org/googleads/4285F4", status: "ready" },
     { name: "TikTok Ads", desc: "Promote projects, walkthroughs, and branded launch content with short-form campaign distribution for newer audiences.", iconUrl: "https://cdn.simpleicons.org/tiktok/000000", status: "coming_soon" },
   ];
   const comingSoon = [
