@@ -51,8 +51,8 @@ function seedState(): DemoState {
       id: demoId("contact"),
       name: "Shlok",
       occupation: "Buyer",
-      phone: "9876543211",
-      email: "shlok@example.com",
+      phone: null,
+      email: null,
       role: "buyer",
       tags: "premium,budget-ready",
       notes: "Interested in 3 BHK inventory in Pune west.",
@@ -61,10 +61,10 @@ function seedState(): DemoState {
     },
     {
       id: demoId("contact"),
-      name: "Kunj Capital",
+      name: "Aarav Ventures",
       occupation: "Investor",
-      phone: "9876543212",
-      email: "kunj@example.com",
+      phone: "9876543210",
+      email: "aarav@example.com",
       role: "investor",
       tags: "investor,commercial",
       notes: "Looks at yield-first opportunities.",
@@ -75,7 +75,7 @@ function seedState(): DemoState {
       id: demoId("contact"),
       name: "Builder Org",
       occupation: "Developer",
-      phone: "9876543213",
+      phone: "8765432109",
       email: "builder@example.com",
       role: "seller",
       tags: "builder,launch",
@@ -726,13 +726,17 @@ function AppsPreviewPage({ showNotice }: { showNotice: (title: string, message?:
   const providerCards = [
     { name: "Gmail", tab: "communication", category: "Email", rollout: "Phase 1", purpose: "Send client follow-ups and log outbound communication to the CRM timeline." },
     { name: "Google Meet", tab: "meetings", category: "Meetings", rollout: "Phase 1", purpose: "Generate meeting links for walkthroughs, client reviews, and partner calls from Northstone." },
-    { name: "Zoom", tab: "meetings", category: "Meetings", rollout: "Phase 3", purpose: "Create Zoom sessions for sales calls, investor meetings, and remote walkthroughs." },
     { name: "Google Calendar", tab: "calendar", category: "Scheduling", rollout: "Phase 1", purpose: "Create site visits, callbacks, launches, and review meetings from deal and contact context." },
   ];
   const ads = [
     { name: "Google Ads", desc: "Create campaigns for property launches, lead capture, project awareness, branded search, and location-targeted buyer demand." },
-    { name: "Meta Ads", desc: "Run visual campaigns for builders, broker teams, and luxury inventory across Facebook and Instagram audiences." },
     { name: "TikTok Ads", desc: "Promote projects, walkthroughs, and branded launch content with short-form campaign distribution for newer audiences." },
+  ];
+  const comingSoon = [
+    { name: "Zoom", category: "Meetings", description: "Zoom meeting creation is already part of the official CRM rollout and will appear in this public demo soon." },
+    { name: "Meta Ads", category: "Ads", description: "Meta campaign launch surfaces are active in the official CRM path and will be connected into this demo soon." },
+    { name: "Microsoft Teams", category: "Meetings", description: "Microsoft workspace rollout is prepared, but tenant and permission setup stays behind the official website flow." },
+    { name: "Outlook", category: "Email", description: "Outlook support stays queued behind the same Microsoft tenant setup so mail and meeting workflows go live together." },
   ];
 
   return (
@@ -797,22 +801,21 @@ function AppsPreviewPage({ showNotice }: { showNotice: (title: string, message?:
           )) : null}
           {selectedTab === "coming_soon" ? (
             <>
-              <section className="card">
-                <div className="cardTitle">Microsoft Teams</div>
-                <div className="muted">Meetings | Coming soon</div>
-                <div>Microsoft workspace rollout is prepared, but tenant and permission setup stays behind the official website flow.</div>
-                <button className="btn ghost" type="button" onClick={() => showNotice("Microsoft Teams")}>
-                  Show demo notice
-                </button>
-              </section>
-              <section className="card">
-                <div className="cardTitle">Outlook</div>
-                <div className="muted">Email | Coming soon</div>
-                <div>Outlook support stays queued behind the same Microsoft tenant setup so mail and meeting workflows go live together.</div>
-                <button className="btn ghost" type="button" onClick={() => showNotice("Outlook")}>
-                  Show demo notice
-                </button>
-              </section>
+              {comingSoon.map((card) => (
+                <section key={card.name} className="card">
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div className="cardTitle">{card.name}</div>
+                      <div className="muted">{card.category} | Coming soon</div>
+                    </div>
+                    <div className="pill">Coming soon</div>
+                  </div>
+                  <div>{card.description}</div>
+                  <button className="btn ghost" type="button" onClick={() => showNotice(card.name)}>
+                    Show demo notice
+                  </button>
+                </section>
+              ))}
             </>
           ) : null}
         </div>
