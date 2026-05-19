@@ -723,12 +723,12 @@ function AppsPreviewPage({ showNotice }: { showNotice: (title: string, message?:
     { key: "ads", label: "Ads", iconUrl: "https://cdn.simpleicons.org/googleads/4285F4" },
   ] as const;
   const providerCards = [
-    { name: "Gmail", tab: "communication", category: "Email", rollout: "Phase 1", purpose: "Send client follow-ups and log outbound communication to the CRM timeline.", iconUrl: "https://cdn.simpleicons.org/gmail/EA4335", status: "coming_soon" },
+    { name: "Gmail", tab: "communication", category: "Email", rollout: "Phase 1", purpose: "Send client follow-ups and log outbound communication to the CRM timeline.", iconUrl: "https://cdn.simpleicons.org/gmail/EA4335", status: "ready" },
     { name: "Outlook", tab: "communication", category: "Email", rollout: "Coming soon", purpose: "Outlook support stays queued behind Microsoft tenant setup so mail workflows go live cleanly.", iconUrl: "https://cdn.simpleicons.org/microsoftoutlook/0078D4", status: "coming_soon" },
-    { name: "Google Meet", tab: "meetings", category: "Meetings", rollout: "Phase 1", purpose: "Generate meeting links for walkthroughs, client reviews, and partner calls from Northstone.", iconUrl: "https://cdn.simpleicons.org/googlemeet/00897B", status: "coming_soon" },
+    { name: "Google Meet", tab: "meetings", category: "Meetings", rollout: "Phase 1", purpose: "Generate meeting links for walkthroughs, client reviews, and partner calls from Northstone.", iconUrl: "https://cdn.simpleicons.org/googlemeet/00897B", status: "ready" },
     { name: "Zoom", tab: "meetings", category: "Meetings", rollout: "Phase 3", purpose: "Create Zoom sessions for sales calls, investor meetings, and remote walkthroughs.", iconUrl: "https://cdn.simpleicons.org/zoom/0B5CFF", status: "coming_soon" },
     { name: "Microsoft Teams", tab: "meetings", category: "Meetings", rollout: "Coming soon", purpose: "Microsoft workspace rollout is prepared, but tenant and permission setup stays behind the official website flow.", iconUrl: "https://cdn.simpleicons.org/microsoftteams/6264A7", status: "coming_soon" },
-    { name: "Google Calendar", tab: "calendar", category: "Scheduling", rollout: "Phase 1", purpose: "Create site visits, callbacks, launches, and review meetings from deal and contact context.", iconUrl: "https://cdn.simpleicons.org/googlecalendar/4285F4", status: "coming_soon" },
+    { name: "Google Calendar", tab: "calendar", category: "Scheduling", rollout: "Phase 1", purpose: "Create site visits, callbacks, launches, and review meetings from deal and contact context.", iconUrl: "https://cdn.simpleicons.org/googlecalendar/4285F4", status: "ready" },
   ];
   const ads = [
     { name: "Google Ads", desc: "Create campaigns for property launches, lead capture, project awareness, branded search, and location-targeted buyer demand.", iconUrl: "https://cdn.simpleicons.org/googleads/4285F4", status: "ready" },
