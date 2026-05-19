@@ -1098,8 +1098,8 @@
               Open the secure CRM preview or login first. The actual install option appears inside the paid owner workspace so team devices do not get disconnected from subscription ownership.
             </div>
             <div class="heroActions" style="margin-top:18px">
-              <a class="btn btnPrimary" id="downloadAppButton" href="#" target="_blank" rel="noreferrer">Open CRM preview</a>
-              <a class="btn btnSecondary" id="openLoginButton" href="#" target="_blank" rel="noreferrer">Open CRM login</a>
+              <a class="btn btnPrimary" id="downloadAppButton" href="/app" target="_blank" rel="noreferrer">Open CRM demo</a>
+              <a class="btn btnSecondary" id="openLoginButton" href="/app" target="_blank" rel="noreferrer">Open demo in new tab</a>
             </div>
             <div class="finePrint">
               Honest answer: this will not create extra lagging or data-loss issues when we ship it as an installed web app. The browser installs the interface shell, but deals, contacts, subscriptions, enterprise data, and admin controls still live on the main system database.
@@ -1324,10 +1324,10 @@
     };
 
     if (downloadAppButton) {
-      downloadAppButton.href = `${APP_BASE}/`;
+      downloadAppButton.href = "/app";
     }
     if (openLoginButton) {
-      openLoginButton.href = `${APP_BASE}/login`;
+      openLoginButton.href = "/app";
     }
 
     if (location.protocol === "file:" && localNotice) {
