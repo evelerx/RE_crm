@@ -2,12 +2,23 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
 type MeResponse = {
   is_admin: boolean;
   ai_enabled?: boolean;
   ai_model?: string;
   ai_scope?: string;
   enterprise_company_name?: string;
+  plan?: string;
+  enterprise_owner_id?: string | null;
+  subscription_plan?: string;
+  subscription_cycle?: string;
+  subscription_seats?: number;
+  can_install_app?: boolean;
 };
 
 type LlmTestResponse = { ok: boolean; output: string };
@@ -41,6 +52,9 @@ export default function SettingsPage() {
   const [busy, setBusy] = useState(false);
   const [configBusy, setConfigBusy] = useState(false);
   const [configMsg, setConfigMsg] = useState<string | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installBusy, setInstallBusy] = useState(false);
+  const [installMsg, setInstallMsg] = useState<string | null>(null);
   const [configForm, setConfigForm] = useState({
     frontend_origin: "",
     openrouter_base_url: "",
@@ -81,6 +95,18 @@ export default function SettingsPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    function handleBeforeInstallPrompt(event: Event) {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+  }, []);
+
+  const isSubscriptionOwner = Boolean(me?.can_install_app);
 
   return (
     <div className="page">
@@ -143,6 +169,58 @@ export default function SettingsPage() {
           ) : null}
         </div>
       </section>
+
+      {isSubscriptionOwner ? (
+        <section className="card premiumPanel" id="install-app">
+          <div className="cardTitle">Install Northstone</div>
+          <div className="muted small">
+            Install access is limited to subscription owners so the CRM app stays tied to the correct paid workspace. Team members continue using the browser version under the owner-managed account.
+          </div>
+          <div className="mini" style={{ marginTop: 14 }}>
+            <div>
+              <b>Subscription:</b> {(me?.subscription_plan || me?.plan || "free").replace(/_/g, " ")}
+            </div>
+            <div>
+              <b>Cycle:</b> {(me?.subscription_cycle || "monthly").replace(/_/g, " ")}
+            </div>
+            <div>
+              <b>Seat allocation:</b> {me?.subscription_seats || 1}
+            </div>
+          </div>
+          <div className="muted small" style={{ marginTop: 14 }}>
+            On supported browsers, this installs Northstone like an app while your live deals, contacts, subscriptions, and enterprise records remain on the secure backend.
+          </div>
+          {installMsg ? <div className="alert ok">{installMsg}</div> : null}
+          <div className="row" style={{ marginTop: 16 }}>
+            <button
+              className="btn"
+              type="button"
+              disabled={installBusy}
+              onClick={async () => {
+                setInstallBusy(true);
+                setInstallMsg(null);
+                try {
+                  if (installPrompt) {
+                    await installPrompt.prompt();
+                    const choice = await installPrompt.userChoice;
+                    setInstallPrompt(null);
+                    setInstallMsg(choice.outcome === "accepted" ? "Northstone install started." : "Install prompt dismissed. You can try again anytime from this page.");
+                  } else {
+                    setInstallMsg("Install prompt is not available on this browser right now. On Chrome or Edge, use the browser menu and choose Install app / Add to desktop.");
+                  }
+                } finally {
+                  setInstallBusy(false);
+                }
+              }}
+            >
+              {installBusy ? "Opening..." : "Install CRM app"}
+            </button>
+            <Link className="btn ghost" to="/">
+              Open CRM
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       {me?.is_admin && runtimeConfig ? (
         <section className="card premiumPanel">

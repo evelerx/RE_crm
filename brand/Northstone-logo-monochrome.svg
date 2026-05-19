@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760">
+  <rect width="1280" height="760" rx="32" fill="#FAFBFD"/>
+  <g transform="translate(440 82)">
+    <path fill="#222A33" d="M49 34h65v86L49 74z"/>
+    <path fill="#222A33" d="M49 110l65 46v111H49z"/>
+    <path fill="#4C5661" d="M136 98l115 81v86l-115-82z"/>
+    <path fill="#4C5661" d="M202 34h49v102l-49-35z"/>
+    <path fill="#FAFBFD" d="M49 126l18-13 129 92-18 13z"/>
+  </g>
+  <text x="640" y="474" fill="#2A3139" font-family="Montserrat, Arial, sans-serif" font-size="82" font-weight="600" letter-spacing="11" text-anchor="middle">NORTHSTONE</text>
+  <line x1="350" y1="538" x2="500" y2="538" stroke="#727A84" stroke-width="3"/>
+  <line x1="780" y1="538" x2="930" y2="538" stroke="#727A84" stroke-width="3"/>
+  <text x="640" y="551" fill="#555E68" font-family="Montserrat, Arial, sans-serif" font-size="34" font-weight="500" letter-spacing="7" text-anchor="middle">BUILDING BETTER DEALS</text>
+</svg>

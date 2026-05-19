@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" rx="32" fill="#F8FBFF"/>
+  <g transform="translate(440 94)">
+    <path fill="#0A1D35" d="M49 34h65v86L49 74z"/>
+    <path fill="#102B49" d="M49 110l65 46v111H49z"/>
+    <path fill="#345E88" d="M136 98l115 81v86l-115-82z"/>
+    <path fill="#6B7C93" opacity=".16" d="M136 98l115 81v86l-115-82z"/>
+    <path fill="#6B7C93" d="M202 34h49v102l-49-35z"/>
+    <path fill="#F8FBFF" d="M49 126l18-13 129 92-18 13z"/>
+  </g>
+  <text x="640" y="486" fill="#081B35" font-family="Montserrat, Arial, sans-serif" font-size="86" font-weight="600" letter-spacing="12" text-anchor="middle">NORTHSTONE</text>
+</svg>

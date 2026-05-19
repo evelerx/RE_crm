@@ -1,9 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Northstone | The Real-Estate Sales Operating System</title>
+<link rel="icon" href="./northstone-favicon.svg" type="image/svg+xml" />
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <style>
   :root {
@@ -31,6 +32,20 @@
       linear-gradient(180deg, #08101a 0%, #0b1220 100%);
     color: var(--text);
   }
+  body::before {
+    content: "";
+    position: fixed;
+    top: -60px;
+    right: -40px;
+    width: 420px;
+    height: 420px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(127,177,255,0.14), transparent 68%);
+    pointer-events: none;
+    filter: blur(8px);
+    animation: floatGlow 18s ease-in-out infinite;
+    z-index: 0;
+  }
   a { color: inherit; text-decoration: none; }
   .shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
   .topbar {
@@ -57,8 +72,16 @@
     width: 38px;
     height: 38px;
     border-radius: 12px;
-    background: linear-gradient(135deg, var(--brand), var(--accent));
-    box-shadow: 0 16px 36px rgba(127,177,255,0.22);
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(227,236,248,0.9));
+    box-shadow: 0 16px 36px rgba(10, 20, 36, 0.26);
+    overflow: hidden;
+  }
+  .logo img {
+    width: 28px;
+    height: 28px;
+    display: block;
   }
   .brandTitle {
     font-family: Georgia, "Times New Roman", serif;
@@ -107,7 +130,7 @@
   }
   .heroGrid {
     display: grid;
-    grid-template-columns: 1.15fr 0.85fr;
+    grid-template-columns: 1fr;
     gap: 28px;
     align-items: start;
   }
@@ -148,6 +171,59 @@
   .heroCopyStrong {
     color: var(--text);
     font-weight: 700;
+  }
+  .modeDock {
+    display: inline-flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+    padding: 8px;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(8, 14, 24, 0.58);
+  }
+  .modeBtn {
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    transition: all 0.18s ease;
+  }
+  .modeBtn:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.04);
+  }
+  .modeBtn.active {
+    color: #07111d;
+    background: linear-gradient(135deg, var(--brand), var(--brand-strong));
+    box-shadow: 0 12px 26px rgba(93,147,242,0.24);
+  }
+  .modeShowcase {
+    margin-top: 34px;
+    max-width: 980px;
+  }
+  .modeShowcase .modeDock {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    width: min(100%, 620px);
+    margin-top: 0;
+    margin-bottom: 18px;
+    padding: 10px;
+  }
+  .modeShowcase .modeBtn {
+    width: 100%;
+    padding: 14px 18px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .modeShowcase .heroPanel {
+    max-width: 980px;
   }
   .heroActions {
     display: flex;
@@ -210,6 +286,7 @@
   }
   .heroPanel {
     padding: 24px;
+    transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
   }
   .panelKicker {
     font-size: 12px;
@@ -242,6 +319,12 @@
     border-radius: 16px;
     border: 1px solid rgba(255,255,255,0.05);
     background: rgba(6,12,20,0.44);
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  }
+  .signalRow:hover {
+    transform: translateY(-1px);
+    border-color: rgba(127,177,255,0.16);
+    background: rgba(8,14,24,0.6);
   }
   .signalTitle {
     font-size: 14px;
@@ -294,12 +377,21 @@
     gap: 18px;
     margin-top: 42px;
   }
+  .overviewGrid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 18px;
+    margin-top: 42px;
+  }
   .featureGrid { grid-template-columns: repeat(3, minmax(0,1fr)); }
   .whyGrid { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .pricingGrid { grid-template-columns: repeat(4, minmax(0,1fr)); align-items: start; }
   .audienceGrid { grid-template-columns: repeat(3, minmax(0,1fr)); }
   .card {
     padding: 24px;
+  }
+  .card:hover {
+    border-color: rgba(127,177,255,0.16);
   }
   .cardTitle {
     font-family: Georgia, "Times New Roman", serif;
@@ -311,6 +403,19 @@
     color: var(--muted);
     font-size: 14px;
     line-height: 1.72;
+  }
+  .overviewStat {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 34px;
+    line-height: 1;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+  .overviewMini {
+    margin-top: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: rgba(244,247,251,0.82);
   }
   .featureTag, .priceTag {
     display: inline-flex;
@@ -487,18 +592,34 @@
     font-size: 13px;
     line-height: 1.7;
   }
+  .js-ready .revealItem {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.55s ease, transform 0.55s ease;
+  }
+  .js-ready .revealItem.revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  @keyframes floatGlow {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(-18px, 16px, 0) scale(1.06); }
+  }
   @media (max-width: 1080px) {
     .heroGrid, .ctaBand { grid-template-columns: 1fr; }
-    .featureGrid, .pricingGrid, .audienceGrid { grid-template-columns: 1fr 1fr; }
+    .featureGrid, .pricingGrid, .audienceGrid, .overviewGrid { grid-template-columns: 1fr 1fr; }
     .heroStats { grid-template-columns: repeat(2, minmax(0,1fr)); }
   }
   @media (max-width: 720px) {
     .topbarInner { align-items: flex-start; }
     .nav { justify-content: flex-start; }
-    .featureGrid, .whyGrid, .pricingGrid, .audienceGrid, .heroStats, .formGrid { grid-template-columns: 1fr; }
+    .featureGrid, .whyGrid, .pricingGrid, .audienceGrid, .overviewGrid, .heroStats, .formGrid { grid-template-columns: 1fr; }
     .hero { padding-top: 68px; }
     section { padding: 72px 0; }
     .priceCard.featured { transform: none; }
+    .modeDock { width: 100%; }
+    .modeShowcase .modeDock { grid-template-columns: 1fr; }
+    .modeShowcase .modeBtn { white-space: normal; }
   }
 </style>
 </head>
@@ -509,13 +630,14 @@
   <div class="topbar">
     <div class="shell topbarInner">
       <div class="brand">
-        <div class="logo"></div>
+        <div class="logo"><img src="./northstone-mark.svg" alt="Northstone logo" /></div>
         <div>
           <div class="brandTitle">Northstone</div>
-          <div class="brandSub">Real-estate sales operating system for solo closers, broker teams, and builder organizations</div>
+          <div class="brandSub">Real-estate sales operating system for solo closers, broker teams, enterprise owners, and builder organizations</div>
         </div>
       </div>
       <div class="nav">
+        <a href="#overview">Overview</a>
         <a href="#why">Why Us</a>
         <a href="#features">Features</a>
         <a href="#pricing">Pricing</a>
@@ -535,7 +657,7 @@
           <h1>Stop managing deals like a side hustle. <br />Run your sales like a machine.</h1>
           <div class="heroLead">
             <span class="heroCopyStrong">Northstone is not another generic CRM.</span>
-            It is the operating system for real-estate sales teams that are done losing revenue to missed follow-ups, weak visibility, broken reporting, and spreadsheet chaos.
+            It is the operating system for real-estate sales teams that are done losing revenue to missed follow-ups, weak visibility, scattered tools, broken reporting, and spreadsheet chaos.
           </div>
           <div class="heroActions">
             <a class="btn btnPrimary" href="#start">Start your plan</a>
@@ -562,36 +684,40 @@
             </div>
           </div>
         </div>
-        <aside class="heroPanel">
-          <div class="panelKicker">What this changes</div>
-          <div class="panelTitle">Your current CRM stores records. This one pushes revenue.</div>
-          <div class="panelSub">
-            If your team still depends on memory, scattered chats, notebooks, and delayed follow-ups, you do not have a sales system. You have risk. Northstone gives you the discipline layer your current stack never gave you.
+      </div>
+    </section>
+
+    <section id="overview">
+      <div class="shell">
+        <div class="sectionLabel">Overview</div>
+        <div class="sectionTitle">Everything important is organized here before a client ever clicks Start Now.</div>
+        <div class="sectionSub">This section gives buyers a fast executive read of what Northstone is, who it serves, what is already live, and how the commercial model works today.</div>
+        <div class="overviewGrid">
+          <div class="card">
+            <div class="cardTitle">What it is</div>
+            <div class="overviewStat">CRM + Ops</div>
+            <div class="cardText">Northstone is a real-estate sales operating system for solo closers, broker teams, enterprise owners, and builder organizations.</div>
+            <div class="overviewMini">Pipeline, deals, contacts, ROI, insights, enterprise controls, apps, and launch-ready workflows in one stack.</div>
           </div>
-          <div class="signalStack">
-            <div class="signalRow">
-              <div>
-                <div class="signalTitle">Every deal visible</div>
-                <div class="signalMeta">Pipeline, grid, detail workspace, ROI, visits, typology, budget, and client heat in one place.</div>
-              </div>
-              <span class="pill">Execution</span>
-            </div>
-            <div class="signalRow">
-              <div>
-                <div class="signalTitle">Every team member accountable</div>
-                <div class="signalMeta">Enterprise owners can see activity, usage, employee IDs, AI access, and rollups without chasing scattered updates.</div>
-              </div>
-              <span class="pill">Control</span>
-            </div>
-            <div class="signalRow">
-              <div>
-                <div class="signalTitle">Every subscription linked</div>
-                <div class="signalMeta">Landing page plan selection can create the CRM account and reflect the sale inside subscription revenue reporting.</div>
-              </div>
-              <span class="pill">Growth</span>
-            </div>
+          <div class="card">
+            <div class="cardTitle">Who it serves</div>
+            <div class="overviewStat">4 lanes</div>
+            <div class="cardText">Independent brokers, channel partners, brokerages, and builder-led sales organizations all fit inside the same product model.</div>
+            <div class="overviewMini">Solo for individuals. Enterprise for broker and CP teams. Builder for developer-led operations. Custom for larger rollouts.</div>
           </div>
-        </aside>
+          <div class="card">
+            <div class="cardTitle">What is live today</div>
+            <div class="overviewStat">Live UI</div>
+            <div class="cardText">Landing page, CRM preview, pipeline workspace, admin portal, enterprise flows, apps workspace, and owner-managed install flow are already structured.</div>
+            <div class="overviewMini">Public preview shows the full product shape. Paid owner access unlocks the live operational workflow.</div>
+          </div>
+          <div class="card">
+            <div class="cardTitle">How pricing works</div>
+            <div class="overviewStat">1 / 6 / 12</div>
+            <div class="cardText">Subscriptions now support 1 month, 6 months, and 1 year billing cycles, with a 5% discount reserved only for the 1-year option.</div>
+            <div class="overviewMini">Enterprise and Builder include seat drilldown, so extra sub accounts scale from the same pricing logic instead of being handled manually.</div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -610,7 +736,7 @@
               <div class="listRow"><span class="tick">+</span><span>Solo and enterprise workflows inside the same product</span></div>
               <div class="listRow"><span class="tick">+</span><span>Leadership visibility over revenue, access, subscriptions, AI allocation, and governance</span></div>
               <div class="listRow"><span class="tick">+</span><span>Enterprise owner -> employee hierarchy with rollups and drill-downs</span></div>
-              <div class="listRow"><span class="tick">+</span><span>AI follow-up, WhatsApp workflow, ROI, insights, and audit visibility in one stack</span></div>
+              <div class="listRow"><span class="tick">+</span><span>Apps workspace, ROI, insights, audit visibility, and guided onboarding in one stack</span></div>
             </div>
           </div>
           <div class="card">
@@ -632,6 +758,43 @@
         <div class="sectionLabel">What clients get</div>
         <div class="sectionTitle">Everything that moves deals forward. Nothing that wastes the team’s time.</div>
         <div class="sectionSub">This is the version of the CRM you have now: clearer, stronger, more commercial, and more operationally serious than a generic lead tracker.</div>
+        <div class="modeShowcase">
+          <div class="modeDock" id="modeDock" aria-label="Northstone use case modes">
+            <button class="modeBtn active" type="button" data-mode="solo">Solo closer view</button>
+            <button class="modeBtn" type="button" data-mode="enterprise">Enterprise owner view</button>
+            <button class="modeBtn" type="button" data-mode="builder">Builder ops view</button>
+          </div>
+          <div class="heroPanel">
+            <div class="panelKicker" id="panelKicker">What this changes</div>
+            <div class="panelTitle" id="panelTitle">Your current CRM stores records. This one pushes revenue.</div>
+            <div class="panelSub" id="panelSub">
+              If your team still depends on memory, scattered chats, notebooks, and delayed follow-ups, you do not have a sales system. You have risk. Northstone gives you the discipline layer your current stack never gave you.
+            </div>
+            <div class="signalStack">
+              <div class="signalRow" id="signalRow1">
+                <div>
+                  <div class="signalTitle" id="signalTitle1">Every deal visible</div>
+                  <div class="signalMeta" id="signalMeta1">Pipeline, grid, detail workspace, ROI, visits, typology, budget, and client heat in one place.</div>
+                </div>
+                <span class="pill" id="signalPill1">Execution</span>
+              </div>
+              <div class="signalRow" id="signalRow2">
+                <div>
+                  <div class="signalTitle" id="signalTitle2">Every team member accountable</div>
+                  <div class="signalMeta" id="signalMeta2">Enterprise owners can see activity, usage, employee IDs, AI access, and rollups without chasing scattered updates.</div>
+                </div>
+                <span class="pill" id="signalPill2">Control</span>
+              </div>
+              <div class="signalRow" id="signalRow3">
+                <div>
+                  <div class="signalTitle" id="signalTitle3">Every workspace connected</div>
+                  <div class="signalMeta" id="signalMeta3">Google Workspace, Calendar, Meet, Zoom, and ad launch surfaces are being brought into one operating layer instead of being managed in isolation.</div>
+                </div>
+                <span class="pill" id="signalPill3">Growth</span>
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="featureGrid">
           <div class="card">
             <div class="cardTitle">Pipeline + deals command center</div>
@@ -639,18 +802,18 @@
             <div class="featureTag">Core execution</div>
           </div>
           <div class="card">
-            <div class="cardTitle">AI follow-up that stays under control</div>
-            <div class="cardText">Generate follow-ups faster, route them to WhatsApp workflows, and keep AI access centrally managed instead of letting every user improvise with unmanaged keys.</div>
-            <div class="featureTag">AI operations</div>
+            <div class="cardTitle">Apps workspace for communication and launch workflows</div>
+            <div class="cardText">Use a dedicated apps layer for Gmail, Google Calendar, Google Meet, Zoom, and ad platform jump-offs instead of forcing teams to keep those workflows scattered outside the CRM.</div>
+            <div class="featureTag">Apps and integrations</div>
           </div>
           <div class="card">
             <div class="cardTitle">Enterprise team structure</div>
-            <div class="cardText">Owners can create broker, CP, and employee IDs while keeping team activity, deals, and results visible at the organization level.</div>
+            <div class="cardText">Owners can create broker, CP, and employee IDs while keeping team activity, deals, and results visible at the organization level, with limited access for the right inherited roles.</div>
             <div class="featureTag">Enterprise</div>
           </div>
           <div class="card">
             <div class="cardTitle">Management oversight that actually matters</div>
-            <div class="cardText">See subscriptions, revenue visibility, AI allocation, enterprise or builder usage, audit activity, locked accounts, security posture, and support threads from one operational cockpit.</div>
+            <div class="cardText">See plan mix, AI allocation, enterprise or builder usage, audit activity, locked accounts, security posture, and support threads from one operational cockpit.</div>
             <div class="featureTag">Governance</div>
           </div>
           <div class="card">
@@ -665,7 +828,7 @@
           </div>
           <div class="card">
             <div class="cardTitle">A product teams can actually adopt</div>
-            <div class="cardText">Mobile-friendly CRM, clean account onboarding, private organization support threads, import/export, RERA-aware onboarding, and a layout that works on real screens in real teams.</div>
+            <div class="cardText">Mobile-friendly CRM, clean account onboarding, tutorial guidance, forgot-password recovery, private organization support threads, import/export, and a layout that works on real screens in real teams.</div>
             <div class="featureTag">Adoption</div>
           </div>
         </div>
@@ -699,7 +862,7 @@
               <tr>
                 <td>Management visibility</td>
                 <td class="bad">Weak revenue and usage visibility</td>
-                <td class="good">Subscriptions, security, AI access, audit, support, enterprise usage</td>
+                <td class="good">Plan oversight, security, AI access, audit, support, enterprise usage</td>
               </tr>
               <tr>
                 <td>Real-estate deal context</td>
@@ -769,7 +932,7 @@
               <div class="listRow"><span class="tick">+</span><span>Includes 5 team IDs to start</span></div>
               <div class="listRow"><span class="tick">+</span><span>More than 5 sub accounts: &#8377;1,499 per new ID</span></div>
             </div>
-            <div class="featureTag">Premium-affordable for active builder teams</div>
+            <div class="featureTag">Builder operations</div>
             <div class="heroActions" style="margin-top:18px">
               <button class="btn btnPrimary choose-plan" data-plan="builder" data-cycle="monthly" data-amount="11999" data-seats="5">Start Builder</button>
             </div>
@@ -787,7 +950,7 @@
             </div>
             <div class="featureTag">For custom rollout</div>
             <div class="heroActions" style="margin-top:18px">
-              <button class="btn btnSecondary choose-plan" data-plan="custom" data-cycle="yearly" data-amount="0" data-seats="10">Request Custom Plan</button>
+              <button class="btn btnSecondary choose-plan" data-plan="custom" data-cycle="monthly" data-amount="0" data-seats="10">Request Custom Plan</button>
             </div>
           </div>
         </div>
@@ -840,7 +1003,7 @@
             <div class="list">
               <div class="listRow"><span class="tick">+</span><span>Every paid plan links directly to a live CRM account instead of disappearing into a sales inbox</span></div>
               <div class="listRow"><span class="tick">+</span><span>Subscriptions, access, and rollout status stay connected inside the product</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Official Razorpay checkout support for Indian subscription purchases</span></div>
+              <div class="listRow"><span class="tick">+</span><span>Checkout-ready flow for Indian subscription purchases with Razorpay activation</span></div>
               <div class="listRow"><span class="tick">+</span><span>Clear enterprise structure for teams that care about accountability and governance</span></div>
             </div>
           </div>
@@ -918,24 +1081,24 @@
       <div class="shell">
         <div class="ctaBand">
           <div>
-            <div class="sectionLabel">Download on device</div>
-            <div class="sectionTitle">Install the CRM on desktop or mobile without creating a risky local copy.</div>
+            <div class="sectionLabel">Owner-only install</div>
+            <div class="sectionTitle">Subscription owners can install Northstone on desktop or mobile without creating a risky local copy.</div>
             <div class="sectionSub">
-              This is the safe version of “download.” Clients install Northstone as an app shortcut, while live data still stays on the secured backend and database. That gives easier daily access without turning the CRM into a laggy, disconnected offline file.
+              This is the safe version of "download." Clients install Northstone as an app shortcut, while live data still stays on the secured backend and database. That gives easier daily access without turning the CRM into a laggy, disconnected offline file.
             </div>
             <div class="list" style="margin-top:20px">
               <div class="listRow"><span class="tick">+</span><span>Faster access from desktop, taskbar, dock, or home screen</span></div>
               <div class="listRow"><span class="tick">+</span><span>No separate local database to lose, corrupt, or drift away from live records</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Ideal for solo operators, serious broker teams, and builder organizations who work daily inside the CRM</span></div>
+              <div class="listRow"><span class="tick">+</span><span>Owner-managed install access for solo subscriptions, enterprise owners, and builder owners</span></div>
             </div>
           </div>
           <div class="card" style="padding:26px">
             <div class="cardTitle">Install Northstone</div>
             <div class="cardText">
-              Open the secure CRM app and use the install option there. On supported browsers, the CRM can be added to the device like an app while your live records continue to stay server-backed.
+              Open the secure CRM preview or login first. The actual install option appears inside the paid owner workspace so team devices do not get disconnected from subscription ownership.
             </div>
             <div class="heroActions" style="margin-top:18px">
-              <a class="btn btnPrimary" id="downloadAppButton" href="#" target="_blank" rel="noreferrer">Open install page</a>
+              <a class="btn btnPrimary" id="downloadAppButton" href="#" target="_blank" rel="noreferrer">Open CRM preview</a>
               <a class="btn btnSecondary" id="openLoginButton" href="#" target="_blank" rel="noreferrer">Open CRM login</a>
             </div>
             <div class="finePrint">
@@ -964,7 +1127,7 @@
           </div>
           <div class="card" style="padding:26px">
             <div class="cardTitle">Provision account</div>
-            <div class="cardText">Choose the plan, enter account details, and complete checkout. After payment, the CRM account is created and linked to the purchased subscription automatically.</div>
+            <div class="cardText">Choose the plan, enter account details, and prepare the account provisioning flow. Live hosted checkout activation is the final launch step once the production backend is connected.</div>
             <form id="subscribeForm">
               <div class="formGrid">
                 <div class="field">
@@ -1003,8 +1166,9 @@
                 <div class="field">
                   <label for="billing_cycle">Billing cycle</label>
                   <select id="billing_cycle" name="billing_cycle" required>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
+                    <option value="monthly">1 month</option>
+                    <option value="six_month">6 months</option>
+                    <option value="yearly">1 year (5% off)</option>
                   </select>
                 </div>
                 <div class="field">
@@ -1021,13 +1185,13 @@
                 </div>
                 <div class="field full">
                   <label for="notes">Notes</label>
-                  <textarea id="notes" name="notes" placeholder="Anything the rollout team should know before setup" required></textarea>
+                  <textarea id="notes" name="notes" placeholder="Anything the rollout team should know before setup (optional)"></textarea>
                 </div>
               </div>
               <div id="formMessage" class="message"></div>
               <button class="btn btnPrimary" type="submit" style="width:100%;margin-top:16px">Continue to secure checkout</button>
               <div class="finePrint">
-                Annual billing is priced at roughly 10 months of the monthly plan. Razorpay checkout can be enabled with your live keys when you are ready to sell.
+                Monthly and 6-month billing stay at the standard commercial rate. One-year billing applies a 5% discount to the same plan and seat structure.
               </div>
             </form>
           </div>
@@ -1051,42 +1215,50 @@
         ? "http://127.0.0.1:8000"
         : ((location.hostname === "localhost" || location.hostname === "127.0.0.1" || isIpv4(location.hostname))
           ? `http://${location.hostname}:8000`
-          : "https://api.yourdomain.com"));
+          : "https://api.northstonecrm.com"));
     const APP_BASE =
       window.DEALIOS_APP_BASE ||
       (location.protocol === "file:"
         ? "http://127.0.0.1:5173"
         : ((location.hostname === "localhost" || location.hostname === "127.0.0.1" || isIpv4(location.hostname))
           ? `http://${location.hostname}:5173`
-          : "https://app.yourdomain.com"));
+          : "https://northstonecrm.com"));
 
     const PLAN_PRICING = {
       solo: {
         monthly: 1199,
-        yearly: 11990,
+        six_month: 7194,
+        yearly: 13669,
         includedSeats: 1,
         extraSeatMonthly: 0,
+        extraSeatSixMonth: 0,
         extraSeatYearly: 0
       },
       enterprise: {
         monthly: 6999,
-        yearly: 69990,
+        six_month: 41994,
+        yearly: 79789,
         includedSeats: 5,
         extraSeatMonthly: 899,
-        extraSeatYearly: 8990
+        extraSeatSixMonth: 5394,
+        extraSeatYearly: 10249
       },
       builder: {
         monthly: 11999,
-        yearly: 119990,
+        six_month: 71994,
+        yearly: 136789,
         includedSeats: 5,
         extraSeatMonthly: 1499,
-        extraSeatYearly: 14990
+        extraSeatSixMonth: 8994,
+        extraSeatYearly: 17089
       },
       custom: {
         monthly: 0,
+        six_month: 0,
         yearly: 0,
         includedSeats: 10,
         extraSeatMonthly: 0,
+        extraSeatSixMonth: 0,
         extraSeatYearly: 0
       }
     };
@@ -1095,7 +1267,7 @@
       solo: { billing_cycle: "monthly", amount_inr: 1199, seats: 1 },
       enterprise: { billing_cycle: "monthly", amount_inr: 6999, seats: 5 },
       builder: { billing_cycle: "monthly", amount_inr: 11999, seats: 5 },
-      custom: { billing_cycle: "yearly", amount_inr: 0, seats: 10 }
+      custom: { billing_cycle: "monthly", amount_inr: 0, seats: 10 }
     };
 
     const planField = document.getElementById("product_plan");
@@ -1112,13 +1284,50 @@
     const localNotice = document.getElementById("localNotice");
     const downloadAppButton = document.getElementById("downloadAppButton");
     const openLoginButton = document.getElementById("openLoginButton");
+    const modeButtons = Array.from(document.querySelectorAll(".modeBtn"));
     let checkoutConfig = null;
 
+    const HERO_MODES = {
+      solo: {
+        kicker: "Solo closer mode",
+        title: "One operator. Zero chaos. Every follow-up tracked.",
+        sub: "Northstone gives independent brokers a cleaner daily selling system with one pipeline, one contact layer, one ROI workflow, and no spreadsheet spillover.",
+        rows: [
+          ["Every active deal visible", "Pipeline, grid, detail workspace, ROI, visits, typology, budget, and client heat in one place.", "Execution"],
+          ["Follow-up discipline stays tight", "You stop depending on memory, personal notes, and delayed callbacks to move revenue forward.", "Speed"],
+          ["Install and work daily", "Paid owners can install the CRM like an app while live data still stays server-backed and secure.", "Access"]
+        ],
+        plan: ["solo", "monthly", 1199, 1]
+      },
+      enterprise: {
+        kicker: "Enterprise owner mode",
+        title: "Leadership visibility without chasing ten people for updates.",
+        sub: "Brokerage owners and CP leaders get team hierarchy, user control, AI inheritance, audit visibility, and seller-level drilldowns from one operating layer.",
+        rows: [
+          ["Every team member accountable", "Enterprise owners can see activity, usage, employee IDs, AI access, and rollups without scattered updates.", "Control"],
+          ["Every deal motion visible", "Open, closed, lost, and active pipeline movement stay visible across the owner and inherited sellers.", "Oversight"],
+          ["Apps and support centralized", "Workspace tools, support threads, and enterprise controls sit inside one operational cockpit.", "Ops"]
+        ],
+        plan: ["enterprise", "monthly", 6999, 5]
+      },
+      builder: {
+        kicker: "Builder operations mode",
+        title: "Project sales teams need operating discipline, not ERP bloat.",
+        sub: "Builder subscriptions add project-facing communication, document workflows, owner controls, team visibility, and launch support inside one commercial stack.",
+        rows: [
+          ["Builder documents ready faster", "Project overviews, offers, updates, and compliance-style drafts stay connected to the same workspace.", "Documents"],
+          ["Hierarchy and governance built in", "Owners can manage seller access, inherited IDs, organization visibility, and rollout discipline from one place.", "Governance"],
+          ["Launch workflows stay connected", "Google Workspace, Zoom, and ad launch surfaces stay closer to the project sales workflow instead of living in five separate tools.", "Launch"]
+        ],
+        plan: ["builder", "monthly", 11999, 5]
+      }
+    };
+
     if (downloadAppButton) {
-      downloadAppButton.href = `${APP_BASE}/settings#install-app`;
+      downloadAppButton.href = `${APP_BASE}/`;
     }
     if (openLoginButton) {
-      openLoginButton.href = `${APP_BASE}/`;
+      openLoginButton.href = `${APP_BASE}/login`;
     }
 
     if (location.protocol === "file:" && localNotice) {
@@ -1149,48 +1358,46 @@
       });
     }
 
-    function recommendedAmount(plan, seats) {
-      return 0;
+    document.body.classList.add("js-ready");
+
+    const revealTargets = Array.from(document.querySelectorAll(".card, .stat, .signalRow, .ctaBand, .comparison table"));
+    revealTargets.forEach((node) => node.classList.add("revealItem"));
+    if ("IntersectionObserver" in window) {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("revealed");
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.14 });
+      revealTargets.forEach((node) => revealObserver.observe(node));
+    } else {
+      revealTargets.forEach((node) => node.classList.add("revealed"));
     }
 
-    function refreshPricingHint() {
-      const plan = planField.value;
-      const seats = Number(seatsField.value || 1);
-      if (plan === "enterprise") {
-        const extra = Math.max(seats - 5, 0);
-        pricingHintField.value = extra > 0
-          ? `Enterprise base includes 5 IDs. Extra IDs: ${extra} x ₹899 = ₹${(extra * 899).toLocaleString("en-IN")}.`
-          : "Enterprise base includes 5 IDs. Every extra ID is billed at ₹899.";
-        return;
+    function applyHeroMode(mode) {
+      const config = HERO_MODES[mode] || HERO_MODES.solo;
+      const [plan, cycle, amount, seats] = config.plan;
+      document.getElementById("panelKicker").textContent = config.kicker;
+      document.getElementById("panelTitle").textContent = config.title;
+      document.getElementById("panelSub").textContent = config.sub;
+      config.rows.forEach((row, index) => {
+        document.getElementById(`signalTitle${index + 1}`).textContent = row[0];
+        document.getElementById(`signalMeta${index + 1}`).textContent = row[1];
+        document.getElementById(`signalPill${index + 1}`).textContent = row[2];
+      });
+      modeButtons.forEach((button) => {
+        button.classList.toggle("active", button.dataset.mode === mode);
+      });
+      if (!location.hash || location.hash === "#pricing" || location.hash === "#start") {
+        applyPlan(plan, cycle, amount, seats, { scroll: false });
       }
-      if (plan === "solo") {
-        pricingHintField.value = "Solo is a single-user plan at ₹1,199 per month.";
-        return;
-      }
-      pricingHintField.value = "Custom plans are finalized with your rollout and commercial requirements.";
     }
 
-    function syncAmount() {
-      amountField.value = String(recommendedAmount(planField.value, Number(seatsField.value || 1)));
-      refreshPricingHint();
-    }
-
-    function refreshPricingHint() {
-      const plan = planField.value;
-      if (plan === "enterprise") {
-        const seats = Number(seatsField.value || 5);
-        const extra = Math.max(seats - 5, 0);
-        pricingHintField.value = extra > 0
-          ? `Testing mode is active. Enterprise is linked at INR 0 right now. Live rule: 5 IDs included, then ₹899 per extra ID. Extra IDs selected: ${extra}.`
-          : "Testing mode is active. Enterprise is linked at INR 0 right now. Live rule: 5 IDs included, then ₹899 per extra ID.";
-        return;
-      }
-      if (plan === "solo") {
-        pricingHintField.value = "Testing mode is active. Solo provisioning is currently linked at INR 0.";
-        return;
-      }
-      pricingHintField.value = "Testing mode is active. Custom provisioning is currently set to INR 0.";
-    }
+    modeButtons.forEach((button) => {
+      button.addEventListener("click", () => applyHeroMode(button.dataset.mode || "solo"));
+    });
 
     function recommendedAmount(plan, seats, cycle) {
       const pricing = PLAN_PRICING[plan] || PLAN_PRICING.solo;
@@ -1198,44 +1405,53 @@
       if (plan === "solo") return pricing[cycle];
       const included = pricing.includedSeats || 1;
       const extraSeats = Math.max(Number(seats || included) - included, 0);
-      const extraSeatPrice = cycle === "yearly" ? pricing.extraSeatYearly : pricing.extraSeatMonthly;
+      const extraSeatPrice = cycle === "yearly"
+        ? pricing.extraSeatYearly
+        : cycle === "six_month"
+          ? pricing.extraSeatSixMonth
+          : pricing.extraSeatMonthly;
       return pricing[cycle] + (extraSeats * extraSeatPrice);
     }
 
     function refreshPricingHint() {
       const plan = planField.value;
-      const cycle = cycleField.value === "yearly" ? "yearly" : "monthly";
+      const cycle = cycleField.value === "yearly" ? "yearly" : cycleField.value === "six_month" ? "six_month" : "monthly";
+      const cycleLabel = cycle === "yearly" ? "1-year" : cycle === "six_month" ? "6-month" : "1-month";
       if (plan === "enterprise") {
         const seats = Number(seatsField.value || 5);
         const extra = Math.max(seats - 5, 0);
         pricingHintField.value = extra > 0
-          ? `Enterprise includes 5 IDs. Extra IDs: ${extra} x ₹${(cycle === "yearly" ? 8990 : 899).toLocaleString("en-IN")} on the ${cycle} plan.`
-          : `Enterprise includes 5 IDs. ${cycle === "yearly" ? "Annual billing gives roughly 2 months free." : "Extra IDs are billed at ₹899 each per month."}`;
+          ? `Enterprise includes 5 IDs. Extra IDs: ${extra} x ₹${(cycle === "yearly" ? 10249 : cycle === "six_month" ? 5394 : 899).toLocaleString("en-IN")} on the ${cycleLabel} cycle.`
+          : `Enterprise includes 5 IDs. ${cycle === "yearly" ? "One-year billing applies a 5% discount." : cycle === "six_month" ? "6-month billing keeps the same monthly commercial rate." : "Extra IDs are billed at ₹899 each per month."}`;
         return;
       }
       if (plan === "builder") {
         const seats = Number(seatsField.value || 5);
         const extra = Math.max(seats - 5, 0);
         pricingHintField.value = extra > 0
-          ? `Builder includes 5 IDs. Extra IDs: ${extra} x ₹${(cycle === "yearly" ? 14990 : 1499).toLocaleString("en-IN")} on the ${cycle} plan.`
-          : "Builder is priced for active developer teams that need owner controls, AI builder documents, org reporting, and project-facing communication without entering ERP-level budgets.";
+          ? `Builder includes 5 IDs. Extra IDs: ${extra} x ₹${(cycle === "yearly" ? 17089 : cycle === "six_month" ? 8994 : 1499).toLocaleString("en-IN")} on the ${cycleLabel} cycle.`
+          : `Builder includes 5 IDs. ${cycle === "yearly" ? "One-year billing applies a 5% discount." : cycle === "six_month" ? "6-month billing keeps the same monthly commercial rate." : "Builder is priced for active developer teams that need owner controls, AI builder documents, org reporting, and project-facing communication without entering ERP-level budgets."}`;
         return;
       }
       if (plan === "solo") {
         pricingHintField.value = cycle === "yearly"
-          ? "Solo yearly billing is priced at roughly 10 months to reward annual commitment."
-          : "Solo is a clean single-user commercial tier for independent closers.";
+          ? "Solo yearly billing applies a 5% discount to the same single-user subscription."
+          : cycle === "six_month"
+            ? "Solo 6-month billing keeps the same monthly commercial rate with a longer commitment."
+            : "Solo is a clean single-user commercial tier for independent closers.";
         return;
       }
       pricingHintField.value = "Custom plans are finalized with rollout scope, seat structure, onboarding requirements, and commercial terms.";
     }
 
     function syncAmount() {
-      amountField.value = String(recommendedAmount(planField.value, Number(seatsField.value || 1), cycleField.value === "yearly" ? "yearly" : "monthly"));
+      const cycle = cycleField.value === "yearly" ? "yearly" : cycleField.value === "six_month" ? "six_month" : "monthly";
+      amountField.value = String(recommendedAmount(planField.value, Number(seatsField.value || 1), cycle));
       refreshPricingHint();
     }
 
-    function applyPlan(plan, cycle, amount, seats) {
+    function applyPlan(plan, cycle, amount, seats, options = {}) {
+      const shouldScroll = Boolean(options.scroll);
       planField.value = plan;
       cycleField.value = cycle;
       amountField.value = amount;
@@ -1244,7 +1460,9 @@
       seatsField.readOnly = plan === "solo";
       cycleField.disabled = false;
       syncAmount();
-      document.getElementById("start").scrollIntoView({ behavior: "smooth", block: "start" });
+      if (shouldScroll) {
+        document.getElementById("start").scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     }
 
     async function getCheckoutConfig() {
@@ -1361,7 +1579,8 @@
           btn.dataset.plan || "solo",
           btn.dataset.cycle || "monthly",
           btn.dataset.amount || "0",
-          btn.dataset.seats || "1"
+          btn.dataset.seats || "1",
+          { scroll: true }
         );
       });
     });
@@ -1460,7 +1679,9 @@
       }
     });
 
-    applyPlan(planField.value, cycleField.value, amountField.value, seatsField.value);
+    applyHeroMode("solo");
+    applyPlan(planField.value, cycleField.value, amountField.value, seatsField.value, { scroll: false });
   </script>
 </body>
 </html>
+

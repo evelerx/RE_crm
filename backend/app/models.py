@@ -34,6 +34,12 @@ class User(SQLModel, table=True):
     llm_api_key: str = ""
     llm_model: str = ""
     llm_allocated_at: Optional[datetime] = None
+    subscription_plan: str = ""
+    subscription_cycle: str = ""
+    subscription_seats: int = 1
+    subscription_amount_inr: int = 0
+    subscription_started_at: Optional[datetime] = None
+    subscription_expires_at: Optional[datetime] = None
 
 
 class Profile(SQLModel, table=True):

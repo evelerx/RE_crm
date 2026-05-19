@@ -45,6 +45,11 @@ export default function DealDetailPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [whatsAppContactId, setWhatsAppContactId] = useState("");
   const [editing, setEditing] = useState(false);
+  const [notesBusy, setNotesBusy] = useState(false);
+  const [followupBusy, setFollowupBusy] = useState(false);
+  const [activityBusy, setActivityBusy] = useState(false);
+  const [reminderBusy, setReminderBusy] = useState(false);
+  const [scoreBusy, setScoreBusy] = useState(false);
   const [editPayload, setEditPayload] = useState({
     contact_id: "",
     visit_date: "",
@@ -62,7 +67,11 @@ export default function DealDetailPage() {
     if (!dealId) return;
     setError(null);
     try {
-      const d = await api<Deal>(`/deals/${dealId}`);
+      const [d, contactRows, a] = await Promise.all([
+        api<Deal>(`/deals/${dealId}`),
+        api<Contact[]>("/contacts"),
+        api<Activity[]>(`/activities?deal_id=${encodeURIComponent(dealId)}`)
+      ]);
       setDeal(d);
       setNoteDraft(d.notes ?? "");
       setEditPayload({
@@ -77,14 +86,12 @@ export default function DealDetailPage() {
         liquidity_days_est: d.liquidity_days_est == null ? "" : String(d.liquidity_days_est),
         risk_flags: d.risk_flags ?? ""
       });
-      const contactRows = await api<Contact[]>("/contacts");
       setContacts(contactRows);
       const preferredContactId =
         (d.contact_id && contactRows.some((contact) => contact.id === d.contact_id) ? d.contact_id : "") ||
         contactRows.find((contact) => normalizeWhatsAppNumber(contact.phone))?.id ||
         "";
       setWhatsAppContactId(preferredContactId);
-      const a = await api<Activity[]>(`/activities?deal_id=${encodeURIComponent(dealId)}`);
       setActivities(a);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deal");
@@ -97,38 +104,69 @@ export default function DealDetailPage() {
 
   async function saveNotes() {
     if (!dealId) return;
-    const updated = await api<Deal>(`/deals/${dealId}`, { method: "PATCH", body: JSON.stringify({ notes: noteDraft }) });
-    setDeal(updated);
+    setNotesBusy(true);
+    setError(null);
+    try {
+      const updated = await api<Deal>(`/deals/${dealId}`, { method: "PATCH", body: JSON.stringify({ notes: noteDraft }) });
+      setDeal(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save notes");
+    } finally {
+      setNotesBusy(false);
+    }
   }
 
   async function addActivity(payload: { summary: string; kind?: string; due_at?: string | null }) {
     if (!dealId) return;
-    const created = await api<Activity>("/activities", {
-      method: "POST",
-      body: JSON.stringify({
-        deal_id: dealId,
-        kind: payload.kind ?? "whatsapp",
-        summary: payload.summary,
-        due_at: payload.due_at ?? null
-      })
-    });
-    setActivities((prev) => [created, ...prev]);
-    await load();
+    setActivityBusy(true);
+    setError(null);
+    try {
+      const created = await api<Activity>("/activities", {
+        method: "POST",
+        body: JSON.stringify({
+          deal_id: dealId,
+          kind: payload.kind ?? "whatsapp",
+          summary: payload.summary,
+          due_at: payload.due_at ?? null
+        })
+      });
+      setActivities((prev) => [created, ...prev]);
+      setDeal((prev) =>
+        prev
+          ? {
+              ...prev,
+              last_activity_at: created.created_at
+            }
+          : prev
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not add activity");
+    } finally {
+      setActivityBusy(false);
+    }
   }
 
   async function addReminderInDays(days: number) {
     if (!dealId) return;
     const due = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-    await api<Activity>("/activities", {
-      method: "POST",
-      body: JSON.stringify({
-        deal_id: dealId,
-        kind: "call",
-        summary: "Follow-up reminder",
-        due_at: due.toISOString()
-      })
-    });
-    await load();
+    setReminderBusy(true);
+    setError(null);
+    try {
+      const created = await api<Activity>("/activities", {
+        method: "POST",
+        body: JSON.stringify({
+          deal_id: dealId,
+          kind: "call",
+          summary: "Follow-up reminder",
+          due_at: due.toISOString()
+        })
+      });
+      setActivities((prev) => [created, ...prev]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create reminder");
+    } finally {
+      setReminderBusy(false);
+    }
   }
 
   async function toggleActivityDone(a: Activity) {
@@ -336,7 +374,7 @@ export default function DealDetailPage() {
             <textarea className="textarea" value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} />
             <div className="row right">
               <button className="btn" onClick={() => void saveNotes()}>
-                Save notes
+                {notesBusy ? "Saving..." : "Save notes"}
               </button>
             </div>
           </section>
@@ -360,6 +398,8 @@ export default function DealDetailPage() {
               <button
                 className="btn"
                 onClick={async () => {
+                  setFollowupBusy(true);
+                  setError(null);
                   try {
                     const resp = await api<LlmFollowupResponse>("/ai/llm/followup", {
                       method: "POST",
@@ -373,17 +413,23 @@ export default function DealDetailPage() {
                     });
                     setFollowupDraft(resp.message);
                   } catch (e) {
-                    if (!(e instanceof ApiError) || (e.status !== 400 && e.status !== 404)) throw e;
-                    const resp = await api<FollowupResponse>("/ai/followup", {
-                      method: "POST",
-                      body: JSON.stringify({ deal_id: deal.id, objective: "followup", channel: "whatsapp", tone: "professional" })
-                    });
-                    setFollowupDraft(resp.message);
+                    try {
+                      if (!(e instanceof ApiError) || (e.status !== 400 && e.status !== 404)) throw e;
+                      const resp = await api<FollowupResponse>("/ai/followup", {
+                        method: "POST",
+                        body: JSON.stringify({ deal_id: deal.id, objective: "followup", channel: "whatsapp", tone: "professional" })
+                      });
+                      setFollowupDraft(resp.message);
+                    } catch (inner) {
+                      setError(inner instanceof Error ? inner.message : "Follow-up generation failed");
+                    }
+                  } finally {
+                    setFollowupBusy(false);
                   }
                 }}
                 type="button"
               >
-                Generate
+                {followupBusy ? "Generating..." : "Generate"}
               </button>
               <button
                 className="btn ghost"
@@ -401,13 +447,14 @@ export default function DealDetailPage() {
               </button>
               <button
                 className="btn ghost"
+                disabled={activityBusy || !followupDraft.trim()}
                 onClick={() => void addActivity({ kind: "whatsapp", summary: followupDraft || "Follow-up sent" })}
                 type="button"
               >
-                Log activity
+                {activityBusy ? "Logging..." : "Log activity"}
               </button>
-              <button className="btn ghost" onClick={() => void addReminderInDays(2)} type="button">
-                Remind in 2 days
+              <button className="btn ghost" disabled={reminderBusy} onClick={() => void addReminderInDays(2)} type="button">
+                {reminderBusy ? "Adding reminder..." : "Remind in 2 days"}
               </button>
             </div>
             {!canSendWhatsApp ? (
@@ -421,13 +468,29 @@ export default function DealDetailPage() {
               <button
                 className="btn"
                 onClick={async () => {
-                  const resp = await api<DealScoreResponse>(`/ai/deal-score/${deal.id}`, { method: "POST" });
-                  setScore(resp);
-                  await load();
+                  setScoreBusy(true);
+                  setError(null);
+                  try {
+                    const resp = await api<DealScoreResponse>(`/ai/deal-score/${deal.id}`, { method: "POST" });
+                    setScore(resp);
+                    setDeal((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            close_probability: resp.close_probability,
+                            risk_flags: resp.risk_flags.join(", ")
+                          }
+                        : prev
+                    );
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : "Could not run deal score");
+                  } finally {
+                    setScoreBusy(false);
+                  }
                 }}
                 type="button"
               >
-                Run score
+                {scoreBusy ? "Scoring..." : "Run score"}
               </button>
               <div className="muted">This updates close probability directly on the deal record.</div>
             </div>

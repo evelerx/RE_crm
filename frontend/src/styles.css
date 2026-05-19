@@ -75,8 +75,17 @@ a {
   width: 34px;
   height: 34px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #6a89bc, #3b8f87);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(220, 231, 247, 0.92));
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.24);
+  overflow: hidden;
+}
+
+.logoMark {
+  width: 24px;
+  height: 24px;
+  display: block;
 }
 
 .brandTitle {
@@ -847,14 +856,6 @@ textarea.textarea {
     min-width: 0;
   }
 
-  .brandTitle {
-    font-size: 18px;
-  }
-
-  .brandSub {
-    line-height: 1.4;
-  }
-
   .navMobile .btn,
   .navMobile .navA {
     white-space: nowrap;
@@ -923,4 +924,37 @@ textarea.textarea {
   cursor: pointer;
   padding: 6px 0;
   text-align: left;
+}
+
+.previewHeroCard,
+.previewLockedCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.previewBulletGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.previewActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.previewDealCard {
+  cursor: default;
+  pointer-events: none;
+  position: relative;
+}
+
+.previewDealLock {
+  margin-top: 10px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(138, 180, 255, 0.88);
 }

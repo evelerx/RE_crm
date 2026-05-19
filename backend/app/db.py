@@ -212,6 +212,18 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "user", "llm_model VARCHAR DEFAULT ''")
             if "llm_allocated_at" not in cols:
                 _sqlite_add_column(conn, "user", "llm_allocated_at DATETIME")
+            if "subscription_plan" not in cols:
+                _sqlite_add_column(conn, "user", "subscription_plan VARCHAR DEFAULT ''")
+            if "subscription_cycle" not in cols:
+                _sqlite_add_column(conn, "user", "subscription_cycle VARCHAR DEFAULT ''")
+            if "subscription_seats" not in cols:
+                _sqlite_add_column(conn, "user", "subscription_seats INTEGER DEFAULT 1")
+            if "subscription_amount_inr" not in cols:
+                _sqlite_add_column(conn, "user", "subscription_amount_inr INTEGER DEFAULT 0")
+            if "subscription_started_at" not in cols:
+                _sqlite_add_column(conn, "user", "subscription_started_at DATETIME")
+            if "subscription_expires_at" not in cols:
+                _sqlite_add_column(conn, "user", "subscription_expires_at DATETIME")
 
 
 def _postgres_best_effort_migrate() -> None:
@@ -247,6 +259,13 @@ def _postgres_best_effort_migrate() -> None:
                   ALTER TABLE "user"
                   ADD CONSTRAINT chk_user_plan
                   CHECK (plan IN ('free', 'enterprise', 'builder'));
+
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_plan VARCHAR DEFAULT '';
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_cycle VARCHAR DEFAULT '';
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_seats INTEGER DEFAULT 1;
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_amount_inr INTEGER DEFAULT 0;
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_started_at TIMESTAMP;
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMP;
                 EXCEPTION
                   WHEN duplicate_object THEN NULL;
                 END

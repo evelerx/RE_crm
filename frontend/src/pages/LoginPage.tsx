@@ -44,11 +44,16 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
     <div className="loginWrap">
       <div className="loginCard">
         <div className="brand">
-          <div className="logo" />
+          <div className="logo">
+            <img src="/northstone-mark.svg" alt="Northstone logo" className="logoMark" />
+          </div>
           <div>
             <div className="brandTitle">Northstone</div>
             <div className="brandSub">Secure sign-in for your pipeline, reporting, and team workflows.</div>
           </div>
+        </div>
+        <div className="muted small" style={{ marginTop: 10 }}>
+          Want to explore first? <a href="/" style={{ color: "inherit", textDecoration: "underline" }}>Open the CRM preview</a>.
         </div>
 
         <div className="row">

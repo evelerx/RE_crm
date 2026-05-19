@@ -114,38 +114,6 @@ const providerCards = [
     launchLevel: "Meet link generation through the Google stack"
   },
   {
-    name: "Outlook",
-    key: "outlook",
-    tab: "communication",
-    iconUrl: "https://cdn.simpleicons.org/microsoftoutlook/0078D4",
-    providerGroup: "microsoft",
-    category: "Email",
-    rollout: "Phase 2",
-    purpose: "Support enterprise and builder teams that operate on Microsoft mail workflows.",
-    requiredFromOwner: [
-      "Microsoft owner connection",
-      "Graph mail permissions",
-      "Production callback URL"
-    ],
-    launchLevel: "Owner connects once, inherited team IDs use it"
-  },
-  {
-    name: "Microsoft Teams",
-    key: "microsoft_teams",
-    tab: "meetings",
-    iconUrl: "https://cdn.simpleicons.org/microsoftteams/6264A7",
-    providerGroup: "microsoft",
-    category: "Meetings",
-    rollout: "Phase 2",
-    purpose: "Create internal review and client meeting links inside Microsoft-first organizations.",
-    requiredFromOwner: [
-      "Microsoft owner connection",
-      "Graph online meeting permissions",
-      "Production callback URL"
-    ],
-    launchLevel: "Owner-managed Teams meeting access"
-  },
-  {
     name: "Zoom",
     key: "zoom",
     tab: "meetings",
@@ -207,7 +175,7 @@ const comingSoonApps = [
     tab: "coming_soon",
     category: "Meetings",
     iconUrl: "https://cdn.simpleicons.org/microsoftteams/6264A7",
-    description: "Microsoft workspace rollout is partially prepared in the backend and can be activated once the tenant and app registration are ready."
+    description: "Microsoft workspace rollout is prepared in the backend, but it stays parked until the tenant, permissions, and app registration are fully ready."
   },
   {
     name: "Outlook",

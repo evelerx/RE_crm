@@ -461,6 +461,13 @@ def me(
     return {
         "email": user.email,
         "plan": getattr(user, "plan", "free") or "free",
+        "subscription_plan": getattr(user, "subscription_plan", "") or "",
+        "subscription_cycle": getattr(user, "subscription_cycle", "") or "",
+        "subscription_seats": int(getattr(user, "subscription_seats", 1) or 1),
+        "subscription_amount_inr": int(getattr(user, "subscription_amount_inr", 0) or 0),
+        "subscription_started_at": getattr(user, "subscription_started_at", None),
+        "subscription_expires_at": getattr(user, "subscription_expires_at", None),
+        "can_install_app": bool((getattr(user, "subscription_plan", "") or "").strip()) and not enterprise_owner_id and not is_admin,
         "enterprise_owner_id": enterprise_owner_id,
         "enterprise_company_name": enterprise_company_name,
         "enterprise_member_role": getattr(user, "enterprise_member_role", "") or "",

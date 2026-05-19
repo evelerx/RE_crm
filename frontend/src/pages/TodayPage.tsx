@@ -288,11 +288,18 @@ export default function TodayPage() {
                     try {
                       const msg = await generateFollowup(d);
                       openWhatsApp(msg, linkedPhone);
-                      await api<Activity>("/activities", {
+                      const created = await api<Activity>("/activities", {
                         method: "POST",
                         body: JSON.stringify({ deal_id: d.id, kind: "whatsapp", summary: "WhatsApp follow-up generated/sent" })
                       });
-                      await load();
+                      setData((prev) => {
+                        if (!prev) return prev;
+                        return {
+                          ...prev,
+                          stuck_deals: prev.stuck_deals.filter((deal) => deal.id !== d.id),
+                          upcoming: [created, ...prev.upcoming]
+                        };
+                      });
                     } catch (e) {
                       setError(e instanceof Error ? e.message : "WhatsApp follow-up failed");
                     } finally {
@@ -310,7 +317,7 @@ export default function TodayPage() {
                     setBusyId(d.id);
                     try {
                       const due = new Date(Date.now() + 24 * 60 * 60 * 1000);
-                      await api<Activity>("/activities", {
+                      const created = await api<Activity>("/activities", {
                         method: "POST",
                         body: JSON.stringify({
                           deal_id: d.id,
@@ -319,7 +326,14 @@ export default function TodayPage() {
                           due_at: due.toISOString()
                         })
                       });
-                      await load();
+                      setData((prev) => {
+                        if (!prev) return prev;
+                        return {
+                          ...prev,
+                          stuck_deals: prev.stuck_deals.filter((deal) => deal.id !== d.id),
+                          upcoming: [created, ...prev.upcoming]
+                        };
+                      });
                     } finally {
                       setBusyId(null);
                     }

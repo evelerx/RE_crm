@@ -1,11 +1,41 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#0b1220"/>
-      <stop offset="1" stop-color="#0b2a6a"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eef3f8"/>
+    </linearGradient>
+    <linearGradient id="l1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0A1D35"/>
+      <stop offset="1" stop-color="#091A2E"/>
+    </linearGradient>
+    <linearGradient id="l2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#143050"/>
+      <stop offset="1" stop-color="#08192E"/>
+    </linearGradient>
+    <linearGradient id="r1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7EA4CF"/>
+      <stop offset="1" stop-color="#5C82AB"/>
+    </linearGradient>
+    <linearGradient id="r2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2A4E78"/>
+      <stop offset="1" stop-color="#3A628E"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="18" fill="url(#g)"/>
-  <path d="M18 42V22c0-2.2 1.8-4 4-4h20c2.2 0 4 1.8 4 4v20c0 2.2-1.8 4-4 4H22c-2.2 0-4-1.8-4-4Z" fill="rgba(255,255,255,0.09)"/>
-  <path d="M26 40V24h4l8 10V24h4v16h-4l-8-10v10h-4Z" fill="rgba(255,255,255,0.95)"/>
+
+  <rect width="64" height="64" rx="18" fill="url(#bg)"/>
+
+  <g transform="translate(6.2 4.6) scale(0.184)">
+    <!-- L1: outer left face (darkest) — split at diagonal gap -->
+    <path fill="url(#l1)" d="M68,22 L100,12 L100,126 L68,99 Z"/>
+    <path fill="url(#l1)" d="M68,127 L100,154 L100,268 L68,268 Z"/>
+    <!-- L2: inner left face (dark navy) — split at diagonal gap -->
+    <path fill="url(#l2)" d="M100,12 L136,22 L136,156 L100,126 Z"/>
+    <path fill="url(#l2)" d="M100,154 L136,184 L136,268 L100,268 Z"/>
+    <!-- R1: inner right face (lighter steel blue) — diagonal top-left -->
+    <path fill="url(#r1)" d="M150,87 L212,22 L212,268 L150,268 Z"/>
+    <!-- R2: outer right face (medium navy) — full height -->
+    <path fill="url(#r2)" d="M212,22 L252,34 L252,268 L212,268 Z"/>
+    <!-- White N-diagonal slash -->
+    <path fill="#FFFFFF" d="M70,129 L83,112 L205,214 L192,231 Z"/>
+  </g>
 </svg>

@@ -22,6 +22,7 @@ from .routes import (
     meta,
     next_actions,
     profile,
+    public,
 )
 from .settings import settings
 
@@ -62,6 +63,7 @@ def _startup():
 
 
 app.include_router(meta.router)
+app.include_router(public.router)
 app.include_router(auth.router)
 app.include_router(integrations.router)
 

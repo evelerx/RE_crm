@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760">
+  <defs>
+    <linearGradient id="darkBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07162A"/>
+      <stop offset="1" stop-color="#0E2847"/>
+    </linearGradient>
+    <linearGradient id="metalA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".5" stop-color="#C8D4E2"/>
+      <stop offset="1" stop-color="#8299B8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="760" rx="32" fill="url(#darkBg)"/>
+  <g transform="translate(440 82)">
+    <path fill="url(#metalA)" d="M49 34h65v86L49 74z"/>
+    <path fill="url(#metalA)" d="M49 110l65 46v111H49z"/>
+    <path fill="url(#metalA)" d="M136 98l115 81v86l-115-82z"/>
+    <path fill="url(#metalA)" d="M202 34h49v102l-49-35z"/>
+    <path fill="#0A1D35" d="M49 126l18-13 129 92-18 13z"/>
+  </g>
+  <text x="640" y="474" fill="#F6F8FB" font-family="Montserrat, Arial, sans-serif" font-size="82" font-weight="600" letter-spacing="11" text-anchor="middle">NORTHSTONE</text>
+  <line x1="350" y1="538" x2="500" y2="538" stroke="#8FA4BF" stroke-width="3"/>
+  <line x1="780" y1="538" x2="930" y2="538" stroke="#8FA4BF" stroke-width="3"/>
+  <text x="640" y="551" fill="#AFC0D6" font-family="Montserrat, Arial, sans-serif" font-size="34" font-weight="500" letter-spacing="7" text-anchor="middle">BUILDING BETTER DEALS</text>
+</svg>

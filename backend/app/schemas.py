@@ -40,6 +40,74 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(min_length=8)
 
 
+class PublicCheckoutConfigRead(BaseModel):
+    enabled: bool
+    key_id: str = ""
+
+
+class PublicCheckoutOrderRequest(BaseModel):
+    full_name: str = Field(min_length=2, max_length=120)
+    email: str
+    phone: str = Field(min_length=6, max_length=40)
+    company_name: str = Field(min_length=2, max_length=160)
+    product_plan: str = Field(pattern="^(solo|enterprise|builder|custom)$")
+    billing_cycle: str = Field(pattern="^(monthly|six_month|yearly)$")
+    amount_inr: int = Field(ge=0, le=50000000)
+    seats: int = Field(ge=1, le=10000)
+
+
+class PublicCheckoutOrderRead(BaseModel):
+    enabled: bool
+    order_id: str = ""
+    amount_paise: int = 0
+    currency: str = "INR"
+    key_id: str = ""
+
+
+class PublicSubscriptionRequest(BaseModel):
+    full_name: str = Field(min_length=2, max_length=120)
+    email: str
+    password: str = Field(min_length=8)
+    phone: str = Field(min_length=6, max_length=40)
+    company_name: str = Field(min_length=2, max_length=160)
+    city: str = Field(min_length=2, max_length=120)
+    product_plan: str = Field(pattern="^(solo|enterprise|builder|custom)$")
+    billing_cycle: str = Field(pattern="^(monthly|six_month|yearly)$")
+    amount_inr: int = Field(ge=0, le=50000000)
+    seats: int = Field(ge=1, le=10000)
+    notes: str = Field(default="", max_length=4000)
+    payment_provider: str = ""
+    payment_order_id: str = ""
+    payment_id: str = ""
+    payment_signature: str = ""
+
+
+class PublicSubscriptionResponse(BaseModel):
+    ok: bool
+    email: str
+    product_plan: str
+    billing_cycle: str
+    seats: int
+    amount_inr: int
+    app_login_url: str
+
+
+class PublicDemoRequest(BaseModel):
+    full_name: str = Field(min_length=2, max_length=120)
+    email: str
+    phone: str = Field(min_length=6, max_length=40)
+    company_name: str = Field(min_length=2, max_length=160)
+    city: str = Field(min_length=2, max_length=120)
+    preferred_plan: str = Field(pattern="^(solo|enterprise|builder|custom)$")
+    team_size: int = Field(ge=1, le=10000)
+    message: str = Field(min_length=10, max_length=4000)
+
+
+class PublicDemoResponse(BaseModel):
+    ok: bool
+    email: str
+
+
 class AdminResetPasswordRequest(BaseModel):
     email: str
     new_password: str = Field(min_length=8)
