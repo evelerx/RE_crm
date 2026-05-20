@@ -72,20 +72,23 @@ a {
 }
 
 .logo {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(220, 231, 247, 0.92));
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.24);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(234, 241, 250, 0.96));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
   overflow: hidden;
 }
 
 .logoMark {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   display: block;
+  object-fit: contain;
+  object-position: center center;
+  transform: translateX(-1px);
 }
 
 .brandTitle {

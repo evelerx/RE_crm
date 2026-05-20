@@ -8,9 +8,7 @@
   "background_color": "#0b1220",
   "theme_color": "#0b1220",
   "icons": [
-    { "src": "/favicon.svg", "sizes": "64x64", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/favicon.svg", "sizes": "64x64", "type": "image/svg+xml", "purpose": "maskable" },
-    { "src": "/northstone-approved-logo.jpg", "sizes": "112x112", "type": "image/jpeg", "purpose": "any" },
-    { "src": "/northstone-approved-logo.jpg", "sizes": "192x192", "type": "image/jpeg", "purpose": "any" }
+    { "src": "/northstone-logo-icon.png", "sizes": "400x360", "type": "image/png", "purpose": "any" },
+    { "src": "/northstone-logo-icon.png", "sizes": "400x360", "type": "image/png", "purpose": "maskable" }
   ]
 }

@@ -81,7 +81,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
       <div className="loginCard">
         <div className="brand">
           <div className="logo">
-            <img src="/northstone-mark.svg" alt="Northstone logo" className="logoMark" />
+            <img src="/northstone-logo-icon.png" alt="Northstone logo" className="logoMark" />
           </div>
           <div>
             <div className="brandTitle">Northstone</div>
