@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { setSession } from "../auth";
 import Modal from "../components/Modal";
@@ -17,6 +17,29 @@ type ForgotPasswordResponse = {
   message: string;
   preview_reset_url?: string;
 };
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
+function installSupportMessage() {
+  const ua = navigator.userAgent || "";
+  const isIos = /iPhone|iPad|iPod/i.test(ua);
+  const isAndroid = /Android/i.test(ua);
+  const isWindows = /Windows/i.test(ua);
+
+  if (isIos) {
+    return "On iPhone or iPad, open this in Safari and use Share -> Add to Home Screen.";
+  }
+  if (isAndroid) {
+    return "On Android, use Add to Home Screen / Install App from your browser menu if the install prompt does not appear.";
+  }
+  if (isWindows) {
+    return "On Windows, Chrome or Edge can install Northstone from the browser menu as a desktop app.";
+  }
+  return "Use your browser install menu to add Northstone like an app on supported devices.";
+}
 
 export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const backend = useBackendStatus();
@@ -37,8 +60,21 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [resetPassword, setResetPassword] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installBusy, setInstallBusy] = useState(false);
+  const [installMsg, setInstallMsg] = useState<string | null>(null);
 
   const canSubmit = backend.status === "up" && email.trim().includes("@") && password.length >= 8 && !busy;
+
+  useEffect(() => {
+    function handleBeforeInstallPrompt(event: Event) {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+  }, []);
 
   return (
     <div className="loginWrap">
@@ -54,6 +90,41 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
         </div>
         <div className="muted small" style={{ marginTop: 10 }}>
           Want to explore first? <a href="/" style={{ color: "inherit", textDecoration: "underline" }}>Open the CRM preview</a>.
+        </div>
+        <div className="card" style={{ marginTop: 12 }}>
+          <div className="cardTitle">Download / Install Northstone</div>
+          <div className="muted small">
+            Northstone can be installed like an app on <b>Windows</b>, <b>Android</b>, and <b>iPhone / iPad</b>. Use the install button when supported, or your browser menu if the prompt does not appear.
+          </div>
+          {installMsg ? <div className="alert ok" style={{ marginTop: 12 }}>{installMsg}</div> : null}
+          <div className="row" style={{ marginTop: 14, flexWrap: "wrap" }}>
+            <button
+              className="btn ghost"
+              type="button"
+              disabled={installBusy}
+              onClick={async () => {
+                setInstallBusy(true);
+                setInstallMsg(null);
+                try {
+                  if (installPrompt) {
+                    await installPrompt.prompt();
+                    const choice = await installPrompt.userChoice;
+                    setInstallPrompt(null);
+                    setInstallMsg(choice.outcome === "accepted" ? "Northstone install started." : installSupportMessage());
+                  } else {
+                    setInstallMsg(installSupportMessage());
+                  }
+                } finally {
+                  setInstallBusy(false);
+                }
+              }}
+            >
+              {installBusy ? "Opening..." : "Download / Install CRM"}
+            </button>
+            <a className="btn ghost" href="/" style={{ textDecoration: "none" }}>
+              Open website preview
+            </a>
+          </div>
         </div>
 
         <div className="row">
