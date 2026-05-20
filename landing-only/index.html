@@ -1095,11 +1095,11 @@
           <div class="card" style="padding:26px">
             <div class="cardTitle">Install Northstone</div>
             <div class="cardText">
-              Open the secure CRM preview or login first. The actual install option appears inside the paid owner workspace so team devices do not get disconnected from subscription ownership.
+              Start from the official website flow. The real CRM access begins through account login and the install option appears inside the paid owner workspace so team devices stay tied to subscription ownership.
             </div>
             <div class="heroActions" style="margin-top:18px">
-              <a class="btn btnPrimary" id="downloadAppButton" href="/app" target="_blank" rel="noreferrer">Open CRM demo</a>
-              <a class="btn btnSecondary" id="openLoginButton" href="/app" target="_blank" rel="noreferrer">Open demo in new tab</a>
+              <a class="btn btnPrimary" id="downloadAppButton" href="#start">Start your plan</a>
+              <a class="btn btnSecondary" id="openLoginButton" href="#demo">Request demo</a>
             </div>
             <div class="finePrint">
               Honest answer: this will not create extra lagging or data-loss issues when we ship it as an installed web app. The browser installs the interface shell, but deals, contacts, subscriptions, enterprise data, and admin controls still live on the main system database.
@@ -1324,10 +1324,10 @@
     };
 
     if (downloadAppButton) {
-      downloadAppButton.href = "/app";
+      downloadAppButton.href = "#start";
     }
     if (openLoginButton) {
-      openLoginButton.href = "/app";
+      openLoginButton.href = "#demo";
     }
 
     if (location.protocol === "file:" && localNotice) {
