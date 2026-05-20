@@ -37,6 +37,7 @@ export default function DealsGridPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [bulkStage, setBulkStage] = useState<Deal["stage"]>("lead");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function load(search?: string) {
     setError(null);
@@ -53,6 +54,26 @@ export default function DealsGridPage() {
   useEffect(() => {
     void load("");
   }, []);
+
+  async function deleteDeal(deal: Deal) {
+    const confirmed = window.confirm(`Delete deal "${deal.title}"? This cannot be undone.`);
+    if (!confirmed) return;
+    setDeletingId(deal.id);
+    setError(null);
+    try {
+      await api<{ deleted: boolean }>(`/deals/${deal.id}`, { method: "DELETE" });
+      setDeals((prev) => prev.filter((row) => row.id !== deal.id));
+      setSelected((prev) => {
+        const next = { ...prev };
+        delete next[deal.id];
+        return next;
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete deal");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   const rows = useMemo(() => deals, [deals]);
   const selectedIds = useMemo(() => Object.keys(selected).filter((id) => selected[id]), [selected]);
@@ -189,6 +210,7 @@ export default function DealsGridPage() {
               <th>Close %</th>
               <th>Yield %</th>
               <th>ROI %</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -225,11 +247,21 @@ export default function DealsGridPage() {
                 <td>{fmt(d.close_probability)}</td>
                 <td>{fmt(d.expected_yield_pct)}</td>
                 <td>{fmt(d.expected_roi_pct)}</td>
+                <td>
+                  <div className="row" style={{ gap: 8, flexWrap: "nowrap" }}>
+                    <Link to={`/deals/${d.id}`} className="btn ghost">
+                      Open
+                    </Link>
+                    <button className="btn ghost" type="button" onClick={() => void deleteDeal(d)} disabled={deletingId === d.id}>
+                      {deletingId === d.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={13} className="muted">
+                <td colSpan={14} className="muted">
                   No deals found.
                 </td>
               </tr>

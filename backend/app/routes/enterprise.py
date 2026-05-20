@@ -453,6 +453,30 @@ async def generate_builder_document(
     return _builder_document_row(row)
 
 
+@router.delete("/builder-documents/{document_id}")
+def delete_builder_document(
+    document_id: UUID,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_enterprise_owner),
+):
+    owner_id = get_enterprise_owner_id(user)
+    row = session.get(BuilderDocument, document_id)
+    if not row or row.owner_id != owner_id:
+        raise HTTPException(status_code=404, detail="Builder document not found")
+    log_audit_event(
+        session,
+        actor=user,
+        kind="enterprise.builder_document_deleted",
+        summary=f"Deleted builder document: {row.doc_type}",
+        detail=f"project={row.project_name[:120]}",
+        enterprise_owner_id=owner_id,
+        target_user_id=user.id,
+    )
+    session.delete(row)
+    session.commit()
+    return {"deleted": True}
+
+
 @router.post("/deal-score/{deal_id}", response_model=DealScoreResponse)
 def enterprise_deal_score(
     deal_id: UUID,

@@ -27,6 +27,20 @@ from .routes import (
 from .settings import settings
 
 
+def _allowed_origins() -> list[str]:
+    origins = {
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    }
+    for candidate in (settings.frontend_origin, settings.public_app_url):
+        candidate = (candidate or "").strip().rstrip("/")
+        if candidate:
+            origins.add(candidate)
+    return sorted(origins)
+
+
 def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
     if not settings.api_key:
         return
@@ -38,8 +52,8 @@ app = FastAPI(title=settings.app_name)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_origin, "http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1|\d{1,3}(\.\d{1,3}){3}):5173$",
+    allow_origins=_allowed_origins(),
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|\d{1,3}(?:\.\d{1,3}){3})(?::(4173|5173))?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -193,6 +193,7 @@ export default function EnterprisePage() {
   const [builderDocuments, setBuilderDocuments] = useState<BuilderDocumentRow[]>([]);
   const [docBusy, setDocBusy] = useState(false);
   const [docMsg, setDocMsg] = useState<string | null>(null);
+  const [deletingBuilderDocId, setDeletingBuilderDocId] = useState<string | null>(null);
   const [governanceExpanded, setGovernanceExpanded] = useState(false);
   const [docForm, setDocForm] = useState({
     doc_type: "project_overview",
@@ -231,6 +232,24 @@ export default function EnterprisePage() {
 
   function openUpgradePrompt(message: string, targetPlan: "enterprise" | "builder" = "enterprise", title = "Upgrade to unlock") {
     setUpgradePrompt({ title, message, targetPlan });
+  }
+
+  async function deleteBuilderDocument(doc: BuilderDocumentRow) {
+    const confirmed = window.confirm(`Delete this builder draft${doc.project_name ? ` for "${doc.project_name}"` : ""}?`);
+    if (!confirmed) return;
+    setDeletingBuilderDocId(doc.id);
+    setError(null);
+    try {
+      await api<{ deleted: boolean }>(`/enterprise/builder-documents/${doc.id}`, { method: "DELETE" });
+      setBuilderDocuments((prev) => prev.filter((row) => row.id !== doc.id));
+      setDocMsg("Builder draft deleted.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not delete builder draft";
+      setError(message);
+      setDocMsg(message);
+    } finally {
+      setDeletingBuilderDocId(null);
+    }
   }
 
   async function load() {
@@ -952,7 +971,19 @@ export default function EnterprisePage() {
                       <div className="muted small" style={{ marginTop: 12 }}>{doc.instructions}</div>
                     )}
                   </div>
-                  <div className="muted small">{fmtDt(doc.updated_at)}</div>
+                  <div style={{ display: "grid", gap: 10, justifyItems: "end" }}>
+                    <div className="muted small">{fmtDt(doc.updated_at)}</div>
+                    {isEnterpriseOwner ? (
+                      <button
+                        className="btn ghost"
+                        type="button"
+                        onClick={() => void deleteBuilderDocument(doc)}
+                        disabled={deletingBuilderDocId === doc.id}
+                      >
+                        {deletingBuilderDocId === doc.id ? "Deleting..." : "Delete draft"}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ))}

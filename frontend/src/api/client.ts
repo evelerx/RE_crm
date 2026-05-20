@@ -92,7 +92,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const timeoutMs =
     path.startsWith("/enterprise/builder-documents/generate")
       ? 60000
-      : path.startsWith("/auth/") || path.startsWith("/admin/audit") || path.startsWith("/enterprise/audit")
+      : path.startsWith("/auth/") || path.startsWith("/admin/") || path.startsWith("/enterprise/audit")
         ? 20000
         : 8000;
   let res: Response;

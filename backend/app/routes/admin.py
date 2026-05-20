@@ -7,13 +7,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from ..audit import log_audit_event, redact_detail
 from ..auth import decode_token, get_current_user, hash_password, is_admin_email, normalize_email
 from ..crypto import encrypt_if_configured
 from ..db import get_session
-from ..enterprise_scope import count_org_records, employee_record_counts
+from ..enterprise_scope import count_org_records, employee_record_counts, org_owner_filter
 from ..models import Activity, AuditEvent, Contact, Deal, Profile, SupportChatMessage, User
 from ..schemas import (
     AdminBlacklistRequest,
@@ -185,6 +185,74 @@ def _user_email_map(session: Session, user_ids: list[UUID]) -> dict[UUID, str]:
     return {user.id: user.email for user in users}
 
 
+def _enterprise_workspace_payload(session: Session, owner: User) -> dict:
+    def admin_stage(raw_stage: str | None) -> str:
+        stage = (raw_stage or "").strip().lower()
+        if stage == "lead":
+            return "new_lead"
+        if stage == "visit":
+            return "qualified"
+        if stage == "negotiation":
+            return "active"
+        if stage == "closed":
+            return "closed"
+        if stage == "lost":
+            return "lost"
+        return "new_lead"
+
+    deals = session.exec(
+        select(Deal)
+        .where(org_owner_filter(Deal, owner.id))
+        .order_by(col(Deal.updated_at).desc())
+    ).all()
+    contacts = session.exec(
+        select(Contact)
+        .where(org_owner_filter(Contact, owner.id))
+        .order_by(col(Contact.updated_at).desc())
+    ).all()
+
+    stage_counts = {stage: 0 for stage in ["new_lead", "qualified", "active", "closed", "lost"]}
+    for deal in deals:
+        stage_counts[admin_stage(deal.stage)] += 1
+
+    return {
+        "enterprise_owner_id": str(owner.id),
+        "pipeline": {
+            "total": len(deals),
+            "stage_counts": stage_counts,
+        },
+        "deals": [
+            {
+                "id": str(deal.id),
+                "title": deal.title,
+                "asset_type": deal.asset_type,
+                "stage": admin_stage(deal.stage),
+                "city": deal.city,
+                "area": deal.area,
+                "typology": deal.typology or "",
+                "ticket_size": deal.ticket_size,
+                "customer_budget": deal.customer_budget,
+                "close_probability": deal.close_probability,
+                "last_activity_at": deal.last_activity_at,
+                "updated_at": deal.updated_at,
+            }
+            for deal in deals
+        ],
+        "contacts": [
+            {
+                "id": str(contact.id),
+                "name": contact.name,
+                "role": contact.role,
+                "phone": contact.phone,
+                "email": contact.email,
+                "tags": contact.tags or "",
+                "updated_at": contact.updated_at,
+            }
+            for contact in contacts
+        ],
+    }
+
+
 def _audit_row_payload(row: AuditEvent, email_by_id: dict[UUID, str]) -> dict:
     actor_email = email_by_id.get(row.actor_user_id, "") if row.actor_user_id else ""
     target_email = email_by_id.get(row.target_user_id, "") if row.target_user_id else ""
@@ -206,6 +274,45 @@ def _audit_row_payload(row: AuditEvent, email_by_id: dict[UUID, str]) -> dict:
         "readable_summary": readable,
         "created_at": row.created_at,
     }
+
+
+def _parse_demo_request_detail(detail: str) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    for chunk in (detail or "").split(";"):
+        if "=" not in chunk:
+            continue
+        key, value = chunk.split("=", 1)
+        parsed[key.strip()] = value.strip()
+    return parsed
+
+
+def _demo_request_payload(session: Session) -> list[dict]:
+    rows = session.exec(
+        select(AuditEvent)
+        .where(AuditEvent.kind == "public.request_demo")
+        .order_by(col(AuditEvent.created_at).desc())
+    ).all()
+    user_ids = [row.target_user_id for row in rows if row.target_user_id]
+    users = session.exec(select(User).where(User.id.in_(user_ids))).all() if user_ids else []
+    profiles = session.exec(select(Profile).where(Profile.owner_id.in_(user_ids))).all() if user_ids else []
+    user_by_id = {user.id: user for user in users}
+    profile_by_owner = {profile.owner_id: profile for profile in profiles}
+
+    return [
+        {
+            "id": str(row.id),
+            "full_name": (profile_by_owner.get(row.target_user_id).full_name if row.target_user_id and profile_by_owner.get(row.target_user_id) else ""),
+            "email": (user_by_id.get(row.target_user_id).email if row.target_user_id and user_by_id.get(row.target_user_id) else ""),
+            "phone": (profile_by_owner.get(row.target_user_id).phone if row.target_user_id and profile_by_owner.get(row.target_user_id) else ""),
+            "company_name": (profile_by_owner.get(row.target_user_id).company if row.target_user_id and profile_by_owner.get(row.target_user_id) else ""),
+            "city": (profile_by_owner.get(row.target_user_id).city if row.target_user_id and profile_by_owner.get(row.target_user_id) else ""),
+            "preferred_plan": _parse_demo_request_detail(row.detail).get("plan", ""),
+            "team_size": int(_parse_demo_request_detail(row.detail).get("team_size", "0") or 0),
+            "message": _parse_demo_request_detail(row.detail).get("message", ""),
+            "requested_at": row.created_at,
+        }
+        for row in rows
+    ]
 
 
 def _chat_row_payload(session: Session, row: SupportChatMessage) -> SupportChatMessageRead:
@@ -494,6 +601,26 @@ def enterprise_detail(
     if not owner or (getattr(owner, "plan", "free") or "free") not in {"enterprise", "builder"}:
         raise HTTPException(status_code=404, detail="Organization owner not found")
     return _enterprise_detail_payload(session, owner)
+
+
+@router.get("/enterprises/{enterprise_owner_id}/workspace")
+def enterprise_workspace_detail(
+    enterprise_owner_id: UUID,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> dict:
+    owner = session.get(User, enterprise_owner_id)
+    if not owner or (getattr(owner, "plan", "free") or "free") not in {"enterprise", "builder"}:
+        raise HTTPException(status_code=404, detail="Organization owner not found")
+    return _enterprise_workspace_payload(session, owner)
+
+
+@router.get("/demo-requests")
+def demo_requests(
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> list[dict]:
+    return _demo_request_payload(session)
 
 
 @router.get("/audit")

@@ -811,6 +811,40 @@ textarea.textarea {
   line-height: 1.45;
 }
 
+.adminPipelineBoard {
+  align-items: stretch;
+}
+
+.adminPrimaryStage {
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.16);
+}
+
+.adminSecondaryStage {
+  background: rgba(18, 26, 40, 0.72);
+}
+
+.adminIntakeCard {
+  background:
+    linear-gradient(180deg, rgba(17, 26, 39, 0.94), rgba(13, 20, 31, 0.84));
+  border-color: rgba(95, 135, 198, 0.18);
+}
+
+.adminIntakeMeta {
+  display: grid;
+  gap: 6px;
+}
+
+.adminStagePlaceholder {
+  min-height: 96px;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+  align-content: center;
+  background: rgba(255, 255, 255, 0.015);
+}
+
 .calcGrid {
   display: grid;
   grid-template-columns: 1fr;
@@ -830,6 +864,9 @@ textarea.textarea {
   .kanban {
     grid-template-columns: repeat(5, 1fr);
     align-items: start;
+  }
+  .adminPipelineBoard {
+    grid-template-columns: minmax(320px, 1.35fr) repeat(5, minmax(170px, 1fr));
   }
   .detailGrid {
     grid-template-columns: 1fr 1fr;

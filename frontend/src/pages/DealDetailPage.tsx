@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api } from "../api/client";
 import type { Activity, Contact, Deal } from "../api/types";
 
@@ -36,6 +36,7 @@ function formatDate(value: string | null | undefined) {
 
 export default function DealDetailPage() {
   const { dealId } = useParams();
+  const navigate = useNavigate();
   const [deal, setDeal] = useState<Deal | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +51,7 @@ export default function DealDetailPage() {
   const [activityBusy, setActivityBusy] = useState(false);
   const [reminderBusy, setReminderBusy] = useState(false);
   const [scoreBusy, setScoreBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [editPayload, setEditPayload] = useState({
     contact_id: "",
     visit_date: "",
@@ -177,11 +179,6 @@ export default function DealDetailPage() {
     setActivities((prev) => prev.map((x) => (x.id === a.id ? updated : x)));
   }
 
-  async function deleteActivity(a: Activity) {
-    await api<{ deleted: boolean }>(`/activities/${a.id}`, { method: "DELETE" });
-    setActivities((prev) => prev.filter((x) => x.id !== a.id));
-  }
-
   async function saveDealSnapshot() {
     if (!dealId) return;
     const payload: Record<string, unknown> = {
@@ -202,6 +199,21 @@ export default function DealDetailPage() {
     setEditing(false);
   }
 
+  async function deleteDeal() {
+    if (!dealId || !deal) return;
+    const confirmed = window.confirm(`Delete deal "${deal.title}"? This cannot be undone.`);
+    if (!confirmed) return;
+    setDeleteBusy(true);
+    setError(null);
+    try {
+      await api<{ deleted: boolean }>(`/deals/${dealId}`, { method: "DELETE" });
+      navigate("/deals");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete deal");
+      setDeleteBusy(false);
+    }
+  }
+
   if (!dealId) return <div className="page">Missing deal ID.</div>;
   const whatsAppContact = contacts.find((contact) => contact.id === whatsAppContactId) || null;
   const whatsAppPhone = whatsAppContact?.phone;
@@ -218,6 +230,9 @@ export default function DealDetailPage() {
         </div>
         <button className="btn ghost" onClick={() => void load()}>
           Refresh
+        </button>
+        <button className="btn ghost" onClick={() => void deleteDeal()} disabled={deleteBusy} type="button">
+          {deleteBusy ? "Deleting..." : "Delete deal"}
         </button>
       </div>
       {error ? <div className="alert">{error}</div> : null}
@@ -523,9 +538,6 @@ export default function DealDetailPage() {
                     <div className="grow">{a.summary || "-"}</div>
                     <button className={a.completed ? "btn ghost" : "btn"} onClick={() => void toggleActivityDone(a)} type="button">
                       {a.completed ? "Completed" : "Mark done"}
-                    </button>
-                    <button className="btn ghost" onClick={() => void deleteActivity(a)} type="button">
-                      Delete
                     </button>
                   </div>
                 </div>

@@ -4,13 +4,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
-from sqlmodel import Session, col, select
+from sqlmodel import Session, col, delete, select
 
 from ..audit import log_audit_event
 from ..auth import get_current_user
 from ..db import get_session
 from ..enterprise_scope import assign_enterprise_fields, user_can_access_record, user_read_filter
-from ..models import Contact, Deal, DealStageEvent, User
+from ..models import Activity, Contact, Deal, DealStageEvent, User
 from ..schemas import BulkStageUpdateRequest, DealCreate, DealRead, DealUpdate, StageSummary
 
 
@@ -211,6 +211,8 @@ def delete_deal(
         summary=f"Deleted deal {deal.title}",
         enterprise_owner_id=getattr(deal, "enterprise_owner_id", None),
     )
+    session.exec(delete(Activity).where(Activity.deal_id == deal.id))
+    session.exec(delete(DealStageEvent).where(DealStageEvent.deal_id == deal.id))
     session.delete(deal)
     session.commit()
     return {"deleted": True}

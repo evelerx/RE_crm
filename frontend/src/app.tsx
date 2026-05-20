@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { api } from "./api/client";
-import { clearSession, getEmail, getToken } from "./auth";
+import { clearSession, getEmail, getToken, hasKnownAccount } from "./auth";
 import TutorialBubble from "./components/TutorialBubble";
 import AdminPage from "./pages/AdminPage";
+import { AdminOwnerContactsPage, AdminOwnerDealsPage, AdminOwnerPipelinePage } from "./pages/AdminWorkspacePages";
 import AccountPage from "./pages/AccountPage";
 import AppsPage from "./pages/AppsPage";
 import CalculatorPage from "./pages/CalculatorPage";
@@ -546,11 +547,11 @@ export default function App() {
     setIsEnterprise(false);
     setEnterpriseBadge(null);
     setReraCompleted(true);
-    navigate("/");
+    navigate("/login");
   }
 
   if (!authed) {
-    if (location.pathname === "/login") {
+    if (location.pathname === "/login" || hasKnownAccount()) {
       return (
         <LoginPage
           onLoggedIn={async () => {
@@ -575,10 +576,10 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/today" element={<TodayPage />} />
-          <Route path="/" element={<PipelinePage />} />
-          <Route path="/deals" element={<DealsGridPage />} />
+          <Route path="/" element={isAdmin ? <AdminOwnerPipelinePage /> : <PipelinePage />} />
+          <Route path="/deals" element={isAdmin ? <AdminOwnerDealsPage /> : <DealsGridPage />} />
           <Route path="/deals/:dealId" element={<DealDetailPage />} />
-          <Route path="/contacts" element={<ContactsPage />} />
+          <Route path="/contacts" element={isAdmin ? <AdminOwnerContactsPage /> : <ContactsPage />} />
           <Route path="/calc" element={<CalculatorPage />} />
           <Route path="/insights" element={<InsightsPage />} />
           <Route path="/account" element={<AccountPage />} />

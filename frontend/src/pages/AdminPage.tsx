@@ -62,6 +62,62 @@ type EnterpriseDetail = {
   employees: EnterpriseEmployeeRow[];
 };
 
+type OwnerPipelineStageCounts = {
+  new_lead: number;
+  qualified: number;
+  active: number;
+  closed: number;
+  lost: number;
+};
+
+type OwnerDealRow = {
+  id: string;
+  title: string;
+  asset_type: string;
+  stage: string;
+  city: string;
+  area: string;
+  typology: string;
+  ticket_size: number | null;
+  customer_budget: number | null;
+  close_probability: number | null;
+  last_activity_at: string | null;
+  updated_at: string;
+};
+
+type OwnerContactRow = {
+  id: string;
+  name: string;
+  role: string;
+  phone: string | null;
+  email: string | null;
+  tags: string;
+  updated_at: string;
+};
+
+type OwnerWorkspace = {
+  enterprise_owner_id: string;
+  pipeline: {
+    total: number;
+    stage_counts: OwnerPipelineStageCounts;
+  };
+  deals: OwnerDealRow[];
+  contacts: OwnerContactRow[];
+};
+
+type DemoRequestRow = {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  company_name: string;
+  city: string;
+  preferred_plan: string;
+  team_size: number;
+  message: string;
+  requested_at: string;
+};
+
 type AuditRow = {
   id: string;
   actor_user_id: string;
@@ -448,6 +504,8 @@ export default function AdminPage() {
   const [enterprises, setEnterprises] = useState<EnterpriseDetail[]>([]);
   const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string>("");
   const [selectedEnterprise, setSelectedEnterprise] = useState<EnterpriseDetail | null>(null);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<OwnerWorkspace | null>(null);
+  const [demoRequests, setDemoRequests] = useState<DemoRequestRow[]>([]);
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [auditLimit, setAuditLimit] = useState(30);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -536,25 +594,29 @@ export default function AdminPage() {
   async function loadEnterpriseDetails(nextId: string, enterpriseRows?: EnterpriseDetail[]) {
     if (!nextId) {
       setSelectedEnterprise(null);
+      setSelectedWorkspace(null);
       setChatRows([]);
       return;
     }
     const local = (enterpriseRows ?? enterprises).find((enterprise) => enterprise.enterprise_owner_id === nextId) ?? null;
+    setSelectedEnterprise(local);
+    try {
+      const [detail, chat, workspace] = await Promise.all([
+        api<EnterpriseDetail>(`/admin/enterprises/${nextId}`),
+        api<SupportChatRow[]>(`/admin/support-chat/${nextId}`),
+        api<OwnerWorkspace>(`/admin/enterprises/${nextId}/workspace`)
+      ]);
+      setEnterprises((prev) =>
+        prev.map((enterprise) =>
+          enterprise.enterprise_owner_id === detail.enterprise_owner_id ? detail : enterprise
+        )
+      );
+      setSelectedEnterprise(detail);
+      setSelectedWorkspace(workspace);
+      setChatRows(chat);
+    } catch (e) {
       setSelectedEnterprise(local);
-      try {
-        const [detail, chat] = await Promise.all([
-          api<EnterpriseDetail>(`/admin/enterprises/${nextId}`),
-          api<SupportChatRow[]>(`/admin/support-chat/${nextId}`)
-        ]);
-        setEnterprises((prev) =>
-          prev.map((enterprise) =>
-            enterprise.enterprise_owner_id === detail.enterprise_owner_id ? detail : enterprise
-          )
-        );
-        setSelectedEnterprise(detail);
-        setChatRows(chat);
-      } catch (e) {
-      setSelectedEnterprise(local);
+      setSelectedWorkspace(null);
       setChatRows([]);
       throw e;
     }
@@ -587,13 +649,14 @@ export default function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-        const [users, enterpriseRows, securityPosture, complianceReport, runtime, subscriptionData] = await Promise.all([
+        const [users, enterpriseRows, securityPosture, complianceReport, runtime, subscriptionData, demoRows] = await Promise.all([
         api<AdminUserRow[]>("/admin/users"),
         api<EnterpriseDetail[]>("/admin/enterprises"),
         api<SecurityPosture>("/admin/security-posture"),
         api<ComplianceReport>("/admin/compliance-report"),
         api<RuntimeConfig>("/admin/runtime-config"),
-        api<SubscriptionAnalytics>(`/admin/subscription-analytics?grain=${subscriptionGrain}`)
+        api<SubscriptionAnalytics>(`/admin/subscription-analytics?grain=${subscriptionGrain}`),
+        api<DemoRequestRow[]>("/admin/demo-requests")
       ]);
       const adminMe = await api<{ is_admin: boolean; email: string }>("/admin/me");
       setRows(users);
@@ -601,6 +664,7 @@ export default function AdminPage() {
       setSecurity(securityPosture);
       setCompliance(complianceReport);
       setSubscriptionAnalytics(subscriptionData);
+      setDemoRequests(demoRows);
       setRuntimeConfig(runtime);
       setAdminEmail(adminMe.email || "");
       setConfigForm((prev) => ({
@@ -658,6 +722,12 @@ export default function AdminPage() {
     selectedEnterpriseEmployees.length > 0
       ? selectedEnterpriseEmployees
       : fallbackEmployeesFromUsers(displayRows, selectedEnterpriseId);
+  const selectedPipeline =
+    selectedWorkspace?.enterprise_owner_id === selectedEnterpriseId ? selectedWorkspace.pipeline : null;
+  const selectedDeals =
+    selectedWorkspace?.enterprise_owner_id === selectedEnterpriseId ? selectedWorkspace.deals : [];
+  const selectedContacts =
+    selectedWorkspace?.enterprise_owner_id === selectedEnterpriseId ? selectedWorkspace.contacts : [];
   const visibleAuditRows = auditListExpanded ? displayAuditRows : displayAuditRows.slice(0, 1);
   const complianceBars = displayCompliance
     ? [
@@ -1459,6 +1529,165 @@ export default function AdminPage() {
         <div className="muted small">
           Admin can inspect brokers, CPs, and employee IDs under the selected enterprise below.
         </div>
+
+        {selectedPipeline ? (
+          <>
+            <div className="statsGrid">
+              <div className="statCard">
+                <div className="statLabel">Pipeline total</div>
+                <div className="statValue">{selectedPipeline.total}</div>
+                <div className="statHint">All live deals currently visible for this subscription owner.</div>
+              </div>
+              <div className="statCard">
+                <div className="statLabel">Demo requested</div>
+                <div className="statValue">{demoRequests.length}</div>
+                <div className="statHint">People who filled the landing-page demo form and can be contacted directly.</div>
+              </div>
+              <div className="statCard">
+                <div className="statLabel">New lead</div>
+                <div className="statValue">{selectedPipeline.stage_counts.new_lead}</div>
+                <div className="statHint">Fresh user client records now visible under this owner workspace.</div>
+              </div>
+              <div className="statCard">
+                <div className="statLabel">Qualified</div>
+                <div className="statValue">{selectedPipeline.stage_counts.qualified}</div>
+                <div className="statHint">Client records that have moved beyond basic entry.</div>
+              </div>
+              <div className="statCard">
+                <div className="statLabel">Active</div>
+                <div className="statValue">{selectedPipeline.stage_counts.active}</div>
+                <div className="statHint">Ongoing visits, follow-ups, or commercial progress under this owner.</div>
+              </div>
+              <div className="statCard">
+                <div className="statLabel">Closed</div>
+                <div className="statValue">{selectedPipeline.stage_counts.closed}</div>
+                <div className="statHint">Converted deals already closed by this owner organization.</div>
+              </div>
+              <div className="statCard">
+                <div className="statLabel">Lost</div>
+                <div className="statValue">{selectedPipeline.stage_counts.lost}</div>
+                <div className="statHint">Lost deals that still matter for admin oversight and coaching.</div>
+              </div>
+            </div>
+
+            <div className="tableWrap" style={{ marginTop: 16 }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Demo requester</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Company</th>
+                    <th>City</th>
+                    <th>Interested plan</th>
+                    <th>Team size</th>
+                    <th>Message</th>
+                    <th>Requested</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {demoRequests.map((request) => (
+                    <tr key={request.id}>
+                      <td className="tdTitle">{request.full_name || "-"}</td>
+                      <td>{request.email || "-"}</td>
+                      <td>{request.phone || "-"}</td>
+                      <td>{request.company_name || "-"}</td>
+                      <td>{request.city || "-"}</td>
+                      <td>{request.preferred_plan || "-"}</td>
+                      <td>{request.team_size || "-"}</td>
+                      <td>{request.message || "-"}</td>
+                      <td>{fmtDt(request.requested_at)}</td>
+                    </tr>
+                  ))}
+                  {!demoRequests.length ? (
+                    <tr>
+                      <td colSpan={9} className="muted">
+                        No landing-page demo requests have been captured yet.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="tableWrap" style={{ marginTop: 16 }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Deal</th>
+                    <th>Stage</th>
+                    <th>Type</th>
+                    <th>Location</th>
+                    <th>Typology</th>
+                    <th>Ticket size</th>
+                    <th>Client budget</th>
+                    <th>Close %</th>
+                    <th>Last activity</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedDeals.map((deal) => (
+                    <tr key={deal.id}>
+                      <td className="tdTitle">{deal.title}</td>
+                      <td>{deal.stage || "-"}</td>
+                      <td>{deal.asset_type || "-"}</td>
+                      <td>{[deal.area, deal.city].filter(Boolean).join(", ") || "-"}</td>
+                      <td>{deal.typology || "-"}</td>
+                      <td>{deal.ticket_size != null ? formatRupees(deal.ticket_size) : "-"}</td>
+                      <td>{deal.customer_budget != null ? formatRupees(deal.customer_budget) : "-"}</td>
+                      <td>{deal.close_probability != null ? `${deal.close_probability}%` : "-"}</td>
+                      <td>{fmtDt(deal.last_activity_at)}</td>
+                      <td>{fmtDt(deal.updated_at)}</td>
+                    </tr>
+                  ))}
+                  {!selectedDeals.length ? (
+                    <tr>
+                      <td colSpan={10} className="muted">
+                        No deal records are attached to this subscription owner yet.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="tableWrap" style={{ marginTop: 16 }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Contact</th>
+                    <th>Role</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Tags</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedContacts.map((contact) => (
+                    <tr key={contact.id}>
+                      <td className="tdTitle">{contact.name}</td>
+                      <td>{contact.role || "-"}</td>
+                      <td>{contact.phone || "-"}</td>
+                      <td>{contact.email || "-"}</td>
+                      <td>{contact.tags || "-"}</td>
+                      <td>{fmtDt(contact.updated_at)}</td>
+                    </tr>
+                  ))}
+                  {!selectedContacts.length ? (
+                    <tr>
+                      <td colSpan={6} className="muted">
+                        No contact records are attached to this subscription owner yet.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
+
         <div className="tableWrap">
           <table className="table">
             <thead>
