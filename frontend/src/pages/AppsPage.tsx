@@ -69,7 +69,7 @@ const providerCards = [
     name: "Gmail",
     key: "gmail",
     tab: "communication",
-    iconUrl: "https://cdn.simpleicons.org/gmail/EA4335",
+    iconUrl: "https://img.icons8.com/color/48/gmail-new.png",
     providerGroup: "google",
     category: "Email",
     rollout: "Phase 1",
@@ -85,7 +85,7 @@ const providerCards = [
     name: "Google Calendar",
     key: "google_calendar",
     tab: "calendar",
-    iconUrl: "https://cdn.simpleicons.org/googlecalendar/4285F4",
+    iconUrl: "https://img.icons8.com/color/48/google-calendar--v2.png",
     providerGroup: "google",
     category: "Scheduling",
     rollout: "Phase 1",
@@ -101,7 +101,7 @@ const providerCards = [
     name: "Google Meet",
     key: "google_meet",
     tab: "meetings",
-    iconUrl: "https://cdn.simpleicons.org/googlemeet/00897B",
+    iconUrl: "https://img.icons8.com/color/48/google-meet.png",
     providerGroup: "google",
     category: "Meetings",
     rollout: "Phase 1",
@@ -117,7 +117,7 @@ const providerCards = [
     name: "Zoom",
     key: "zoom",
     tab: "meetings",
-    iconUrl: "https://cdn.simpleicons.org/zoom/0B5CFF",
+    iconUrl: "https://img.icons8.com/color/48/zoom.png",
     providerGroup: "zoom",
     category: "Meetings",
     rollout: "Phase 3",
@@ -135,7 +135,7 @@ const adPlatforms = [
   {
     name: "Google Ads",
     tab: "ads",
-    iconUrl: "https://cdn.simpleicons.org/googleads/4285F4",
+    iconUrl: "https://img.icons8.com/color/48/google-ads.png",
     category: "Search and display",
     description:
       "Create campaigns for property launches, lead capture, project awareness, branded search, and location-targeted buyer demand.",
@@ -144,7 +144,7 @@ const adPlatforms = [
   {
     name: "Meta Ads",
     tab: "ads",
-    iconUrl: "https://cdn.simpleicons.org/meta/0866FF",
+    iconUrl: "https://img.icons8.com/color/48/facebook-new.png",
     category: "Facebook and Instagram",
     description:
       "Run visual campaigns for builders, broker teams, and luxury inventory across Facebook and Instagram audiences.",
@@ -153,7 +153,7 @@ const adPlatforms = [
   {
     name: "TikTok Ads",
     tab: "ads",
-    iconUrl: "https://cdn.simpleicons.org/tiktok/000000",
+    iconUrl: "https://img.icons8.com/color/48/tiktok--v1.png",
     category: "Short-form discovery",
     description:
       "Promote projects, walkthroughs, and branded launch content with short-form campaign distribution for newer audiences.",
@@ -162,11 +162,11 @@ const adPlatforms = [
 ];
 
 const appTabs = [
-  { key: "communication", label: "Communication", iconUrl: "https://cdn.simpleicons.org/gmail/EA4335" },
-  { key: "meetings", label: "Meetings", iconUrl: "https://cdn.simpleicons.org/zoom/0B5CFF" },
-  { key: "calendar", label: "Calendar", iconUrl: "https://cdn.simpleicons.org/googlecalendar/4285F4" },
-  { key: "ads", label: "Ads", iconUrl: "https://cdn.simpleicons.org/googleads/4285F4" },
-  { key: "coming_soon", label: "Coming soon", iconUrl: "https://cdn.simpleicons.org/clockify/03A9F4" }
+  { key: "communication", label: "Communication", iconUrl: "https://img.icons8.com/color/48/gmail-new.png" },
+  { key: "meetings", label: "Meetings", iconUrl: "https://img.icons8.com/color/48/zoom.png" },
+  { key: "calendar", label: "Calendar", iconUrl: "https://img.icons8.com/color/48/google-calendar--v2.png" },
+  { key: "ads", label: "Ads", iconUrl: "https://img.icons8.com/color/48/google-ads.png" },
+  { key: "coming_soon", label: "Coming soon", iconUrl: "https://img.icons8.com/color/48/clock--v1.png" }
 ] as const;
 
 const comingSoonApps = [
@@ -174,14 +174,14 @@ const comingSoonApps = [
     name: "Microsoft Teams",
     tab: "coming_soon",
     category: "Meetings",
-    iconUrl: "https://cdn.simpleicons.org/microsoftteams/6264A7",
+    iconUrl: "https://img.icons8.com/color/48/microsoft-teams-2019.png",
     description: "Microsoft workspace rollout is prepared in the backend, but it stays parked until the tenant, permissions, and app registration are fully ready."
   },
   {
     name: "Outlook",
     tab: "coming_soon",
     category: "Email",
-    iconUrl: "https://cdn.simpleicons.org/microsoftoutlook/0078D4",
+    iconUrl: "https://img.icons8.com/color/48/microsoft-outlook-2019.png",
     description: "Outlook support stays queued behind the same Microsoft tenant setup so mail and meeting workflows go live together."
   }
 ];
