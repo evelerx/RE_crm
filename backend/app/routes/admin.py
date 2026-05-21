@@ -151,7 +151,11 @@ def _enterprise_detail_payload(session: Session, owner: User) -> dict:
     return {
         "enterprise_owner_id": str(owner.id),
         "owner_email": owner.email,
+        "owner_full_name": owner_profile.full_name if owner_profile else "",
+        "owner_phone": owner_profile.phone if owner_profile else "",
+        "owner_whatsapp": owner_profile.whatsapp if owner_profile else "",
         "company": owner_profile.company if owner_profile else "",
+        "company_city": owner_profile.city if owner_profile else "",
         "llm_provider": getattr(owner, "llm_provider", "") or "",
         "llm_model": getattr(owner, "llm_model", "") or "",
         "llm_allocated_at": getattr(owner, "llm_allocated_at", None),

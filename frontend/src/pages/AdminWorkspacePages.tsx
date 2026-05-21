@@ -4,7 +4,11 @@ import { api } from "../api/client";
 type EnterpriseDetail = {
   enterprise_owner_id: string;
   owner_email: string;
+  owner_full_name: string;
+  owner_phone: string;
+  owner_whatsapp: string;
   company: string;
+  company_city: string;
   employee_limit: number;
   employee_count: number;
 };
@@ -313,14 +317,15 @@ export function AdminOwnerDealsPage() {
 }
 
 export function AdminOwnerContactsPage() {
-  const { owners, selectedOwnerId, setSelectedOwnerId, workspace, loading, error, reload } = useAdminWorkspaceData();
+  const { owners, selectedOwnerId, setSelectedOwnerId, loading, error, reload } = useAdminWorkspaceData();
+  const selectedOwner = owners.find((owner) => owner.enterprise_owner_id === selectedOwnerId) ?? null;
 
   return (
     <div className="page">
       <div className="pageHeader">
         <div>
           <div className="h1">Contacts</div>
-          <div className="muted">All subscription-owner contact records visible to admin for user tracking.</div>
+          <div className="muted">Subscription owner contact details visible to admin for account communication.</div>
         </div>
         <div className="row">
           <OwnerSelector owners={owners} selectedOwnerId={selectedOwnerId} onChange={setSelectedOwnerId} />
@@ -335,30 +340,33 @@ export function AdminOwnerContactsPage() {
         <table className="table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Role</th>
+              <th>Owner name</th>
               <th>Phone</th>
+              <th>WhatsApp</th>
               <th>Email</th>
-              <th>Tags</th>
-              <th>Updated</th>
+              <th>Company</th>
+              <th>City</th>
+              <th>Employee limit</th>
+              <th>Employee count</th>
             </tr>
           </thead>
           <tbody>
-            {(workspace?.contacts ?? []).map((contact) => (
-              <tr key={contact.id}>
-                <td className="tdTitle">{contact.name}</td>
-                <td>{contact.role || "-"}</td>
-                <td>{contact.phone || "-"}</td>
-                <td>{contact.email || "-"}</td>
-                <td>{contact.tags || "-"}</td>
-                <td>{fmtDt(contact.updated_at)}</td>
-              </tr>
-            ))}
-            {!(workspace?.contacts.length) ? (
+            {selectedOwner ? (
               <tr>
-                <td colSpan={6} className="muted">No contact records found for this subscription owner.</td>
+                <td className="tdTitle">{selectedOwner.owner_full_name || "-"}</td>
+                <td>{selectedOwner.owner_phone || "-"}</td>
+                <td>{selectedOwner.owner_whatsapp || "-"}</td>
+                <td>{selectedOwner.owner_email || "-"}</td>
+                <td>{selectedOwner.company || "-"}</td>
+                <td>{selectedOwner.company_city || "-"}</td>
+                <td>{selectedOwner.employee_limit || 0}</td>
+                <td>{selectedOwner.employee_count || 0}</td>
               </tr>
-            ) : null}
+            ) : (
+              <tr>
+                <td colSpan={8} className="muted">No subscription owner selected.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
