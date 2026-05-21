@@ -33,6 +33,9 @@ def _allowed_origins() -> list[str]:
         "http://127.0.0.1:5173",
         "http://localhost:4173",
         "http://127.0.0.1:4173",
+        "https://northstonecrm.com",
+        "https://www.northstonecrm.com",
+        "https://app.northstonecrm.com",
     }
     for candidate in (settings.frontend_origin, settings.public_app_url):
         candidate = (candidate or "").strip().rstrip("/")
