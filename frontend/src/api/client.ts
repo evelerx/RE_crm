@@ -2,10 +2,32 @@ export const fallbackHost =
   typeof globalThis !== "undefined" && "location" in globalThis && globalThis.location
     ? globalThis.location.hostname
     : "localhost";
-const defaultApiBase =
-  typeof globalThis !== "undefined" && "location" in globalThis && globalThis.location
-    ? `http://${fallbackHost}:8000`
-    : `http://${fallbackHost}:8000`;
+
+function inferDefaultApiBase() {
+  if (!(typeof globalThis !== "undefined" && "location" in globalThis && globalThis.location)) {
+    return `http://${fallbackHost}:8000`;
+  }
+
+  const { hostname, protocol } = globalThis.location;
+  const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
+  const isLanIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
+
+  if (isLocalhost || isLanIp) {
+    return `http://${hostname}:8000`;
+  }
+
+  if (hostname === "app.northstonecrm.com" || hostname === "northstonecrm.com" || hostname === "www.northstonecrm.com") {
+    return "https://api.northstonecrm.com";
+  }
+
+  if (hostname.endsWith(".northstonecrm.com")) {
+    return "https://api.northstonecrm.com";
+  }
+
+  return `${protocol}//${hostname}:8000`;
+}
+
+const defaultApiBase = inferDefaultApiBase();
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? defaultApiBase).replace(/\/$/, "");
 const API_KEY = import.meta.env.VITE_API_KEY ?? "";
 const TOKEN_KEY = "northstonecrm_token";

@@ -41,6 +41,11 @@ function installSupportMessage() {
   return "Use your browser install menu to add Northstone like an app on supported devices.";
 }
 
+function isHostedProductionApp() {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname === "app.northstonecrm.com";
+}
+
 export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const backend = useBackendStatus();
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -63,6 +68,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installBusy, setInstallBusy] = useState(false);
   const [installMsg, setInstallMsg] = useState<string | null>(null);
+  const hostedProductionApp = isHostedProductionApp();
 
   const canSubmit = backend.status === "up" && email.trim().includes("@") && password.length >= 8 && !busy;
 
@@ -89,7 +95,10 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
           </div>
         </div>
         <div className="muted small" style={{ marginTop: 10 }}>
-          Want to explore first? <a href="/" style={{ color: "inherit", textDecoration: "underline" }}>Open the CRM preview</a>.
+          Want the main website first?{" "}
+          <a href="https://northstonecrm.com" style={{ color: "inherit", textDecoration: "underline" }}>
+            Open northstonecrm.com
+          </a>.
         </div>
         <div className="card" style={{ marginTop: 12 }}>
           <div className="cardTitle">Download / Install Northstone</div>
@@ -121,8 +130,8 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
             >
               {installBusy ? "Opening..." : "Download / Install CRM"}
             </button>
-            <a className="btn ghost" href="/" style={{ textDecoration: "none" }}>
-              Open website preview
+            <a className="btn ghost" href="https://northstonecrm.com" style={{ textDecoration: "none" }}>
+              Open main website
             </a>
           </div>
         </div>
@@ -215,9 +224,15 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
           </label>
           {backend.status !== "up" ? (
             <div className="alert">
-              {backend.status === "checking" ? "Connecting to server..." : `Server not reachable at ${backend.apiBaseUrl}.`}
+              {backend.status === "checking"
+                ? "Connecting to Northstone services..."
+                : hostedProductionApp
+                  ? "Northstone account services are not reachable right now."
+                  : `Server not reachable at ${backend.apiBaseUrl}.`}
               <div className="muted small">
-                If you are on mobile, make sure the backend is running on the host machine and port 8000 is allowed through Windows Firewall.
+                {hostedProductionApp
+                  ? "The CRM frontend is live, but the production backend still needs to be reachable at api.northstonecrm.com for login and data access."
+                  : "If you are on mobile or LAN, make sure the backend is running on the host machine and port 8000 is allowed through Windows Firewall."}
               </div>
             </div>
           ) : null}
