@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 from email.message import EmailMessage
@@ -498,6 +499,18 @@ async def _google_api_request(
         return {}
 
 
+def _extract_google_meet_link(payload: dict[str, Any]) -> str:
+    if isinstance(payload.get("hangoutLink"), str):
+        return str(payload.get("hangoutLink"))
+    entry_points = (
+        ((payload.get("conferenceData") or {}).get("entryPoints")) if isinstance(payload.get("conferenceData"), dict) else []
+    ) or []
+    for item in entry_points:
+        if isinstance(item, dict) and item.get("entryPointType") == "video" and item.get("uri"):
+            return str(item.get("uri"))
+    return ""
+
+
 def _status_redirect(status: str, detail: str = "") -> RedirectResponse:
     params = {"integration": "google", "status": status}
     if detail:
@@ -782,16 +795,18 @@ async def google_create_calendar_event(
         access_token=access_token,
         json_body=body,
     )
-    meet_link = ""
-    if isinstance(res.get("hangoutLink"), str):
-        meet_link = str(res.get("hangoutLink"))
-    else:
-        entry_points = (
-            ((res.get("conferenceData") or {}).get("entryPoints")) if isinstance(res.get("conferenceData"), dict) else []
-        ) or []
-        for item in entry_points:
-            if isinstance(item, dict) and item.get("entryPointType") == "video" and item.get("uri"):
-                meet_link = str(item.get("uri"))
+    event_id = str(res.get("id") or "")
+    event_link = str(res.get("htmlLink") or "")
+    meet_link = _extract_google_meet_link(res)
+    if payload.create_meet_link and event_id and not meet_link:
+        event_url = f"https://www.googleapis.com/calendar/v3/calendars/primary/events/{event_id}?conferenceDataVersion=1"
+        for _ in range(3):
+            await asyncio.sleep(1)
+            latest = await _google_api_request(method="GET", url=event_url, access_token=access_token)
+            meet_link = _extract_google_meet_link(latest)
+            if latest.get("htmlLink") and not event_link:
+                event_link = str(latest.get("htmlLink") or "")
+            if meet_link:
                 break
     now = _utc_now_naive()
     row.last_test_at = now
@@ -810,8 +825,8 @@ async def google_create_calendar_event(
     session.commit()
     return GoogleCalendarEventResponse(
         ok=True,
-        event_id=str(res.get("id") or ""),
-        html_link=str(res.get("htmlLink") or ""),
+        event_id=event_id,
+        html_link=event_link,
         meet_link=meet_link,
     )
 
