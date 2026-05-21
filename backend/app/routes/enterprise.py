@@ -584,8 +584,9 @@ def integrations(
     session: Session = Depends(get_session),
     user: User = Depends(require_enterprise),
 ) -> EnterpriseIntegrationsRead:
+    admin_view = (getattr(user, "email", "") or "").strip().lower() == (settings.admin_email or "").strip().lower()
     member_role = (getattr(user, "enterprise_member_role", "") or "").strip().lower()
-    access_role = "owner" if is_enterprise_owner(user) else (member_role or "member")
+    access_role = "admin" if admin_view else ("owner" if is_enterprise_owner(user) else (member_role or "member"))
     owner_id = get_enterprise_owner_id(user)
     rows = session.exec(
         select(AppIntegrationConnection).where(AppIntegrationConnection.enterprise_owner_id == owner_id)
@@ -598,17 +599,17 @@ def integrations(
         configured, missing_env = _provider_configured(provider_group)
         connection = connection_by_group.get(provider_group)
         connected = bool(connection and connection.status == "connected")
-        owner_view = is_enterprise_owner(user)
+        owner_view = admin_view or is_enterprise_owner(user)
 
         if connected:
             status = "connected" if owner_view else "inherited"
-            next_step = "Ready to use across the organization."
+            next_step = "Admin can manage this provider directly." if admin_view else "Ready to use across the organization."
         elif not configured:
             status = "configuration_required"
             next_step = "Add provider credentials in backend env before owners can connect."
         elif owner_view:
             status = "ready_to_connect"
-            next_step = "Owner can connect this provider from the integrations panel."
+            next_step = "Admin can connect this provider from the integrations panel." if admin_view else "Owner can connect this provider from the integrations panel."
         else:
             status = "awaiting_owner_connection"
             next_step = "Your organization owner must connect this provider first."
@@ -635,10 +636,10 @@ def integrations(
     return EnterpriseIntegrationsRead(
         plan=getattr(user, "plan", "free"),
         enterprise_owner_id=owner_id,
-        is_enterprise_owner=is_enterprise_owner(user),
+        is_enterprise_owner=admin_view or is_enterprise_owner(user),
         is_enterprise_member=is_enterprise_member(user),
         access_role=access_role,
-        can_manage=is_enterprise_owner(user),
+        can_manage=admin_view or is_enterprise_owner(user),
         can_view=True,
         owner_managed=True,
         providers=providers,

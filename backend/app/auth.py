@@ -164,6 +164,8 @@ def get_current_user(
 
 
 def require_enterprise(user: User = Depends(get_current_user)) -> User:
+    if is_admin_email(user.email):
+        return user
     plan = (getattr(user, "plan", "") or "free").strip().lower()
     member_role = (getattr(user, "enterprise_member_role", "") or "").strip().lower()
     is_member = bool(getattr(user, "enterprise_owner_id", None))

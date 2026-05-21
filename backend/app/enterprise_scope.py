@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy import or_
 from sqlmodel import Session, select
 
+from .auth import is_admin_email
 from .models import Activity, Contact, Deal, DealStageEvent, User
 
 
@@ -14,6 +15,8 @@ TRACKED_MODELS = (Deal, Contact, Activity, DealStageEvent)
 
 
 def get_enterprise_owner_id(user: User) -> UUID | None:
+    if is_admin_email(user.email):
+        return user.id
     owner_id = getattr(user, "enterprise_owner_id", None)
     plan = (getattr(user, "plan", "") or "free").strip().lower()
     if owner_id:

@@ -217,6 +217,29 @@ function statusLabel(status: string) {
   }
 }
 
+function adminAppsBanner(integrations: IntegrationsResponse | null) {
+  if (integrations?.access_role === "admin") {
+    return "Admin has direct control over every completed integration here. Subscription owners receive access under admin control, and employee IDs inherit what their owner allows.";
+  }
+  return "Enterprise and builder owners connect once, and their inherited team IDs use the same approved workspace access.";
+}
+
+function appsRequirementTitle(integrations: IntegrationsResponse | null) {
+  return integrations?.access_role === "admin" ? "Admin connection control" : "Required from the owner connection";
+}
+
+function providerRequirementItems(provider: { requiredFromOwner: string[] }, integrations: IntegrationsResponse | null) {
+  if (integrations?.access_role !== "admin") {
+    return provider.requiredFromOwner;
+  }
+  return provider.requiredFromOwner.map((item) => {
+    if (item === "Google owner connection") return "Google workspace connection";
+    if (item === "Zoom owner connection") return "Zoom workspace connection";
+    if (item === "Owner-managed organization access") return "Organization access managed by admin";
+    return item;
+  });
+}
+
 export default function AppsPage() {
   const [selectedTab, setSelectedTab] = useState<(typeof appTabs)[number]["key"]>("communication");
   const [integrations, setIntegrations] = useState<IntegrationsResponse | null>(null);
@@ -514,9 +537,7 @@ export default function AppsPage() {
             </div>
           </div>
         </div>
-        <div className="bannerInfo">
-          Enterprise and builder owners connect once, and their inherited team IDs use the same approved workspace access.
-        </div>
+        <div className="bannerInfo">{adminAppsBanner(integrations)}</div>
         {loading ? <div className="muted" style={{ marginTop: 14 }}>Loading live integration status...</div> : null}
         {error ? <div className="bannerWarn" style={{ marginTop: 14 }}>{error}</div> : null}
         {actionMsg ? <div className="bannerInfo" style={{ marginTop: 14 }}>{actionMsg}</div> : null}
@@ -584,7 +605,7 @@ export default function AppsPage() {
             <div className="grid cols2">
               {visibleProviderCards.map((provider) => {
                 const live = providerByKey.get(provider.key);
-                const showGoogleActions = provider.key === "gmail" && !!googlePrimary;
+                const showGoogleActions = provider.providerGroup === "google" && !!googlePrimary;
                 const showMicrosoftActions = provider.key === "outlook" && !!microsoftPrimary;
                 const showZoomActions = provider.key === "zoom" && !!zoomPrimary;
                 const connectedLabel = live?.connected_account_email ? `Connected as ${live.connected_account_email}` : "";
@@ -617,7 +638,7 @@ export default function AppsPage() {
                         Missing backend env: {live.required_env.join(", ")}
                       </div>
                     ) : null}
-                    <ListSection title="Required from the owner connection" items={provider.requiredFromOwner} />
+                    <ListSection title={appsRequirementTitle(integrations)} items={providerRequirementItems(provider, integrations)} />
 
                     {showGoogleActions ? (
                       <div className="stack" style={{ gap: 14, marginTop: 18 }}>

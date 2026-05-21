@@ -15,7 +15,7 @@ from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
 
 from ..audit import log_audit_event
-from ..auth import get_current_user, require_enterprise
+from ..auth import get_current_user, is_admin_email, require_enterprise
 from ..crypto import decrypt_if_configured, encrypt_if_configured
 from ..db import get_session
 from ..enterprise_scope import get_enterprise_owner_id, is_enterprise_owner
@@ -66,7 +66,7 @@ def _utc_now_naive() -> datetime:
 
 
 def require_enterprise_owner(user: User = Depends(require_enterprise)) -> User:
-    if not is_enterprise_owner(user):
+    if not (is_admin_email(user.email) or is_enterprise_owner(user)):
         raise HTTPException(status_code=403, detail="Enterprise owner only")
     return user
 
