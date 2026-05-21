@@ -52,19 +52,6 @@ type OwnerWorkspace = {
   contacts: OwnerContactRow[];
 };
 
-type DemoRequestRow = {
-  id: string;
-  full_name: string;
-  email: string;
-  phone: string | null;
-  company_name: string;
-  city: string;
-  preferred_plan: string;
-  team_size: number;
-  message: string;
-  requested_at: string;
-};
-
 function fmtDt(value: string | null) {
   if (!value) return "-";
   const d = new Date(value);
@@ -78,7 +65,6 @@ function formatRupees(value: number | null) {
 }
 
 const ADMIN_PIPELINE_STAGES = [
-  { key: "demo_requested", label: "Demo requested" },
   { key: "new_lead", label: "New lead" },
   { key: "qualified", label: "Qualified" },
   { key: "active", label: "Active" },
@@ -92,7 +78,6 @@ function useAdminWorkspaceData() {
   const [owners, setOwners] = useState<EnterpriseDetail[]>([]);
   const [selectedOwnerId, setSelectedOwnerId] = useState("");
   const [workspace, setWorkspace] = useState<OwnerWorkspace | null>(null);
-  const [demoRequests, setDemoRequests] = useState<DemoRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,11 +90,7 @@ function useAdminWorkspaceData() {
       const nextOwnerId = ownerIdOverride || selectedOwnerId || enterpriseRows[0]?.enterprise_owner_id || "";
       setSelectedOwnerId(nextOwnerId);
 
-      const [demoRows, nextWorkspace] = await Promise.all([
-        api<DemoRequestRow[]>("/admin/demo-requests"),
-        nextOwnerId ? api<OwnerWorkspace>(`/admin/enterprises/${nextOwnerId}/workspace`) : Promise.resolve(null)
-      ]);
-      setDemoRequests(demoRows);
+      const nextWorkspace = nextOwnerId ? await api<OwnerWorkspace>(`/admin/enterprises/${nextOwnerId}/workspace`) : null;
       setWorkspace(nextWorkspace);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load admin workspace data");
@@ -142,7 +123,6 @@ function useAdminWorkspaceData() {
     selectedOwnerId,
     setSelectedOwnerId: selectOwner,
     workspace,
-    demoRequests,
     loading,
     error,
     reload: load
@@ -174,16 +154,9 @@ function OwnerSelector({
 }
 
 export function AdminOwnerPipelinePage() {
-  const { demoRequests, loading, error, reload } = useAdminWorkspaceData();
+  const { owners, selectedOwnerId, setSelectedOwnerId, workspace, loading, error, reload } = useAdminWorkspaceData();
   const stageMap = useMemo(() => {
-    const map: Record<AdminPipelineStageKey, { id: string; title: string; subtitle: string; meta: string; kind: "demo" | "deal" }[]> = {
-      demo_requested: demoRequests.map((request) => ({
-        id: request.id,
-        title: request.full_name || request.email || "Demo request",
-        subtitle: request.email || "-",
-        meta: request.phone || "-",
-        kind: "demo"
-      })),
+    const map: Record<AdminPipelineStageKey, { id: string; title: string; subtitle: string; meta: string; kind: "deal" }[]> = {
       new_lead: [],
       qualified: [],
       active: [],
@@ -192,16 +165,25 @@ export function AdminOwnerPipelinePage() {
     };
 
     return map;
-  }, [demoRequests]);
+  }, []);
+
+  const stageCounts = workspace?.pipeline.stage_counts ?? {
+    new_lead: 0,
+    qualified: 0,
+    active: 0,
+    closed: 0,
+    lost: 0
+  };
 
   return (
     <div className="page">
       <div className="pageHeader">
         <div>
           <div className="h1">Pipeline</div>
-          <div className="muted">Admin tracking view for landing-page demo requests.</div>
+          <div className="muted">Admin tracking view for live subscription-owner pipeline counts.</div>
         </div>
         <div className="row">
+          <OwnerSelector owners={owners} selectedOwnerId={selectedOwnerId} onChange={setSelectedOwnerId} />
           <button className="btn ghost" onClick={() => void reload()} type="button">
             Refresh
           </button>
@@ -212,16 +194,16 @@ export function AdminOwnerPipelinePage() {
       {loading ? <div className="muted">Loading admin pipeline...</div> : null}
 
       <section className="card">
-        <div className="cardTitle">Lead intake overview</div>
+        <div className="cardTitle">Pipeline overview</div>
         <div className="mini" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
           <div>
-            <b>Total demo requests:</b> {demoRequests.length}
+            <b>Total live records:</b> {workspace?.pipeline.total ?? 0}
           </div>
           <div>
-            <b>Primary source:</b> Landing page request form
+            <b>Source:</b> Subscription owner workspace
           </div>
           <div>
-            <b>Admin usage:</b> Review, contact, and manually move serious prospects later
+            <b>Admin usage:</b> Monitor live customer pipeline health by stage
           </div>
         </div>
       </section>
@@ -232,50 +214,30 @@ export function AdminOwnerPipelinePage() {
           return (
             <div
               key={stage.key}
-              className={`col ${stage.key === "demo_requested" ? "adminPrimaryStage" : "adminSecondaryStage"}`}
+              className="col adminSecondaryStage"
             >
               <div className="colHeader">
                 <div className="colTitle">{stage.label}</div>
-                <div className="count">{cards.length}</div>
+                <div className="count">{stageCounts[stage.key]}</div>
               </div>
               <div className="colBody">
                 {cards.map((card) => (
                   <div key={card.id} className="dealCard adminIntakeCard" style={{ cursor: "default" }}>
                     <div className="dcTop">
                       <div className="dcTitle">{card.title}</div>
-                      <div className="pill">demo</div>
+                      <div className="pill">live</div>
                     </div>
                     <div className="dcMeta">
                       <div className="muted">{card.subtitle || "-"}</div>
                     </div>
                     <div className="muted small">{card.meta || "-"}</div>
-                    {card.kind === "demo" ? (
-                      <div className="mini adminIntakeMeta" style={{ marginTop: 10 }}>
-                        {(() => {
-                          const request = demoRequests.find((row) => row.id === card.id);
-                          if (!request) return null;
-                          return (
-                            <>
-                              <div><b>Company:</b> {request.company_name || "-"}</div>
-                              <div><b>City:</b> {request.city || "-"}</div>
-                              <div><b>Interested plan:</b> {request.preferred_plan || "-"}</div>
-                              <div><b>Team size:</b> {request.team_size || "-"}</div>
-                              <div><b>Message:</b> {request.message || "-"}</div>
-                              <div><b>Requested:</b> {fmtDt(request.requested_at)}</div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    ) : null}
                   </div>
                 ))}
                 {!cards.length ? (
                   <div className="adminStagePlaceholder">
                     <div className="muted">No records</div>
                     <div className="small muted">
-                      {stage.key === "demo_requested"
-                        ? "New landing-page demo submissions will appear here automatically."
-                        : "This stage stays available for later admin movement when you decide to operationalize the flow."}
+                      Live stage counts are shown above. Detailed deal movement stays inside the customer workspace.
                     </div>
                   </div>
                 ) : null}
