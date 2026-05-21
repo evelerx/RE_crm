@@ -38,14 +38,18 @@ function TopBar({
         <div className="logo">
           <img src="/northstone-logo-icon.png" alt="Northstone logo" className="logoMark" />
         </div>
-        <div>
+        <div className="brandMeta">
           <div className="brandTitle">Northstone</div>
           <div className="brandSub">
             Pipeline | Grid | ROI
           </div>
+          {isAdmin || enterpriseBadge ? (
+            <div className="brandBadges">
+              {isAdmin ? <div className="pill adminPill">Admin</div> : null}
+              {enterpriseBadge ? <div className="pill enterprisePill">{enterpriseBadge}</div> : null}
+            </div>
+          ) : null}
         </div>
-        {isAdmin ? <div className="pill adminPill">Admin</div> : null}
-        {enterpriseBadge ? <div className="pill enterprisePill">{enterpriseBadge}</div> : null}
       </div>
       <nav className="navDesktop">
         <>
