@@ -350,9 +350,13 @@ export default function AppsPage() {
     setActionMsg(null);
     try {
       const response = await api<ConnectResponse>("/integrations/google/connect");
+      if (!response?.auth_url?.trim()) {
+        throw new Error("Backend did not return a Google authorization URL.");
+      }
       window.location.href = response.auth_url;
     } catch (e) {
       setActionMsg(e instanceof ApiError ? e.message : "Unable to start Google connection.");
+    } finally {
       setGoogleBusy(false);
     }
   }
@@ -376,9 +380,13 @@ export default function AppsPage() {
     setActionMsg(null);
     try {
       const response = await api<ConnectResponse>("/integrations/microsoft/connect");
+      if (!response?.auth_url?.trim()) {
+        throw new Error("Backend did not return a Microsoft authorization URL.");
+      }
       window.location.href = response.auth_url;
     } catch (e) {
       setActionMsg(e instanceof ApiError ? e.message : "Unable to start Microsoft connection.");
+    } finally {
       setMicrosoftBusy(false);
     }
   }
@@ -430,9 +438,13 @@ export default function AppsPage() {
     setActionMsg(null);
     try {
       const response = await api<ConnectResponse>("/integrations/zoom/connect");
+      if (!response?.auth_url?.trim()) {
+        throw new Error("Backend did not return a Zoom authorization URL.");
+      }
       window.location.href = response.auth_url;
     } catch (e) {
       setActionMsg(e instanceof ApiError ? e.message : "Unable to start Zoom connection.");
+    } finally {
       setZoomBusy(false);
     }
   }
