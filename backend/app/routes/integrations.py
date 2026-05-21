@@ -838,7 +838,8 @@ async def google_callback(
         return _status_redirect("error", "invalid_owner")
 
     owner = session.get(User, owner_id)
-    if not owner or (getattr(owner, "plan", "free") or "free") not in {"enterprise", "builder"}:
+    owner_plan = (getattr(owner, "plan", "free") or "free") if owner else "free"
+    if not owner or (owner_plan not in {"enterprise", "builder"} and not is_admin_email(getattr(owner, "email", ""))):
         return _status_redirect("error", "owner_not_found")
 
     if not code:
@@ -906,7 +907,8 @@ async def microsoft_callback(
         return _status_redirect_for("microsoft", "error", "invalid_owner")
 
     owner = session.get(User, owner_id)
-    if not owner or (getattr(owner, "plan", "free") or "free") not in {"enterprise", "builder"}:
+    owner_plan = (getattr(owner, "plan", "free") or "free") if owner else "free"
+    if not owner or (owner_plan not in {"enterprise", "builder"} and not is_admin_email(getattr(owner, "email", ""))):
         return _status_redirect_for("microsoft", "error", "owner_not_found")
 
     if not code:
@@ -973,7 +975,8 @@ async def zoom_callback(
         return _status_redirect_for("zoom", "error", "invalid_owner")
 
     owner = session.get(User, owner_id)
-    if not owner or (getattr(owner, "plan", "free") or "free") not in {"enterprise", "builder"}:
+    owner_plan = (getattr(owner, "plan", "free") or "free") if owner else "free"
+    if not owner or (owner_plan not in {"enterprise", "builder"} and not is_admin_email(getattr(owner, "email", ""))):
         return _status_redirect_for("zoom", "error", "owner_not_found")
 
     if not code:
