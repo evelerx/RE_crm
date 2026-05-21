@@ -21,7 +21,13 @@ def _resolve_database_url() -> str:
     Ensure the SQLite DB path is stable regardless of current working directory.
     Also migrates older DB locations into backend/data/ on first run.
     """
-    url = settings.database_url
+    url = settings.database_url.strip()
+
+    if url.startswith("postgres://"):
+        url = "postgresql+psycopg://" + url[len("postgres://") :]
+    elif url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url[len("postgresql://") :]
+
     if not url.startswith("sqlite:///"):
         return url
 
