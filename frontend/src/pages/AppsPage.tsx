@@ -252,6 +252,8 @@ export default function AppsPage() {
   const [gmailResult, setGmailResult] = useState<GoogleSendEmailResponse | null>(null);
   const [calendarBusy, setCalendarBusy] = useState(false);
   const [calendarResult, setCalendarResult] = useState<GoogleCalendarEventResponse | null>(null);
+  const [meetBusy, setMeetBusy] = useState(false);
+  const [meetResult, setMeetResult] = useState<GoogleCalendarEventResponse | null>(null);
   const [gmailForm, setGmailForm] = useState({
     to_email: "",
     subject: "",
@@ -265,6 +267,14 @@ export default function AppsPage() {
     attendee_email: "",
     timezone: "Asia/Kolkata",
     create_meet_link: true
+  });
+  const [meetForm, setMeetForm] = useState({
+    title: "",
+    description: "",
+    start_at: "",
+    end_at: "",
+    attendee_email: "",
+    timezone: "Asia/Kolkata"
   });
   const [zoomMeetingForm, setZoomMeetingForm] = useState({
     title: "",
@@ -529,6 +539,26 @@ export default function AppsPage() {
     }
   }
 
+  async function createGoogleMeetEvent() {
+    setMeetBusy(true);
+    setActionMsg(null);
+    try {
+      const result = await api<GoogleCalendarEventResponse>("/integrations/google/calendar/events", {
+        method: "POST",
+        body: JSON.stringify({
+          ...meetForm,
+          create_meet_link: true
+        })
+      });
+      setMeetResult(result);
+      setActionMsg(result.meet_link ? "Google Meet session created." : "Meeting event created, but no Meet link was returned.");
+    } catch (e) {
+      setActionMsg(e instanceof ApiError ? e.message : "Unable to create Google Meet session.");
+    } finally {
+      setMeetBusy(false);
+    }
+  }
+
   return (
     <div className="stack">
       <section className="card">
@@ -609,6 +639,10 @@ export default function AppsPage() {
               {visibleProviderCards.map((provider) => {
                 const live = providerByKey.get(provider.key);
                 const showGoogleActions = provider.providerGroup === "google" && !!googlePrimary;
+                const showGoogleConnectionControls = showGoogleActions && provider.key === "gmail";
+                const showGmailTools = showGoogleActions && provider.key === "gmail" && !!googlePrimary?.connected;
+                const showCalendarTools = showGoogleActions && provider.key === "google_calendar" && !!googlePrimary?.connected;
+                const showMeetTools = showGoogleActions && provider.key === "google_meet" && !!googlePrimary?.connected;
                 const showMicrosoftActions = provider.key === "outlook" && !!microsoftPrimary;
                 const showZoomActions = provider.key === "zoom" && !!zoomPrimary;
                 const connectedLabel = live?.connected_account_email ? `Connected as ${live.connected_account_email}` : "";
@@ -645,35 +679,39 @@ export default function AppsPage() {
 
                     {showGoogleActions ? (
                       <div className="stack" style={{ gap: 14, marginTop: 18 }}>
-                        <div className="row" style={{ gap: 14, flexWrap: "wrap", justifyContent: "flex-start" }}>
-                          {googlePrimary?.can_connect && !googlePrimary.connected ? (
-                            <button className="btn" onClick={() => void connectGoogle()} disabled={googleBusy}>
-                              {googleBusy ? "Connecting..." : "Connect Google Workspace"}
-                            </button>
-                          ) : null}
-                          {googlePrimary?.connected ? (
-                            <>
-                              <button className="btn" onClick={() => void testGoogleConnection()} disabled={googleTestBusy}>
-                                {googleTestBusy ? "Testing..." : "Test Google connection"}
-                              </button>
-                              <button className="btn secondary" onClick={() => void disconnectGoogle()} disabled={googleBusy}>
-                                {googleBusy ? "Working..." : "Disconnect Google Workspace"}
-                              </button>
-                            </>
-                          ) : null}
-                        </div>
+                        {showGoogleConnectionControls ? (
+                          <>
+                            <div className="row" style={{ gap: 14, flexWrap: "wrap", justifyContent: "flex-start" }}>
+                              {googlePrimary?.can_connect && !googlePrimary.connected ? (
+                                <button className="btn" onClick={() => void connectGoogle()} disabled={googleBusy}>
+                                  {googleBusy ? "Connecting..." : "Connect Google Workspace"}
+                                </button>
+                              ) : null}
+                              {googlePrimary?.connected ? (
+                                <>
+                                  <button className="btn" onClick={() => void testGoogleConnection()} disabled={googleTestBusy}>
+                                    {googleTestBusy ? "Testing..." : "Test Google connection"}
+                                  </button>
+                                  <button className="btn secondary" onClick={() => void disconnectGoogle()} disabled={googleBusy}>
+                                    {googleBusy ? "Working..." : "Disconnect Google Workspace"}
+                                  </button>
+                                </>
+                              ) : null}
+                            </div>
 
-                        {googleTestResult ? (
-                          <div className="bannerInfo">
-                            Connected account: {googleTestResult.connected_account_email || "-"}
-                            <br />
-                            Expires at: {googleTestResult.expires_at || "Not provided"}
-                            <br />
-                            Scopes: {googleTestResult.scopes.join(", ") || "None reported"}
-                          </div>
+                            {googleTestResult ? (
+                              <div className="bannerInfo">
+                                Connected account: {googleTestResult.connected_account_email || "-"}
+                                <br />
+                                Expires at: {googleTestResult.expires_at || "Not provided"}
+                                <br />
+                                Scopes: {googleTestResult.scopes.join(", ") || "None reported"}
+                              </div>
+                            ) : null}
+                          </>
                         ) : null}
 
-                        {googlePrimary?.connected ? (
+                        {showGmailTools ? (
                           <>
                             <div className="card">
                               <div className="sectionTitle" style={{ fontSize: 18 }}>Send Gmail</div>
@@ -719,104 +757,200 @@ export default function AppsPage() {
                                 ) : null}
                               </div>
                             </div>
-
-                            <div className="card">
-                              <div className="sectionTitle" style={{ fontSize: 18 }}>Create Google Calendar event</div>
-                              <div className="stack" style={{ gap: 10, marginTop: 12 }}>
-                                <label>
-                                  Event title
-                                  <input
-                                    value={calendarForm.title}
-                                    onChange={(e) => setCalendarForm((prev) => ({ ...prev, title: e.target.value }))}
-                                    placeholder="Client walkthrough"
-                                  />
-                                </label>
-                                <label>
-                                  Description
-                                  <textarea
-                                    value={calendarForm.description}
-                                    onChange={(e) => setCalendarForm((prev) => ({ ...prev, description: e.target.value }))}
-                                    placeholder="Meeting notes, property details, and agenda"
-                                    rows={4}
-                                  />
-                                </label>
-                                <div className="grid cols2">
-                                  <label>
-                                    Start date and time
-                                    <input
-                                      type="datetime-local"
-                                      value={calendarForm.start_at}
-                                      onChange={(e) => setCalendarForm((prev) => ({ ...prev, start_at: e.target.value }))}
-                                    />
-                                  </label>
-                                  <label>
-                                    End date and time
-                                    <input
-                                      type="datetime-local"
-                                      value={calendarForm.end_at}
-                                      onChange={(e) => setCalendarForm((prev) => ({ ...prev, end_at: e.target.value }))}
-                                    />
-                                  </label>
-                                </div>
-                                <label>
-                                  Attendee email
-                                  <input
-                                    value={calendarForm.attendee_email}
-                                    onChange={(e) => setCalendarForm((prev) => ({ ...prev, attendee_email: e.target.value }))}
-                                    placeholder="client@example.com"
-                                  />
-                                </label>
-                                <label>
-                                  Timezone
-                                  <input
-                                    value={calendarForm.timezone}
-                                    onChange={(e) => setCalendarForm((prev) => ({ ...prev, timezone: e.target.value }))}
-                                    placeholder="Asia/Kolkata"
-                                  />
-                                </label>
-                                <label className="row" style={{ gap: 10, alignItems: "center" }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={calendarForm.create_meet_link}
-                                    onChange={(e) => setCalendarForm((prev) => ({ ...prev, create_meet_link: e.target.checked }))}
-                                  />
-                                  <span>Create Google Meet link</span>
-                                </label>
-                                <button
-                                  className="btn"
-                                  onClick={() => void createGoogleCalendarEvent()}
-                                  disabled={calendarBusy || !calendarForm.title.trim() || !calendarForm.start_at || !calendarForm.end_at}
-                                >
-                                  {calendarBusy ? "Creating..." : "Create calendar event"}
-                                </button>
-                                {calendarResult ? (
-                                  <div className="bannerInfo">
-                                    Event created: {calendarResult.event_id}
-                                    <br />
-                                    {calendarResult.html_link ? (
-                                      <>
-                                        Calendar link:{" "}
-                                        <a href={calendarResult.html_link} target="_blank" rel="noreferrer">
-                                          Open event
-                                        </a>
-                                        <br />
-                                      </>
-                                    ) : null}
-                                    {calendarResult.meet_link ? (
-                                      <>
-                                        Meet link:{" "}
-                                        <a href={calendarResult.meet_link} target="_blank" rel="noreferrer">
-                                          Join meeting
-                                        </a>
-                                      </>
-                                    ) : (
-                                      "Meet link not requested for this event."
-                                    )}
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
                           </>
+                        ) : null}
+
+                        {showCalendarTools ? (
+                          <div className="card">
+                            <div className="sectionTitle" style={{ fontSize: 18 }}>Create Google Calendar event</div>
+                            <div className="stack" style={{ gap: 10, marginTop: 12 }}>
+                              <label>
+                                Event title
+                                <input
+                                  value={calendarForm.title}
+                                  onChange={(e) => setCalendarForm((prev) => ({ ...prev, title: e.target.value }))}
+                                  placeholder="Client walkthrough"
+                                />
+                              </label>
+                              <label>
+                                Description
+                                <textarea
+                                  value={calendarForm.description}
+                                  onChange={(e) => setCalendarForm((prev) => ({ ...prev, description: e.target.value }))}
+                                  placeholder="Meeting notes, property details, and agenda"
+                                  rows={4}
+                                />
+                              </label>
+                              <div className="grid cols2">
+                                <label>
+                                  Start date and time
+                                  <input
+                                    type="datetime-local"
+                                    value={calendarForm.start_at}
+                                    onChange={(e) => setCalendarForm((prev) => ({ ...prev, start_at: e.target.value }))}
+                                  />
+                                </label>
+                                <label>
+                                  End date and time
+                                  <input
+                                    type="datetime-local"
+                                    value={calendarForm.end_at}
+                                    onChange={(e) => setCalendarForm((prev) => ({ ...prev, end_at: e.target.value }))}
+                                  />
+                                </label>
+                              </div>
+                              <label>
+                                Attendee email
+                                <input
+                                  value={calendarForm.attendee_email}
+                                  onChange={(e) => setCalendarForm((prev) => ({ ...prev, attendee_email: e.target.value }))}
+                                  placeholder="client@example.com"
+                                />
+                              </label>
+                              <label>
+                                Timezone
+                                <input
+                                  value={calendarForm.timezone}
+                                  onChange={(e) => setCalendarForm((prev) => ({ ...prev, timezone: e.target.value }))}
+                                  placeholder="Asia/Kolkata"
+                                />
+                              </label>
+                              <label className="row" style={{ gap: 10, alignItems: "center" }}>
+                                <input
+                                  type="checkbox"
+                                  checked={calendarForm.create_meet_link}
+                                  onChange={(e) => setCalendarForm((prev) => ({ ...prev, create_meet_link: e.target.checked }))}
+                                />
+                                <span>Create Google Meet link</span>
+                              </label>
+                              <button
+                                className="btn"
+                                onClick={() => void createGoogleCalendarEvent()}
+                                disabled={calendarBusy || !calendarForm.title.trim() || !calendarForm.start_at || !calendarForm.end_at}
+                              >
+                                {calendarBusy ? "Creating..." : "Create calendar event"}
+                              </button>
+                              {calendarResult ? (
+                                <div className="bannerInfo">
+                                  Event created: {calendarResult.event_id}
+                                  <br />
+                                  {calendarResult.html_link ? (
+                                    <>
+                                      Calendar link:{" "}
+                                      <a href={calendarResult.html_link} target="_blank" rel="noreferrer">
+                                        Open event
+                                      </a>
+                                      <br />
+                                    </>
+                                  ) : null}
+                                  {calendarResult.meet_link ? (
+                                    <>
+                                      Meet link:{" "}
+                                      <a href={calendarResult.meet_link} target="_blank" rel="noreferrer">
+                                        Join meeting
+                                      </a>
+                                    </>
+                                  ) : (
+                                    "Meet link not requested for this event."
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {showMeetTools ? (
+                          <div className="card">
+                            <div className="sectionTitle" style={{ fontSize: 18 }}>Create Google Meet session</div>
+                            <div className="sectionSub" style={{ marginTop: 8 }}>
+                              Northstone creates Google Meet links through a connected Google Calendar event.
+                            </div>
+                            <div className="stack" style={{ gap: 10, marginTop: 12 }}>
+                              <label>
+                                Meeting title
+                                <input
+                                  value={meetForm.title}
+                                  onChange={(e) => setMeetForm((prev) => ({ ...prev, title: e.target.value }))}
+                                  placeholder="Sales review call"
+                                />
+                              </label>
+                              <label>
+                                Meeting description
+                                <textarea
+                                  value={meetForm.description}
+                                  onChange={(e) => setMeetForm((prev) => ({ ...prev, description: e.target.value }))}
+                                  placeholder="Agenda, property notes, and call purpose"
+                                  rows={4}
+                                />
+                              </label>
+                              <div className="grid cols2">
+                                <label>
+                                  Start date and time
+                                  <input
+                                    type="datetime-local"
+                                    value={meetForm.start_at}
+                                    onChange={(e) => setMeetForm((prev) => ({ ...prev, start_at: e.target.value }))}
+                                  />
+                                </label>
+                                <label>
+                                  End date and time
+                                  <input
+                                    type="datetime-local"
+                                    value={meetForm.end_at}
+                                    onChange={(e) => setMeetForm((prev) => ({ ...prev, end_at: e.target.value }))}
+                                  />
+                                </label>
+                              </div>
+                              <label>
+                                Attendee email
+                                <input
+                                  value={meetForm.attendee_email}
+                                  onChange={(e) => setMeetForm((prev) => ({ ...prev, attendee_email: e.target.value }))}
+                                  placeholder="client@example.com"
+                                />
+                              </label>
+                              <label>
+                                Timezone
+                                <input
+                                  value={meetForm.timezone}
+                                  onChange={(e) => setMeetForm((prev) => ({ ...prev, timezone: e.target.value }))}
+                                  placeholder="Asia/Kolkata"
+                                />
+                              </label>
+                              <button
+                                className="btn"
+                                onClick={() => void createGoogleMeetEvent()}
+                                disabled={meetBusy || !meetForm.title.trim() || !meetForm.start_at || !meetForm.end_at}
+                              >
+                                {meetBusy ? "Creating..." : "Create Google Meet"}
+                              </button>
+                              {meetResult ? (
+                                <div className="bannerInfo">
+                                  Event created: {meetResult.event_id}
+                                  <br />
+                                  {meetResult.html_link ? (
+                                    <>
+                                      Calendar link:{" "}
+                                      <a href={meetResult.html_link} target="_blank" rel="noreferrer">
+                                        Open event
+                                      </a>
+                                      <br />
+                                    </>
+                                  ) : null}
+                                  {meetResult.meet_link ? (
+                                    <>
+                                      Meet link:{" "}
+                                      <a href={meetResult.meet_link} target="_blank" rel="noreferrer">
+                                        Join meeting
+                                      </a>
+                                    </>
+                                  ) : (
+                                    "Google did not return a Meet link for this event."
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
                         ) : null}
                       </div>
                     ) : null}
