@@ -516,6 +516,8 @@ export default function AdminPage() {
   const [compliance, setCompliance] = useState<ComplianceReport | null>(null);
   const [subscriptionAnalytics, setSubscriptionAnalytics] = useState<SubscriptionAnalytics | null>(null);
   const [subscriptionGrain, setSubscriptionGrain] = useState<"day" | "week" | "month" | "year">("month");
+  const [securityEventWindow, setSecurityEventWindow] = useState<"1d" | "2d" | "7d" | "all" | "date">("2d");
+  const [securityEventDate, setSecurityEventDate] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -760,6 +762,32 @@ export default function AdminPage() {
       (displaySubscriptionAnalytics.current_mix.builder * demoBuilderMonthlyPrice)
     : 0;
   const demoEstimatedArr = demoEstimatedMrr * 12;
+
+  const filteredRecentSecurityEvents = (() => {
+    const rows = displayCompliance?.recent_security_events ?? [];
+    if (securityEventWindow === "all") return rows;
+
+    const now = new Date();
+    if (securityEventWindow === "date") {
+      if (!securityEventDate) return rows;
+      return rows.filter((item) => {
+        const itemDate = new Date(item.created_at);
+        if (Number.isNaN(itemDate.getTime())) return false;
+        const yyyy = itemDate.getFullYear();
+        const mm = `${itemDate.getMonth() + 1}`.padStart(2, "0");
+        const dd = `${itemDate.getDate()}`.padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}` === securityEventDate;
+      });
+    }
+
+    const days = securityEventWindow === "1d" ? 1 : securityEventWindow === "2d" ? 2 : 7;
+    const threshold = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    return rows.filter((item) => {
+      const itemDate = new Date(item.created_at);
+      if (Number.isNaN(itemDate.getTime())) return false;
+      return itemDate >= threshold;
+    });
+  })();
 
   useEffect(() => {
     void load();
@@ -1951,6 +1979,31 @@ export default function AdminPage() {
             </div>
           </div>
           <div className="muted small">Generated {fmtDt(displayCompliance.generated_at)}</div>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginTop: 14 }}>
+            <div className="cardTitle" style={{ fontSize: 16 }}>Recent security events</div>
+            <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+              <label className="muted small">
+                Show
+                <select value={securityEventWindow} onChange={(e) => setSecurityEventWindow((e.target.value as "1d" | "2d" | "7d" | "all" | "date") || "2d")}>
+                  <option value="1d">Last 1 day</option>
+                  <option value="2d">Last 2 days</option>
+                  <option value="7d">Last 7 days</option>
+                  <option value="all">All dates</option>
+                  <option value="date">Specific date</option>
+                </select>
+              </label>
+              {securityEventWindow === "date" ? (
+                <label className="muted small">
+                  Date
+                  <input
+                    type="date"
+                    value={securityEventDate}
+                    onChange={(e) => setSecurityEventDate(e.target.value)}
+                  />
+                </label>
+              ) : null}
+            </div>
+          </div>
           <div className="tableWrap">
             <table className="table">
               <thead>
@@ -1961,16 +2014,26 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {displayCompliance.recent_security_events.map((item, idx) => (
+                {filteredRecentSecurityEvents.map((item, idx) => (
                   <tr key={`${item.kind}-${item.created_at}-${idx}`}>
                     <td className="tdTitle">{item.summary}</td>
-                    <td>{item.detail || "-"}</td>
+                    <td
+                      title={item.detail || "-"}
+                      style={{
+                        maxWidth: 420,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis"
+                      }}
+                    >
+                      {item.detail || "-"}
+                    </td>
                     <td>{fmtDt(item.created_at)}</td>
                   </tr>
                 ))}
-                {displayCompliance.recent_security_events.length === 0 ? (
+                {filteredRecentSecurityEvents.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="muted">No recent security events.</td>
+                    <td colSpan={3} className="muted">No security events found for the selected time window.</td>
                   </tr>
                 ) : null}
               </tbody>
