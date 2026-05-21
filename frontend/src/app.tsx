@@ -41,7 +41,7 @@ function TopBar({
         <div>
           <div className="brandTitle">Northstone</div>
           <div className="brandSub">
-            Pipeline | Grid | ROI <span className="brandBy">by Nihar Lakhani</span>
+            Pipeline | Grid | ROI
           </div>
         </div>
         {isAdmin ? <div className="pill adminPill">Admin</div> : null}

@@ -169,22 +169,13 @@ const appTabs = [
   { key: "coming_soon", label: "Coming soon", iconUrl: "https://img.icons8.com/color/48/clock--v1.png" }
 ] as const;
 
-const comingSoonApps = [
-  {
-    name: "Microsoft Teams",
-    tab: "coming_soon",
-    category: "Meetings",
-    iconUrl: "https://img.icons8.com/color/48/microsoft-teams-2019.png",
-    description: "Microsoft workspace rollout is prepared in the backend, but it stays parked until the tenant, permissions, and app registration are fully ready."
-  },
-  {
-    name: "Outlook",
-    tab: "coming_soon",
-    category: "Email",
-    iconUrl: "https://img.icons8.com/color/48/microsoft-outlook-2019.png",
-    description: "Outlook support stays queued behind the same Microsoft tenant setup so mail and meeting workflows go live together."
-  }
-];
+const comingSoonApps: Array<{
+  name: string;
+  tab: string;
+  category: string;
+  iconUrl: string;
+  description: string;
+}> = [];
 
 function ListSection({ title, items }: { title: string; items: string[] }) {
   return (
