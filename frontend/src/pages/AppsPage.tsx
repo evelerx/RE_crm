@@ -75,12 +75,11 @@ const providerCards = [
     rollout: "Phase 1",
     purpose: "Send client follow-ups and log outbound communication to the CRM timeline.",
     requiredFromOwner: [
-      "Admin approval for the subscription owner",
       "Google owner connection",
       "Gmail API enabled",
-      "Employee IDs inherit owner-managed access"
+      "Owner-managed organization access"
     ],
-    launchLevel: "Admin governs access, owner connects once, employee IDs inherit it"
+    launchLevel: "Owner connects once, inherited team IDs use it"
   },
   {
     name: "Google Calendar",
@@ -92,12 +91,11 @@ const providerCards = [
     rollout: "Phase 1",
     purpose: "Create site visits, callbacks, launches, and review meetings from deal and contact context.",
     requiredFromOwner: [
-      "Admin approval for the subscription owner",
       "Google owner connection",
       "Calendar API enabled",
-      "Employee IDs inherit owner-managed access"
+      "Live callback URL"
     ],
-    launchLevel: "Admin-approved owner scheduling for the organization"
+    launchLevel: "Owner-managed scheduling for the organization"
   },
   {
     name: "Google Meet",
@@ -109,12 +107,11 @@ const providerCards = [
     rollout: "Phase 1",
     purpose: "Generate meeting links for walkthroughs, client reviews, and partner calls from Northstone.",
     requiredFromOwner: [
-      "Admin approval for the subscription owner",
       "Google owner connection",
       "Calendar conference permissions",
-      "Employee IDs inherit owner-managed access"
+      "Live callback URL"
     ],
-    launchLevel: "Admin-approved meeting access through the Google stack"
+    launchLevel: "Meet link generation through the Google stack"
   },
   {
     name: "Zoom",
@@ -126,34 +123,13 @@ const providerCards = [
     rollout: "Phase 3",
     purpose: "Create Zoom sessions for sales calls, investor meetings, and remote walkthroughs.",
     requiredFromOwner: [
-      "Admin approval for the subscription owner",
       "Zoom owner connection",
       "Zoom OAuth app",
-      "Employee IDs inherit owner-managed access"
+      "Production callback URL"
     ],
-    launchLevel: "Admin-approved owner-managed Zoom meeting creation"
+    launchLevel: "Owner-managed Zoom meeting creation"
   }
 ];
-
-function appsHierarchyMessage(integrations: IntegrationsResponse | null) {
-  if (integrations?.access_role === "admin") {
-    return "Admin sits above every subscription owner and employee ID. Admin does not depend on any owner connection. Subscription owners receive access under admin control, and employee IDs inherit the permissions their owner grants.";
-  }
-  if (integrations?.is_enterprise_owner) {
-    return "Subscription owners operate under admin control, then connect the approved workspace once for their organization. Employee IDs inherit only the access their owner allows.";
-  }
-  return "Employee IDs do not connect provider stacks directly. Access flows from admin to the subscription owner, then from the owner to the employee ID.";
-}
-
-function providerRequirementTitle(integrations: IntegrationsResponse | null) {
-  if (integrations?.access_role === "admin") {
-    return "Hierarchy and access model";
-  }
-  if (integrations?.is_enterprise_owner) {
-    return "Required for owner activation";
-  }
-  return "How access reaches employee IDs";
-}
 
 const adPlatforms = [
   {
@@ -538,7 +514,9 @@ export default function AppsPage() {
             </div>
           </div>
         </div>
-        <div className="bannerInfo">{appsHierarchyMessage(integrations)}</div>
+        <div className="bannerInfo">
+          Enterprise and builder owners connect once, and their inherited team IDs use the same approved workspace access.
+        </div>
         {loading ? <div className="muted" style={{ marginTop: 14 }}>Loading live integration status...</div> : null}
         {error ? <div className="bannerWarn" style={{ marginTop: 14 }}>{error}</div> : null}
         {actionMsg ? <div className="bannerInfo" style={{ marginTop: 14 }}>{actionMsg}</div> : null}
@@ -639,7 +617,7 @@ export default function AppsPage() {
                         Missing backend env: {live.required_env.join(", ")}
                       </div>
                     ) : null}
-                    <ListSection title={providerRequirementTitle(integrations)} items={provider.requiredFromOwner} />
+                    <ListSection title="Required from the owner connection" items={provider.requiredFromOwner} />
 
                     {showGoogleActions ? (
                       <div className="stack" style={{ gap: 14, marginTop: 18 }}>
