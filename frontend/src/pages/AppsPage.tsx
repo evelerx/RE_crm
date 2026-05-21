@@ -833,26 +833,31 @@ export default function AppsPage() {
                               {calendarResult ? (
                                 <div className="bannerInfo">
                                   Event created: {calendarResult.event_id}
-                                  <br />
-                                  {calendarResult.html_link ? (
-                                    <>
-                                      Calendar link:{" "}
-                                      <a href={calendarResult.html_link} target="_blank" rel="noreferrer">
+                                  <div className="row" style={{ gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+                                    {calendarResult.html_link ? (
+                                      <a
+                                        className="btn secondary"
+                                        href={calendarResult.html_link}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{ textDecoration: "none" }}
+                                      >
                                         Open event
                                       </a>
-                                      <br />
-                                    </>
-                                  ) : null}
-                                  {calendarResult.meet_link ? (
-                                    <>
-                                      Meet link:{" "}
-                                      <a href={calendarResult.meet_link} target="_blank" rel="noreferrer">
+                                    ) : null}
+                                    {calendarResult.meet_link ? (
+                                      <a
+                                        className="btn"
+                                        href={calendarResult.meet_link}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{ textDecoration: "none" }}
+                                      >
                                         Join meeting
                                       </a>
-                                    </>
-                                  ) : (
-                                    "Meet link not requested for this event."
-                                  )}
+                                    ) : null}
+                                  </div>
+                                  {!calendarResult.meet_link ? <div style={{ marginTop: 10 }}>Meet link not requested for this event.</div> : null}
                                 </div>
                               ) : null}
                             </div>
@@ -927,26 +932,31 @@ export default function AppsPage() {
                               {meetResult ? (
                                 <div className="bannerInfo">
                                   Event created: {meetResult.event_id}
-                                  <br />
-                                  {meetResult.html_link ? (
-                                    <>
-                                      Calendar link:{" "}
-                                      <a href={meetResult.html_link} target="_blank" rel="noreferrer">
+                                  <div className="row" style={{ gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+                                    {meetResult.html_link ? (
+                                      <a
+                                        className="btn secondary"
+                                        href={meetResult.html_link}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{ textDecoration: "none" }}
+                                      >
                                         Open event
                                       </a>
-                                      <br />
-                                    </>
-                                  ) : null}
-                                  {meetResult.meet_link ? (
-                                    <>
-                                      Meet link:{" "}
-                                      <a href={meetResult.meet_link} target="_blank" rel="noreferrer">
+                                    ) : null}
+                                    {meetResult.meet_link ? (
+                                      <a
+                                        className="btn"
+                                        href={meetResult.meet_link}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{ textDecoration: "none" }}
+                                      >
                                         Join meeting
                                       </a>
-                                    </>
-                                  ) : (
-                                    "Google did not return a Meet link for this event."
-                                  )}
+                                    ) : null}
+                                  </div>
+                                  {!meetResult.meet_link ? <div style={{ marginTop: 10 }}>Google did not return a Meet link for this event.</div> : null}
                                 </div>
                               ) : null}
                             </div>
