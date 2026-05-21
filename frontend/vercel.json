@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/((?!assets/|demo%20website%20crm/|favicon\\.svg|northstone-logo-icon\\.png|manifest\\.webmanifest).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
