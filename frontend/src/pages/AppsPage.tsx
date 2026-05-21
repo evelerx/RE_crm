@@ -525,6 +525,7 @@ export default function AppsPage() {
   async function createGoogleCalendarEvent() {
     setCalendarBusy(true);
     setActionMsg(null);
+    setCalendarResult(null);
     try {
       const result = await api<GoogleCalendarEventResponse>("/integrations/google/calendar/events", {
         method: "POST",
@@ -542,6 +543,7 @@ export default function AppsPage() {
   async function createGoogleMeetEvent() {
     setMeetBusy(true);
     setActionMsg(null);
+    setMeetResult(null);
     try {
       const result = await api<GoogleCalendarEventResponse>("/integrations/google/calendar/events", {
         method: "POST",
@@ -830,6 +832,11 @@ export default function AppsPage() {
                               >
                                 {calendarBusy ? "Creating..." : "Create calendar event"}
                               </button>
+                              {!calendarBusy && (!calendarForm.title.trim() || !calendarForm.start_at || !calendarForm.end_at) ? (
+                                <div className="muted">
+                                  Fill event title, start time, and end time to enable calendar creation.
+                                </div>
+                              ) : null}
                               {calendarResult ? (
                                 <div className="bannerInfo">
                                   Event created: {calendarResult.event_id}
@@ -929,6 +936,11 @@ export default function AppsPage() {
                               >
                                 {meetBusy ? "Creating..." : "Create Google Meet"}
                               </button>
+                              {!meetBusy && (!meetForm.title.trim() || !meetForm.start_at || !meetForm.end_at) ? (
+                                <div className="muted">
+                                  Fill meeting title, start time, and end time to enable Meet creation.
+                                </div>
+                              ) : null}
                               {meetResult ? (
                                 <div className="bannerInfo">
                                   Event created: {meetResult.event_id}
