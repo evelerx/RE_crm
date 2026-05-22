@@ -167,37 +167,117 @@ function OwnerSelector({
   );
 }
 
-export function AdminOwnerPipelinePage() {
-  const { owners, selectedOwnerId, setSelectedOwnerId, workspace, loading, error, reload } = useAdminWorkspaceData();
-  const stageMap = useMemo(() => {
-    const map: Record<AdminPipelineStageKey, { id: string; title: string; subtitle: string; meta: string; kind: "deal" }[]> = {
-      new_lead: [],
-      qualified: [],
-      active: [],
-      closed: [],
-      lost: []
-    };
+function useAdminEnterpriseWorkspaces() {
+  const [owners, setOwners] = useState<EnterpriseDetail[]>([]);
+  const [workspaces, setWorkspaces] = useState<OwnerWorkspace[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    return map;
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const enterpriseRows = await api<EnterpriseDetail[]>("/admin/enterprises");
+      setOwners(enterpriseRows);
+      const workspaceRows = await Promise.all(
+        enterpriseRows.map((owner) => api<OwnerWorkspace>(`/admin/enterprises/${owner.enterprise_owner_id}/workspace`))
+      );
+      setWorkspaces(workspaceRows);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load admin enterprise workspace data");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
   }, []);
 
-  const stageCounts = workspace?.pipeline.stage_counts ?? {
-    new_lead: 0,
-    qualified: 0,
-    active: 0,
-    closed: 0,
-    lost: 0
+  return {
+    owners,
+    workspaces,
+    loading,
+    error,
+    reload: load,
   };
+}
+
+export function AdminOwnerPipelinePage() {
+  const { owners, workspaces, loading, error, reload } = useAdminEnterpriseWorkspaces();
+  const [search, setSearch] = useState("");
+
+  const ownerMetaById = useMemo(
+    () =>
+      new Map(
+        owners.map((owner) => [
+          owner.enterprise_owner_id,
+          {
+            owner_email: owner.owner_email,
+            owner_name: owner.owner_full_name || owner.owner_email,
+            company: owner.company || "-",
+          },
+        ])
+      ),
+    [owners]
+  );
+
+  const pipelineRows = useMemo(() => {
+    const rows = workspaces.flatMap((workspace) =>
+      (workspace.deals ?? []).map((deal) => {
+        const ownerMeta = ownerMetaById.get(workspace.enterprise_owner_id);
+        return {
+          id: deal.id,
+          title: deal.title || "-",
+          stage: deal.stage || "-",
+          asset_type: deal.asset_type || "-",
+          city: deal.city || "-",
+          area: deal.area || "-",
+          typology: deal.typology || "-",
+          owner_email: ownerMeta?.owner_email || "-",
+          owner_name: ownerMeta?.owner_name || "-",
+          company: ownerMeta?.company || "-",
+          last_activity_at: deal.last_activity_at,
+          updated_at: deal.updated_at,
+        };
+      })
+    );
+
+    const query = search.trim().toLowerCase();
+    if (!query) return rows;
+    return rows.filter((row) =>
+      [
+        row.title,
+        row.stage,
+        row.asset_type,
+        row.city,
+        row.area,
+        row.typology,
+        row.owner_email,
+        row.owner_name,
+        row.company,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [ownerMetaById, search, workspaces]);
 
   return (
     <div className="page">
       <div className="pageHeader">
         <div>
           <div className="h1">Pipeline</div>
-          <div className="muted">Admin tracking view for live subscription-owner pipeline counts.</div>
+          <div className="muted">All live subscription-owner pipeline records visible to admin in one searchable table.</div>
         </div>
         <div className="row">
-          <OwnerSelector owners={owners} selectedOwnerId={selectedOwnerId} onChange={setSelectedOwnerId} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search pipeline records"
+            aria-label="Search pipeline records"
+            style={{ minWidth: 260 }}
+          />
           <button className="btn ghost" onClick={() => void reload()} type="button">
             Refresh
           </button>
@@ -207,76 +287,116 @@ export function AdminOwnerPipelinePage() {
       {error ? <div className="alert">{error}</div> : null}
       {loading ? <div className="muted">Loading admin pipeline...</div> : null}
 
-      <section className="card">
-        <div className="cardTitle">Pipeline overview</div>
-        <div className="mini" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-          <div>
-            <b>Total live records:</b> {workspace?.pipeline.total ?? 0}
-          </div>
-          <div>
-            <b>Source:</b> Subscription owner workspace
-          </div>
-          <div>
-            <b>Admin usage:</b> Monitor live customer pipeline health by stage
-          </div>
-        </div>
-      </section>
-
-      <div className="kanban adminPipelineBoard">
-        {ADMIN_PIPELINE_STAGES.map((stage) => {
-          const cards = stageMap[stage.key] ?? [];
-          return (
-            <div
-              key={stage.key}
-              className="col adminSecondaryStage"
-            >
-              <div className="colHeader">
-                <div className="colTitle">{stage.label}</div>
-                <div className="count">{stageCounts[stage.key]}</div>
-              </div>
-              <div className="colBody">
-                {cards.map((card) => (
-                  <div key={card.id} className="dealCard adminIntakeCard" style={{ cursor: "default" }}>
-                    <div className="dcTop">
-                      <div className="dcTitle">{card.title}</div>
-                      <div className="pill">live</div>
-                    </div>
-                    <div className="dcMeta">
-                      <div className="muted">{card.subtitle || "-"}</div>
-                    </div>
-                    <div className="muted small">{card.meta || "-"}</div>
-                  </div>
-                ))}
-                {!cards.length ? (
-                  <div className="adminStagePlaceholder">
-                    <div className="muted">No records</div>
-                    <div className="small muted">
-                      Live stage counts are shown above. Detailed deal movement stays inside the customer workspace.
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
+      <div className="tableWrap tableWrapWide">
+        <table className="table tableWide">
+          <thead>
+            <tr>
+              <th>Deal</th>
+              <th>Stage</th>
+              <th>Asset</th>
+              <th>Location</th>
+              <th>Typology</th>
+              <th>Owner</th>
+              <th>Company</th>
+              <th>Last activity</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pipelineRows.length ? (
+              pipelineRows.map((row) => (
+                <tr key={row.id}>
+                  <td className="tdTitle">{row.title}</td>
+                  <td>{row.stage}</td>
+                  <td>{row.asset_type}</td>
+                  <td>{[row.area, row.city].filter((value) => value && value !== "-").join(", ") || "-"}</td>
+                  <td>{row.typology}</td>
+                  <td>{row.owner_name}</td>
+                  <td>{row.company}</td>
+                  <td>{fmtDt(row.last_activity_at)}</td>
+                  <td>{fmtDt(row.updated_at)}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={9} className="muted">No pipeline records found for the current search.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
 export function AdminOwnerDealsPage() {
-  const { owners, selectedOwnerId, setSelectedOwnerId, workspace, loading, error, reload } = useAdminWorkspaceData();
+  const { owners, workspaces, loading, error, reload } = useAdminEnterpriseWorkspaces();
+  const [search, setSearch] = useState("");
+
+  const ownerMetaById = useMemo(
+    () =>
+      new Map(
+        owners.map((owner) => [
+          owner.enterprise_owner_id,
+          {
+            owner_email: owner.owner_email,
+            owner_name: owner.owner_full_name || owner.owner_email,
+            company: owner.company || "-",
+          },
+        ])
+      ),
+    [owners]
+  );
+
+  const dealRows = useMemo(() => {
+    const rows = workspaces.flatMap((workspace) =>
+      (workspace.deals ?? []).map((deal) => {
+        const ownerMeta = ownerMetaById.get(workspace.enterprise_owner_id);
+        return {
+          ...deal,
+          owner_email: ownerMeta?.owner_email || "-",
+          owner_name: ownerMeta?.owner_name || "-",
+          owner_company: ownerMeta?.company || "-",
+        };
+      })
+    );
+
+    const query = search.trim().toLowerCase();
+    if (!query) return rows;
+    return rows.filter((deal) =>
+      [
+        deal.title,
+        deal.stage,
+        deal.asset_type,
+        deal.city,
+        deal.area,
+        deal.typology,
+        deal.owner_email,
+        deal.owner_name,
+        deal.owner_company,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [ownerMetaById, search, workspaces]);
 
   return (
     <div className="page">
       <div className="pageHeader">
         <div>
           <div className="h1">Deals</div>
-          <div className="muted">All subscription-owner deal records visible to admin for oversight.</div>
+          <div className="muted">All subscription-owner deal records visible to admin in one searchable table.</div>
         </div>
         <div className="row">
-          <OwnerSelector owners={owners} selectedOwnerId={selectedOwnerId} onChange={setSelectedOwnerId} />
-          <button className="btn ghost" onClick={() => void reload(selectedOwnerId)} type="button">Refresh</button>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search deals"
+            aria-label="Search deals"
+            style={{ minWidth: 260 }}
+          />
+          <button className="btn ghost" onClick={() => void reload()} type="button">Refresh</button>
         </div>
       </div>
 
@@ -292,6 +412,8 @@ export function AdminOwnerDealsPage() {
               <th>Asset</th>
               <th>Location</th>
               <th>Typology</th>
+              <th>Owner</th>
+              <th>Company</th>
               <th>Ticket size</th>
               <th>Client budget</th>
               <th>Close %</th>
@@ -300,13 +422,15 @@ export function AdminOwnerDealsPage() {
             </tr>
           </thead>
           <tbody>
-            {(workspace?.deals ?? []).map((deal) => (
+            {dealRows.map((deal) => (
               <tr key={deal.id}>
                 <td className="tdTitle">{deal.title}</td>
                 <td>{deal.stage}</td>
                 <td>{deal.asset_type || "-"}</td>
                 <td>{[deal.area, deal.city].filter(Boolean).join(", ") || "-"}</td>
                 <td>{deal.typology || "-"}</td>
+                <td>{deal.owner_name}</td>
+                <td>{deal.owner_company}</td>
                 <td>{formatRupees(deal.ticket_size)}</td>
                 <td>{formatRupees(deal.customer_budget)}</td>
                 <td>{deal.close_probability != null ? `${deal.close_probability}%` : "-"}</td>
@@ -314,9 +438,9 @@ export function AdminOwnerDealsPage() {
                 <td>{fmtDt(deal.updated_at)}</td>
               </tr>
             ))}
-            {!(workspace?.deals.length) ? (
+            {!dealRows.length ? (
               <tr>
-                <td colSpan={10} className="muted">No deal records found for this subscription owner.</td>
+                <td colSpan={12} className="muted">No deal records found for the current search.</td>
               </tr>
             ) : null}
           </tbody>
