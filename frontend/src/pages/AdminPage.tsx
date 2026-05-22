@@ -640,6 +640,8 @@ export default function AdminPage() {
   const [limitMsg, setLimitMsg] = useState<string | null>(null);
 
   const [llmEmail, setLlmEmail] = useState("");
+  const [aiAssignmentExpanded, setAiAssignmentExpanded] = useState(false);
+  const [aiAssignmentSearch, setAiAssignmentSearch] = useState("");
   const [llmEnabled, setLlmEnabled] = useState(true);
   const [llmModel, setLlmModel] = useState("openai/gpt-4o-mini");
   const [llmApiKey, setLlmApiKey] = useState("");
@@ -814,6 +816,35 @@ export default function AdminPage() {
   const selectedContacts =
     selectedWorkspace?.enterprise_owner_id === selectedEnterpriseId ? selectedWorkspace.contacts : [];
   const visibleAuditRows = auditListExpanded ? displayAuditRows : displayAuditRows.slice(0, 1);
+  const hasEffectiveAiAccess = (row: AdminUserRow) =>
+    row.has_llm_api_key || row.llm_access_scope === "inherited_enterprise";
+  const describeAccountType = (row: AdminUserRow) =>
+    row.is_admin_account
+      ? "Admin"
+      : row.enterprise_owner_id
+        ? `Employee${row.enterprise_member_role ? ` · ${row.enterprise_member_role}` : ""}`
+        : row.plan === "builder"
+          ? "Builder owner"
+          : row.plan === "enterprise"
+            ? "Enterprise owner"
+            : "Solo user";
+  const aiAssignedRows = displayRows.filter((row) => hasEffectiveAiAccess(row));
+  const aiUnassignedRows = displayRows.filter((row) => !hasEffectiveAiAccess(row));
+  const filteredAiUnassignedRows = aiUnassignedRows.filter((row) => {
+    const q = aiAssignmentSearch.trim().toLowerCase();
+    if (!q) return true;
+    return [
+      row.full_name,
+      row.email,
+      row.company,
+      row.city,
+      row.plan,
+      row.enterprise_member_role,
+      describeAccountType(row)
+    ]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(q));
+  });
   const complianceBars = displayCompliance
     ? [
         { label: "Enterprise owners", value: displayCompliance.counts.enterprise_owners, tone: "brand" as const },
@@ -1220,6 +1251,7 @@ export default function AdminPage() {
       <section className="card">
         <div className="cardTitle">Reset user password</div>
         <form
+          id="admin-ai-access-form"
           className="form"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -1397,14 +1429,14 @@ export default function AdminPage() {
             {planBusy ? "Saving..." : "Apply"}
           </button>
         </form>
-      </section>
 
-      <section className="card">
-        <div className="cardTitle">Create 5-day demo account</div>
+        <div className="card" style={{ marginTop: 18 }}>
+          <div className="cardTitle">5-day demo access</div>
         <div className="muted">
-          Admin can create a real demo login for 5 days. When the demo period expires, the account and its CRM data are deleted automatically on the backend.
+          Create a real demo login inside organization access. Demo accounts stay live for 5 days, then the backend automatically removes that demo workspace and its data.
         </div>
         <form
+          id="admin-ai-access-form"
           className="form"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -1578,6 +1610,7 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
+        </div>
       </section>
 
       <section className="card">
@@ -1659,7 +1692,7 @@ export default function AdminPage() {
               <datalist id="admin-user-emails">
                 {rows.map((row) => (
                   <option key={row.id} value={row.email}>
-                    {row.is_admin_account ? "Admin" : row.enterprise_owner_id ? "Organization member" : row.plan === "builder" ? "Builder owner" : row.plan === "enterprise" ? "Enterprise owner" : "Solo user"}
+                    {describeAccountType(row)}
                   </option>
                 ))}
               </datalist>
@@ -2203,11 +2236,19 @@ export default function AdminPage() {
               <div className="statValue">{displayCompliance.counts.users_total}</div>
               <div className="statHint">{displayCompliance.counts.enterprise_owners} enterprise owners, {displayCompliance.counts.enterprise_members} enterprise members.</div>
             </div>
-            <div className="statCard">
-              <div className="statLabel">Protected AI</div>
-              <div className="statValue">{displayCompliance.counts.ai_assigned_accounts}</div>
-              <div className="statHint">Accounts with centrally managed AI access.</div>
-            </div>
+              <div className="statCard">
+                <div className="statLabel">Protected AI</div>
+                <div className="statValue">{displayCompliance.counts.ai_assigned_accounts}</div>
+                <div className="statHint">{aiAssignedRows.length} assigned, {aiUnassignedRows.length} unassigned.</div>
+                <button
+                  className="btn ghost"
+                  type="button"
+                  style={{ marginTop: 12 }}
+                  onClick={() => setAiAssignmentExpanded((prev) => !prev)}
+                >
+                  {aiAssignmentExpanded ? "Hide AI assignment list" : "Show AI assignment list"}
+                </button>
+              </div>
             <div className="statCard">
               <div className="statLabel">Restricted</div>
               <div className="statValue">{displayCompliance.counts.blacklisted_users + displayCompliance.counts.locked_users}</div>
@@ -2219,11 +2260,11 @@ export default function AdminPage() {
               <div className="statHint">Token expiry window currently configured.</div>
             </div>
           </div>
-          <div className="miniChartsGrid">
-            <div className="miniChartCard">
-              <div className="miniChartTitle">Account mix graph</div>
-              <div className="miniChartList">
-                {complianceBars.map((item) => (
+            <div className="miniChartsGrid">
+              <div className="miniChartCard">
+                <div className="miniChartTitle">Account mix graph</div>
+                <div className="miniChartList">
+                  {complianceBars.map((item) => (
                   <div key={item.label} className="miniBarRow">
                     <div className="miniBarMeta">
                       <span>{item.label}</span>
@@ -2233,11 +2274,79 @@ export default function AdminPage() {
                       <div className={`miniBarFill ${item.tone}`} style={{ width: `${pct(item.value, complianceBarMax)}%` }} />
                     </div>
                   </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-          <div className="muted small">Generated {fmtDt(displayCompliance.generated_at)}</div>
+            {aiAssignmentExpanded ? (
+              <div className="card" style={{ marginTop: 16 }}>
+                <div className="cardTitle">AI assignment dropdown</div>
+                <div className="muted">
+                  Only accounts without active AI access are shown here. Click any row to load that account into the AI allocation form below.
+                </div>
+                <div className="row" style={{ marginTop: 12, gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                  <input
+                    value={aiAssignmentSearch}
+                    onChange={(e) => setAiAssignmentSearch(e.target.value)}
+                    placeholder="Search unassigned accounts by name, email, company, city, or type"
+                    style={{ minWidth: 320, flex: "1 1 320px" }}
+                  />
+                  <div className="muted small">
+                    {filteredAiUnassignedRows.length} of {aiUnassignedRows.length} unassigned accounts
+                  </div>
+                </div>
+                <div className="tableWrap" style={{ marginTop: 14 }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Account type</th>
+                        <th>Company</th>
+                        <th>City</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAiUnassignedRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="muted">
+                            No unassigned accounts match this search.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredAiUnassignedRows.map((row) => (
+                          <tr key={row.id}>
+                            <td>{row.full_name || "-"}</td>
+                            <td>{row.email}</td>
+                            <td>{describeAccountType(row)}</td>
+                            <td>{row.company || "-"}</td>
+                            <td>{row.city || "-"}</td>
+                            <td>
+                              <button
+                                className="btn ghost"
+                                type="button"
+                                onClick={() => {
+                                  setLlmEmail(row.email);
+                                  setLlmEnabled(true);
+                                  document.getElementById("admin-ai-access-form")?.scrollIntoView({
+                                    behavior: "smooth",
+                                    block: "center"
+                                  });
+                                }}
+                              >
+                                Use for AI key form
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+            <div className="muted small">Generated {fmtDt(displayCompliance.generated_at)}</div>
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginTop: 14 }}>
             <div className="cardTitle" style={{ fontSize: 16 }}>Recent security events</div>
             <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
