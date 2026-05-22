@@ -16,6 +16,7 @@ from ..auth import (
     get_or_create_user,
     get_user_by_email,
     hash_password,
+    is_demo_account_expired,
     is_admin_email,
     normalize_email,
     password_hash_needs_update,
@@ -23,7 +24,7 @@ from ..auth import (
     verify_password,
 )
 from ..audit import log_audit_event
-from ..db import DATABASE_URL, get_session
+from ..db import DATABASE_URL, delete_demo_account_tree, get_session
 from ..auth import get_current_user
 from ..models import PasswordResetToken, Profile, User
 from ..schemas import (
@@ -322,6 +323,10 @@ def login(payload: LoginRequest, request: Request, session: Session = Depends(ge
     user = get_user_by_email(email=email, session=session)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if is_demo_account_expired(user):
+        delete_demo_account_tree(session, user)
+        session.commit()
+        raise HTTPException(status_code=403, detail="Demo account expired. Ask admin to create a new 5-day demo account.")
     locked_until = _normalize_db_datetime(getattr(user, "locked_until", None))
     if locked_until and locked_until > _utc_now_naive():
         raise HTTPException(status_code=423, detail=f"Account temporarily locked until {locked_until.isoformat()}Z")

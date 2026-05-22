@@ -9,7 +9,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, "index.html"),
-        demoWebsiteCrm: resolve(__dirname, "demo website crm/index.html"),
       }
     }
   }

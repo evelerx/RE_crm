@@ -978,36 +978,3 @@ textarea.textarea {
   padding: 6px 0;
   text-align: left;
 }
-
-.previewHeroCard,
-.previewLockedCard {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.previewBulletGrid {
-  display: grid;
-  gap: 10px;
-}
-
-.previewActions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-.previewDealCard {
-  cursor: default;
-  pointer-events: none;
-  position: relative;
-}
-
-.previewDealLock {
-  margin-top: 10px;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(138, 180, 255, 0.88);
-}

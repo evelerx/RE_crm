@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     zoom_client_secret: str = ""
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
+    payment_link_solo: str = ""
+    payment_link_enterprise: str = ""
+    payment_link_builder: str = ""
     formspree_endpoint: str = ""
     formspree_bearer_token: str = ""
     login_max_attempts: int = 5

@@ -42,7 +42,9 @@ class ResetPasswordRequest(BaseModel):
 
 class PublicCheckoutConfigRead(BaseModel):
     enabled: bool
+    provider: str = ""
     key_id: str = ""
+    plan_links: dict[str, str] = {}
 
 
 class PublicCheckoutOrderRequest(BaseModel):
@@ -92,6 +94,30 @@ class PublicSubscriptionResponse(BaseModel):
     app_login_url: str
 
 
+class PublicPaymentLinkRequest(BaseModel):
+    full_name: str = Field(min_length=2, max_length=120)
+    email: str
+    phone: str = Field(min_length=6, max_length=40)
+    company_name: str = Field(min_length=2, max_length=160)
+    city: str = Field(min_length=2, max_length=120)
+    product_plan: str = Field(pattern="^(solo|enterprise|builder)$")
+    billing_cycle: str = Field(pattern="^(monthly|six_month|yearly)$")
+    amount_inr: int = Field(ge=0, le=50000000)
+    seats: int = Field(ge=1, le=10000)
+    notes: str = Field(default="", max_length=4000)
+
+
+class PublicPaymentLinkResponse(BaseModel):
+    ok: bool
+    email: str
+    product_plan: str
+    billing_cycle: str
+    seats: int
+    amount_inr: int
+    payment_url: str
+    message: str
+
+
 class PublicDemoRequest(BaseModel):
     full_name: str = Field(min_length=2, max_length=120)
     email: str
@@ -129,6 +155,16 @@ class AdminSetEmployeeLimitRequest(BaseModel):
     employee_limit: int = Field(ge=0, le=10000)
 
 
+class AdminCreateDemoAccountRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=8)
+    full_name: str = ""
+    company: str = ""
+    city: str = ""
+    demo_plan: str = Field(default="solo", pattern="^(solo|enterprise|builder)$")
+    employee_limit: int = Field(default=5, ge=0, le=10000)
+
+
 class AdminSetLlmAccessRequest(BaseModel):
     email: str
     provider: str = Field(default="openrouter", pattern="^(openrouter)$")
@@ -157,6 +193,9 @@ class AdminRuntimeConfigRead(BaseModel):
     data_encryption_key_configured: bool = False
     razorpay_key_id_configured: bool = False
     razorpay_key_secret_configured: bool = False
+    payment_link_solo: str = ""
+    payment_link_enterprise: str = ""
+    payment_link_builder: str = ""
     formspree_endpoint_configured: bool = False
     formspree_bearer_token_configured: bool = False
     login_max_attempts: int = 5
@@ -174,6 +213,9 @@ class AdminRuntimeConfigUpdateRequest(BaseModel):
     data_encryption_key: str | None = None
     razorpay_key_id: str | None = None
     razorpay_key_secret: str | None = None
+    payment_link_solo: str | None = None
+    payment_link_enterprise: str | None = None
+    payment_link_builder: str | None = None
     formspree_endpoint: str | None = None
     formspree_bearer_token: str | None = None
     pbkdf2_rounds: int | None = Field(default=None, ge=60000, le=1000000)

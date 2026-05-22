@@ -19,6 +19,8 @@ from ..schemas import (
     PublicCheckoutOrderRequest,
     PublicDemoRequest,
     PublicDemoResponse,
+    PublicPaymentLinkRequest,
+    PublicPaymentLinkResponse,
     PublicSubscriptionRequest,
     PublicSubscriptionResponse,
 )
@@ -122,10 +124,26 @@ def _verify_razorpay_signature(order_id: str, payment_id: str, signature: str) -
         raise HTTPException(status_code=400, detail="Payment signature verification failed.")
 
 
+def _payment_link_for_plan(plan: str) -> str:
+    mapping = {
+        "solo": (settings.payment_link_solo or "").strip(),
+        "enterprise": (settings.payment_link_enterprise or "").strip(),
+        "builder": (settings.payment_link_builder or "").strip(),
+    }
+    return mapping.get(plan, "")
+
+
 @router.get("/checkout-config", response_model=PublicCheckoutConfigRead)
 def checkout_config():
     key_id = (settings.razorpay_key_id or "").strip()
-    return PublicCheckoutConfigRead(enabled=bool(key_id), key_id=key_id)
+    if key_id:
+        return PublicCheckoutConfigRead(enabled=True, provider="razorpay", key_id=key_id, plan_links={})
+
+    plan_links = {plan: link for plan in ("solo", "enterprise", "builder") if (link := _payment_link_for_plan(plan))}
+    if plan_links:
+        return PublicCheckoutConfigRead(enabled=True, provider="payment_link", key_id="", plan_links=plan_links)
+
+    return PublicCheckoutConfigRead(enabled=False, provider="", key_id="", plan_links={})
 
 
 @router.post("/checkout-order", response_model=PublicCheckoutOrderRead)
@@ -166,6 +184,52 @@ async def checkout_order(payload: PublicCheckoutOrderRequest):
         amount_paise=int(body.get("amount", amount_paise) or amount_paise),
         currency=str(body.get("currency", "INR")),
         key_id=key_id,
+    )
+
+
+@router.post("/payment-link-request", response_model=PublicPaymentLinkResponse)
+def payment_link_request(payload: PublicPaymentLinkRequest, session: Session = Depends(get_session)):
+    email = normalize_email(payload.email)
+    quote = _verify_requested_amount(payload.product_plan, payload.billing_cycle, payload.seats, payload.amount_inr)
+    payment_url = _payment_link_for_plan(payload.product_plan)
+    if not payment_url:
+        raise HTTPException(status_code=503, detail="Payment link is not configured for this plan yet.")
+
+    user = get_user_by_email(email=email, session=session) or get_or_create_user(email=email, session=session)
+    session.add(user)
+
+    now = _utc_now_naive()
+    profile = session.exec(select(Profile).where(Profile.owner_id == user.id)).first() or Profile(owner_id=user.id)
+    profile.full_name = payload.full_name.strip()
+    profile.phone = payload.phone.strip()
+    profile.company = payload.company_name.strip()
+    profile.city = payload.city.strip()
+    profile.updated_at = now
+    session.add(profile)
+
+    log_audit_event(
+        session,
+        actor=None,
+        kind="public.payment_link_request",
+        summary=f"Payment link opened for {email}",
+        detail=(
+            f"plan={payload.product_plan}; cycle={payload.billing_cycle}; seats={int(quote['seats'])}; "
+            f"amount_inr={int(quote['amount_inr'])}; company={payload.company_name.strip()}; "
+            f"city={payload.city.strip()}; notes={payload.notes.strip()}"
+        ),
+        target_user_id=user.id,
+    )
+    _commit_or_http(session, "Could not store the payment request")
+
+    return PublicPaymentLinkResponse(
+        ok=True,
+        email=email,
+        product_plan=payload.product_plan,
+        billing_cycle=payload.billing_cycle,
+        seats=int(quote["seats"]),
+        amount_inr=int(quote["amount_inr"]),
+        payment_url=payment_url,
+        message="Payment link opened. Account activation continues after payment confirmation.",
     )
 
 

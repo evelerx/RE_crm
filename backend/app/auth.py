@@ -10,7 +10,7 @@ from passlib.context import CryptContext
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from .db import get_session
+from .db import delete_demo_account_tree, get_session
 from .models import Profile, User
 from .settings import settings
 
@@ -95,6 +95,19 @@ def _normalize_db_datetime(value: datetime | None) -> datetime | None:
     return value
 
 
+def is_demo_account(user: User) -> bool:
+    return (getattr(user, "subscription_plan", "") or "").strip().lower() == "demo"
+
+
+def is_demo_account_expired(user: User) -> bool:
+    if not is_demo_account(user):
+        return False
+    expires_at = _normalize_db_datetime(getattr(user, "subscription_expires_at", None))
+    if not expires_at:
+        return False
+    return expires_at <= _utc_now_naive()
+
+
 def get_current_user(
     request: Request,
     authorization: Optional[str] = Header(default=None),
@@ -116,6 +129,10 @@ def get_current_user(
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    if is_demo_account_expired(user):
+        delete_demo_account_tree(session, user)
+        session.commit()
+        raise HTTPException(status_code=401, detail="Demo account expired. Ask admin to create a new 5-day demo account.")
     if getattr(user, "is_blacklisted", False):
         reason = (getattr(user, "blacklist_reason", "") or "").strip()
         msg = "You are blacklisted by admin."

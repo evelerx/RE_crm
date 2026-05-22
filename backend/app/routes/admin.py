@@ -12,11 +12,12 @@ from sqlmodel import Session, col, select
 from ..audit import log_audit_event, redact_detail
 from ..auth import decode_token, get_current_user, hash_password, is_admin_email, normalize_email, verify_admin_password
 from ..crypto import decrypt_if_configured, encrypt_if_configured
-from ..db import get_session
+from ..db import delete_demo_account_tree, get_session
 from ..enterprise_scope import count_org_records, employee_record_counts, org_owner_filter
 from ..models import Activity, AuditEvent, Contact, Deal, Profile, SupportChatMessage, User
 from ..schemas import (
     AdminBlacklistRequest,
+    AdminCreateDemoAccountRequest,
     AdminResetPasswordRequest,
     AdminRevealSecretRequest,
     AdminRuntimeConfigRead,
@@ -111,6 +112,9 @@ def _runtime_config_payload() -> AdminRuntimeConfigRead:
         data_encryption_key_configured=bool((settings.data_encryption_key or "").strip()),
         razorpay_key_id_configured=bool((settings.razorpay_key_id or "").strip()),
         razorpay_key_secret_configured=bool((settings.razorpay_key_secret or "").strip()),
+        payment_link_solo=settings.payment_link_solo or "",
+        payment_link_enterprise=settings.payment_link_enterprise or "",
+        payment_link_builder=settings.payment_link_builder or "",
         formspree_endpoint_configured=bool((settings.formspree_endpoint or "").strip()),
         formspree_bearer_token_configured=bool((settings.formspree_bearer_token or "").strip()),
         login_max_attempts=int(settings.login_max_attempts or 5),
@@ -331,6 +335,15 @@ def _demo_request_payload(session: Session) -> list[dict]:
     ]
 
 
+def _demo_plan_from_user(user: User) -> str:
+    plan = (getattr(user, "plan", "free") or "free").strip().lower()
+    if plan == "enterprise":
+        return "enterprise"
+    if plan == "builder":
+        return "builder"
+    return "solo"
+
+
 def _chat_row_payload(session: Session, row: SupportChatMessage) -> SupportChatMessageRead:
     sender_email = ""
     if row.sender_user_id:
@@ -396,6 +409,9 @@ def update_runtime_config(
     set_text("data_encryption_key", "DATA_ENCRYPTION_KEY", payload.data_encryption_key)
     set_text("razorpay_key_id", "RAZORPAY_KEY_ID", payload.razorpay_key_id)
     set_text("razorpay_key_secret", "RAZORPAY_KEY_SECRET", payload.razorpay_key_secret)
+    set_text("payment_link_solo", "PAYMENT_LINK_SOLO", payload.payment_link_solo)
+    set_text("payment_link_enterprise", "PAYMENT_LINK_ENTERPRISE", payload.payment_link_enterprise)
+    set_text("payment_link_builder", "PAYMENT_LINK_BUILDER", payload.payment_link_builder)
     set_text("formspree_endpoint", "FORMSPREE_ENDPOINT", payload.formspree_endpoint)
     set_text("formspree_bearer_token", "FORMSPREE_BEARER_TOKEN", payload.formspree_bearer_token)
 
@@ -588,6 +604,14 @@ def users(
                 "blacklist_reason": getattr(u, "blacklist_reason", "") or "",
                 "blacklisted_at": getattr(u, "blacklisted_at", None),
                 "plan": getattr(u, "plan", "free"),
+                "subscription_plan": getattr(u, "subscription_plan", "") or "",
+                "subscription_cycle": getattr(u, "subscription_cycle", "") or "",
+                "subscription_seats": int(getattr(u, "subscription_seats", 1) or 1),
+                "subscription_amount_inr": int(getattr(u, "subscription_amount_inr", 0) or 0),
+                "subscription_started_at": getattr(u, "subscription_started_at", None),
+                "subscription_expires_at": getattr(u, "subscription_expires_at", None),
+                "is_demo_account": ((getattr(u, "subscription_plan", "") or "").strip().lower() == "demo"),
+                "demo_plan": _demo_plan_from_user(u) if ((getattr(u, "subscription_plan", "") or "").strip().lower() == "demo") else "",
                 "enterprise_enabled_at": getattr(u, "enterprise_enabled_at", None),
                 "enterprise_owner_id": str(getattr(u, "enterprise_owner_id", "") or ""),
                 "enterprise_member_role": getattr(u, "enterprise_member_role", "") or "",
@@ -610,6 +634,137 @@ def users(
             }
         )
     return out
+
+
+@router.post("/demo-accounts")
+def create_demo_account(
+    payload: AdminCreateDemoAccountRequest,
+    session: Session = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> dict:
+    email = normalize_email(payload.email)
+    if is_admin_email(email):
+        raise HTTPException(status_code=400, detail="Admin account cannot be turned into a demo account")
+
+    existing = session.exec(select(User).where(User.email == email)).first()
+    if existing and ((getattr(existing, "subscription_plan", "") or "").strip().lower() != "demo"):
+        raise HTTPException(status_code=409, detail="This email already belongs to a real CRM account")
+    if existing:
+        delete_demo_account_tree(session, existing)
+        session.commit()
+
+    now = _utc_now_naive()
+    expires_at = now + timedelta(days=5)
+    plan = "free"
+    employee_limit = 0
+    enterprise_enabled_at = None
+    if payload.demo_plan == "enterprise":
+        plan = "enterprise"
+        employee_limit = max(1, int(payload.employee_limit or 5))
+        enterprise_enabled_at = now
+    elif payload.demo_plan == "builder":
+        plan = "builder"
+        employee_limit = max(1, int(payload.employee_limit or 5))
+        enterprise_enabled_at = now
+
+    user = User(
+        email=email,
+        password_hash=hash_password(payload.password.strip()),
+        created_at=now,
+        last_login_at=None,
+        last_seen_at=None,
+        last_login_ip="",
+        last_seen_ip="",
+        login_count=0,
+        request_count=0,
+        failed_login_attempts=0,
+        locked_until=None,
+        is_blacklisted=False,
+        blacklist_reason="",
+        blacklisted_at=None,
+        plan=plan,
+        enterprise_enabled_at=enterprise_enabled_at,
+        enterprise_owner_id=None,
+        employee_limit=employee_limit,
+        enterprise_member_role="",
+        token_version=1,
+        password_changed_at=now,
+        llm_provider="",
+        llm_api_key="",
+        llm_model="",
+        llm_allocated_at=None,
+        subscription_plan="demo",
+        subscription_cycle="demo_5d",
+        subscription_seats=(employee_limit if plan in {"enterprise", "builder"} else 1),
+        subscription_amount_inr=0,
+        subscription_started_at=now,
+        subscription_expires_at=expires_at,
+    )
+    session.add(user)
+    session.flush()
+
+    profile = Profile(
+        owner_id=user.id,
+        full_name=(payload.full_name or "").strip(),
+        phone=None,
+        whatsapp=None,
+        company=(payload.company or "").strip(),
+        city=(payload.city or "").strip(),
+        areas_served="",
+        specialization="",
+        rera_id=encrypt_if_configured(""),
+        pan=encrypt_if_configured(""),
+        gstin=encrypt_if_configured(""),
+        languages="",
+        bio="",
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(profile)
+    log_audit_event(
+        session,
+        actor=admin_user,
+        target_user_id=user.id,
+        kind="admin.create_demo_account",
+        summary=f"Created 5-day demo account for {user.email}",
+        detail=f"demo_plan={payload.demo_plan}; expires_at={expires_at.isoformat()}Z",
+    )
+    _commit_or_http(session, "Unable to create demo account")
+    return {
+        "ok": True,
+        "user_id": str(user.id),
+        "email": user.email,
+        "demo_plan": payload.demo_plan,
+        "subscription_plan": user.subscription_plan,
+        "subscription_cycle": user.subscription_cycle,
+        "subscription_started_at": user.subscription_started_at,
+        "subscription_expires_at": user.subscription_expires_at,
+        "employee_limit": user.employee_limit,
+    }
+
+
+@router.delete("/demo-accounts/{user_id}")
+def delete_demo_account(
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> dict:
+    user = session.get(User, user_id)
+    if not user or ((getattr(user, "subscription_plan", "") or "").strip().lower() != "demo"):
+        raise HTTPException(status_code=404, detail="Demo account not found")
+
+    email = user.email
+    demo_plan = _demo_plan_from_user(user)
+    delete_demo_account_tree(session, user)
+    log_audit_event(
+        session,
+        actor=admin_user,
+        kind="admin.delete_demo_account",
+        summary=f"Deleted demo account {email}",
+        detail=f"demo_plan={demo_plan}",
+    )
+    _commit_or_http(session, "Unable to delete demo account")
+    return {"ok": True, "email": email, "demo_plan": demo_plan}
 
 
 @router.get("/enterprises")

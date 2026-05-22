@@ -26,12 +26,16 @@ type LlmTestResponse = { ok: boolean; output: string };
 type RuntimeConfig = {
   env_file_path: string;
   frontend_origin: string;
+  public_app_url: string;
   openrouter_base_url: string;
   admin_email: string;
   jwt_secret_configured: boolean;
   admin_password_mode: string;
   pbkdf2_rounds: number;
   data_encryption_key_configured: boolean;
+  payment_link_solo: string;
+  payment_link_enterprise: string;
+  payment_link_builder: string;
   login_max_attempts: number;
   login_lockout_minutes: number;
   jwt_exp_days: number;
@@ -57,11 +61,15 @@ export default function SettingsPage() {
   const [installMsg, setInstallMsg] = useState<string | null>(null);
   const [configForm, setConfigForm] = useState({
     frontend_origin: "",
+    public_app_url: "",
     openrouter_base_url: "",
     admin_email: "",
     jwt_secret: "",
     admin_password: "",
     data_encryption_key: "",
+    payment_link_solo: "",
+    payment_link_enterprise: "",
+    payment_link_builder: "",
     pbkdf2_rounds: 120000,
     login_max_attempts: 5,
     login_lockout_minutes: 15,
@@ -79,8 +87,12 @@ export default function SettingsPage() {
         setConfigForm((prev) => ({
           ...prev,
           frontend_origin: runtime.frontend_origin || "",
+          public_app_url: runtime.public_app_url || "",
           openrouter_base_url: runtime.openrouter_base_url || "",
           admin_email: runtime.admin_email || "",
+          payment_link_solo: runtime.payment_link_solo || "",
+          payment_link_enterprise: runtime.payment_link_enterprise || "",
+          payment_link_builder: runtime.payment_link_builder || "",
           pbkdf2_rounds: runtime.pbkdf2_rounds || 120000,
           login_max_attempts: runtime.login_max_attempts || 5,
           login_lockout_minutes: runtime.login_lockout_minutes || 15,
@@ -254,8 +266,12 @@ export default function SettingsPage() {
               try {
                 const payload = {
                   frontend_origin: configForm.frontend_origin,
+                  public_app_url: configForm.public_app_url,
                   openrouter_base_url: configForm.openrouter_base_url,
                   admin_email: configForm.admin_email,
+                  payment_link_solo: configForm.payment_link_solo,
+                  payment_link_enterprise: configForm.payment_link_enterprise,
+                  payment_link_builder: configForm.payment_link_builder,
                   pbkdf2_rounds: configForm.pbkdf2_rounds,
                   login_max_attempts: configForm.login_max_attempts,
                   login_lockout_minutes: configForm.login_lockout_minutes,
@@ -292,6 +308,12 @@ export default function SettingsPage() {
             </div>
             <div className="grid2">
               <label>
+                Public app URL
+                <input value={configForm.public_app_url} onChange={(e) => setConfigForm((prev) => ({ ...prev, public_app_url: e.target.value }))} />
+              </label>
+            </div>
+            <div className="grid2">
+              <label>
                 OpenRouter base URL
                 <input value={configForm.openrouter_base_url} onChange={(e) => setConfigForm((prev) => ({ ...prev, openrouter_base_url: e.target.value }))} />
               </label>
@@ -302,6 +324,34 @@ export default function SettingsPage() {
                   value={configForm.data_encryption_key}
                   onChange={(e) => setConfigForm((prev) => ({ ...prev, data_encryption_key: e.target.value }))}
                   placeholder={runtimeConfig.data_encryption_key_configured ? "Enter a new key only to rotate it" : "Paste generated Fernet key"}
+                />
+              </label>
+            </div>
+            <div className="grid2">
+              <label>
+                Solo payment link
+                <input
+                  value={configForm.payment_link_solo}
+                  onChange={(e) => setConfigForm((prev) => ({ ...prev, payment_link_solo: e.target.value }))}
+                  placeholder="https://..."
+                />
+              </label>
+              <label>
+                Enterprise payment link
+                <input
+                  value={configForm.payment_link_enterprise}
+                  onChange={(e) => setConfigForm((prev) => ({ ...prev, payment_link_enterprise: e.target.value }))}
+                  placeholder="https://..."
+                />
+              </label>
+            </div>
+            <div className="grid2">
+              <label>
+                Builder payment link
+                <input
+                  value={configForm.payment_link_builder}
+                  onChange={(e) => setConfigForm((prev) => ({ ...prev, payment_link_builder: e.target.value }))}
+                  placeholder="https://..."
                 />
               </label>
             </div>

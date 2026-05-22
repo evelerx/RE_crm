@@ -1,12 +1,26 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import text
+from sqlalchemy import or_, text
 from sqlalchemy.pool import NullPool
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from .enterprise_scope import normalize_existing_enterprise_data
+from .models import (
+    Activity,
+    AppIntegrationConnection,
+    AuditEvent,
+    BuilderDocument,
+    Contact,
+    Deal,
+    DealStageEvent,
+    PasswordResetToken,
+    Profile,
+    SupportChatMessage,
+    User,
+)
 from .settings import app_base_dir, settings
 
 
@@ -77,6 +91,153 @@ else:
     engine_kwargs["connect_args"] = {"prepare_threshold": None}
 
 engine = create_engine(DATABASE_URL, **engine_kwargs)
+
+
+def _utc_now_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _normalize_db_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
+def _delete_rows(session: Session, rows: list[object]) -> int:
+    for row in rows:
+        session.delete(row)
+    return len(rows)
+
+
+def delete_demo_account_tree(session: Session, root_user: User) -> dict[str, int]:
+    owner_id = root_user.id
+    employee_rows = session.exec(select(User).where(User.enterprise_owner_id == owner_id)).all()
+    employee_ids = [row.id for row in employee_rows]
+    all_user_ids = [owner_id, *employee_ids]
+    counts: dict[str, int] = {
+        "users": len(all_user_ids),
+        "profiles": 0,
+        "contacts": 0,
+        "deals": 0,
+        "activities": 0,
+        "deal_stage_events": 0,
+        "support_messages": 0,
+        "builder_documents": 0,
+        "password_reset_tokens": 0,
+        "integration_connections": 0,
+        "audit_events": 0,
+    }
+
+    counts["support_messages"] += _delete_rows(
+        session,
+        session.exec(select(SupportChatMessage).where(SupportChatMessage.enterprise_owner_id == owner_id)).all(),
+    )
+    counts["integration_connections"] += _delete_rows(
+        session,
+        session.exec(select(AppIntegrationConnection).where(AppIntegrationConnection.enterprise_owner_id == owner_id)).all(),
+    )
+    counts["builder_documents"] += _delete_rows(
+        session,
+        session.exec(
+            select(BuilderDocument).where(
+                or_(
+                    BuilderDocument.owner_id.in_(all_user_ids),
+                    BuilderDocument.enterprise_owner_id == owner_id,
+                )
+            )
+        ).all(),
+    )
+    counts["deal_stage_events"] += _delete_rows(
+        session,
+        session.exec(
+            select(DealStageEvent).where(
+                or_(
+                    DealStageEvent.owner_id.in_(all_user_ids),
+                    DealStageEvent.enterprise_owner_id == owner_id,
+                )
+            )
+        ).all(),
+    )
+    counts["activities"] += _delete_rows(
+        session,
+        session.exec(
+            select(Activity).where(
+                or_(
+                    Activity.owner_id.in_(all_user_ids),
+                    Activity.enterprise_owner_id == owner_id,
+                )
+            )
+        ).all(),
+    )
+    counts["deals"] += _delete_rows(
+        session,
+        session.exec(
+            select(Deal).where(
+                or_(
+                    Deal.owner_id.in_(all_user_ids),
+                    Deal.enterprise_owner_id == owner_id,
+                )
+            )
+        ).all(),
+    )
+    counts["contacts"] += _delete_rows(
+        session,
+        session.exec(
+            select(Contact).where(
+                or_(
+                    Contact.owner_id.in_(all_user_ids),
+                    Contact.enterprise_owner_id == owner_id,
+                )
+            )
+        ).all(),
+    )
+    counts["password_reset_tokens"] += _delete_rows(
+        session,
+        session.exec(select(PasswordResetToken).where(PasswordResetToken.user_id.in_(all_user_ids))).all(),
+    )
+    counts["audit_events"] += _delete_rows(
+        session,
+        session.exec(
+            select(AuditEvent).where(
+                or_(
+                    AuditEvent.actor_user_id.in_(all_user_ids),
+                    AuditEvent.target_user_id.in_(all_user_ids),
+                    AuditEvent.enterprise_owner_id == owner_id,
+                )
+            )
+        ).all(),
+    )
+    counts["profiles"] += _delete_rows(
+        session,
+        session.exec(select(Profile).where(Profile.owner_id.in_(all_user_ids))).all(),
+    )
+    counts["users"] = _delete_rows(session, employee_rows) + _delete_rows(session, [root_user])
+    return counts
+
+
+def purge_expired_demo_accounts(session: Session) -> int:
+    now = _utc_now_naive()
+    demo_roots = session.exec(
+        select(User).where(
+            User.subscription_plan == "demo",
+            User.subscription_expires_at.is_not(None),
+            User.enterprise_owner_id.is_(None),
+        )
+    ).all()
+    expired_roots = [
+        row
+        for row in demo_roots
+        if (_normalize_db_datetime(row.subscription_expires_at) or now) <= now
+    ]
+    if not expired_roots:
+        return 0
+
+    for row in expired_roots:
+        delete_demo_account_tree(session, row)
+    session.commit()
+    return len(expired_roots)
 
 
 def _sqlite_table_columns(conn, table: str) -> set[str]:
@@ -287,8 +448,10 @@ def init_db() -> None:
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         normalize_existing_enterprise_data(session)
+        purge_expired_demo_accounts(session)
 
 
 def get_session():
     with Session(engine) as session:
+        purge_expired_demo_accounts(session)
         yield session

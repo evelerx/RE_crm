@@ -4,6 +4,14 @@ import { api, ApiError } from "../api/client";
 type AdminUserRow = {
   id: string;
   email: string;
+  full_name: string;
+  phone: string | null;
+  whatsapp: string | null;
+  company: string;
+  city: string;
+  areas_served: string;
+  specialization: string;
+  has_rera_id?: boolean;
   created_at: string;
   last_login_at: string | null;
   last_seen_at: string | null;
@@ -12,6 +20,14 @@ type AdminUserRow = {
   blacklist_reason: string;
   blacklisted_at: string | null;
   plan: "free" | "enterprise" | "builder";
+  subscription_plan: string;
+  subscription_cycle: string;
+  subscription_seats: number;
+  subscription_amount_inr: number;
+  subscription_started_at: string | null;
+  subscription_expires_at: string | null;
+  is_demo_account?: boolean;
+  demo_plan?: string;
   enterprise_enabled_at: string | null;
   enterprise_owner_id: string;
   enterprise_member_role: string;
@@ -219,6 +235,22 @@ function formatRupees(value: number) {
   return `₹${Math.round(value).toLocaleString("en-IN")}`;
 }
 
+function demoDaysRemaining(expiresAt: string | null) {
+  if (!expiresAt) return 0;
+  const expires = new Date(expiresAt);
+  if (Number.isNaN(expires.getTime())) return 0;
+  const diffMs = expires.getTime() - Date.now();
+  if (diffMs <= 0) return 0;
+  return Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+}
+
+function demoPlanLabel(row: AdminUserRow) {
+  if (row.demo_plan) return row.demo_plan;
+  if (row.plan === "enterprise") return "enterprise";
+  if (row.plan === "builder") return "builder";
+  return "solo";
+}
+
 function fallbackEmployeesFromUsers(rows: AdminUserRow[], selectedEnterpriseId: string): FallbackEmployeeRow[] {
   if (!selectedEnterpriseId) return [];
   return rows
@@ -422,6 +454,14 @@ const demoRows: AdminUserRow[] = [
   {
     id: "demo-admin",
     email: "admin@northstonecrm.com",
+    full_name: "Admin",
+    phone: null,
+    whatsapp: null,
+    company: "",
+    city: "",
+    areas_served: "",
+    specialization: "",
+    has_rera_id: false,
     created_at: "2026-05-01T08:00:00Z",
     last_login_at: "2026-05-14T11:05:00Z",
     last_seen_at: "2026-05-14T11:18:00Z",
@@ -430,6 +470,14 @@ const demoRows: AdminUserRow[] = [
     blacklist_reason: "",
     blacklisted_at: null,
     plan: "free",
+    subscription_plan: "",
+    subscription_cycle: "",
+    subscription_seats: 1,
+    subscription_amount_inr: 0,
+    subscription_started_at: null,
+    subscription_expires_at: null,
+    is_demo_account: false,
+    demo_plan: "",
     enterprise_enabled_at: null,
     enterprise_owner_id: "",
     enterprise_member_role: "",
@@ -448,6 +496,14 @@ const demoRows: AdminUserRow[] = [
   {
     id: "demo-owner",
     email: "owner@northstonecrm.com",
+    full_name: "Northstone Owner",
+    phone: null,
+    whatsapp: null,
+    company: "Northstone Realty",
+    city: "Mumbai",
+    areas_served: "Bandra, Powai",
+    specialization: "residential, commercial",
+    has_rera_id: true,
     created_at: "2026-05-02T09:10:00Z",
     last_login_at: "2026-05-14T10:55:00Z",
     last_seen_at: "2026-05-14T11:12:00Z",
@@ -456,6 +512,14 @@ const demoRows: AdminUserRow[] = [
     blacklist_reason: "",
     blacklisted_at: null,
     plan: "enterprise",
+    subscription_plan: "",
+    subscription_cycle: "",
+    subscription_seats: 10,
+    subscription_amount_inr: 0,
+    subscription_started_at: null,
+    subscription_expires_at: null,
+    is_demo_account: false,
+    demo_plan: "",
     enterprise_enabled_at: "2026-05-03T10:00:00Z",
     enterprise_owner_id: "",
     enterprise_member_role: "",
@@ -474,6 +538,14 @@ const demoRows: AdminUserRow[] = [
   {
     id: "demo-emp-broker",
     email: "broker1@northstonecrm.com",
+    full_name: "Aarav Mehta",
+    phone: null,
+    whatsapp: null,
+    company: "Northstone Realty",
+    city: "Mumbai",
+    areas_served: "Bandra",
+    specialization: "residential",
+    has_rera_id: true,
     created_at: "2026-05-08T10:00:00Z",
     last_login_at: "2026-05-14T09:42:00Z",
     last_seen_at: "2026-05-14T10:15:00Z",
@@ -482,6 +554,14 @@ const demoRows: AdminUserRow[] = [
     blacklist_reason: "",
     blacklisted_at: null,
     plan: "free",
+    subscription_plan: "",
+    subscription_cycle: "",
+    subscription_seats: 1,
+    subscription_amount_inr: 0,
+    subscription_started_at: null,
+    subscription_expires_at: null,
+    is_demo_account: false,
+    demo_plan: "",
     enterprise_enabled_at: null,
     enterprise_owner_id: "demo-enterprise-owner",
     enterprise_member_role: "broker",
@@ -522,7 +602,6 @@ export default function AdminPage() {
   const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [forceDemoPreview, setForceDemoPreview] = useState(false);
 
   const [resetEmail, setResetEmail] = useState("");
   const [resetPassword, setResetPassword] = useState("");
@@ -539,6 +618,18 @@ export default function AdminPage() {
   const [planValue, setPlanValue] = useState<"free" | "enterprise" | "builder">("enterprise");
   const [planBusy, setPlanBusy] = useState(false);
   const [planMsg, setPlanMsg] = useState<string | null>(null);
+  const [demoForm, setDemoForm] = useState({
+    email: "",
+    password: "",
+    full_name: "",
+    company: "",
+    city: "",
+    demo_plan: "solo" as "solo" | "enterprise" | "builder",
+    employee_limit: 5
+  });
+  const [demoBusy, setDemoBusy] = useState(false);
+  const [demoMsg, setDemoMsg] = useState<string | null>(null);
+  const [demoDeleteBusyId, setDemoDeleteBusyId] = useState<string | null>(null);
   const [unlockEmail, setUnlockEmail] = useState("");
   const [unlockBusy, setUnlockBusy] = useState(false);
   const [unlockMsg, setUnlockMsg] = useState<string | null>(null);
@@ -574,24 +665,16 @@ export default function AdminPage() {
     store_admin_password_as_hash: true
   });
 
-  const hasLiveSubscriptionData = Boolean(
-    subscriptionAnalytics &&
-      (subscriptionAnalytics.tracked_subscriptions > 0 ||
-        subscriptionAnalytics.timeline.some((item) => item.total > 0))
+  const showDemoPreview = false;
+  const displayRows = rows;
+  const displayEnterprises = enterprises;
+  const displaySecurity = security;
+  const displayCompliance = compliance;
+  const displaySubscriptionAnalytics = subscriptionAnalytics;
+  const displayAuditRows = auditRows;
+  const activeDemoAccounts = rows.filter(
+    (row) => row.subscription_plan === "demo" && !row.enterprise_owner_id
   );
-  const autoDemoPreview =
-    !loading &&
-    rows.length === 0 &&
-    enterprises.length === 0 &&
-    auditRows.length === 0 &&
-    !hasLiveSubscriptionData;
-  const showDemoPreview = forceDemoPreview || autoDemoPreview;
-  const displayRows = showDemoPreview ? demoRows : rows;
-  const displayEnterprises = showDemoPreview ? demoEnterprises : enterprises;
-  const displaySecurity = showDemoPreview ? demoSecurity : security;
-  const displayCompliance = showDemoPreview ? demoCompliance : compliance;
-  const displaySubscriptionAnalytics = showDemoPreview ? demoSubscriptionAnalytics : subscriptionAnalytics;
-  const displayAuditRows = showDemoPreview ? demoAuditRows : auditRows;
 
   async function loadEnterpriseDetails(nextId: string, enterpriseRows?: EnterpriseDetail[]) {
     if (!nextId) {
@@ -812,9 +895,6 @@ export default function AdminPage() {
           <div className="muted">Users, access, and enterprise oversight.</div>
         </div>
         <div className="row">
-          <button className="btn ghost" onClick={() => setForceDemoPreview((value) => !value)} type="button">
-            {showDemoPreview ? "Hide demo preview" : "Show demo preview"}
-          </button>
           <button className="btn ghost" onClick={() => void load()} type="button">
             Refresh
           </button>
@@ -823,8 +903,6 @@ export default function AdminPage() {
 
       {error ? <div className="alert">{error}</div> : null}
       {loading ? <div className="muted">Loading...</div> : null}
-
-      {showDemoPreview ? <div className="alert ok">Demo preview mode is active because live admin data is still empty. These sample numbers help you validate the admin layout without changing the real database.</div> : null}
 
       {displaySecurity ? (
         <section className="card premiumPanel">
@@ -1319,6 +1397,187 @@ export default function AdminPage() {
             {planBusy ? "Saving..." : "Apply"}
           </button>
         </form>
+      </section>
+
+      <section className="card">
+        <div className="cardTitle">Create 5-day demo account</div>
+        <div className="muted">
+          Admin can create a real demo login for 5 days. When the demo period expires, the account and its CRM data are deleted automatically on the backend.
+        </div>
+        <form
+          className="form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!demoForm.email.trim() || demoForm.password.trim().length < 8) return;
+            setDemoBusy(true);
+            setDemoMsg(null);
+            try {
+              await api<{ ok: boolean }>("/admin/demo-accounts", {
+                method: "POST",
+                body: JSON.stringify(demoForm)
+              });
+              setDemoMsg("5-day demo account created.");
+              setDemoForm({
+                email: "",
+                password: "",
+                full_name: "",
+                company: "",
+                city: "",
+                demo_plan: "solo",
+                employee_limit: 5
+              });
+              await load();
+            } catch (err) {
+              setDemoMsg(err instanceof Error ? err.message : "Could not create demo account");
+            } finally {
+              setDemoBusy(false);
+            }
+          }}
+        >
+          <div className="grid2">
+            <label>
+              Demo email
+              <input
+                value={demoForm.email}
+                onChange={(e) => setDemoForm((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="demo-user@example.com"
+              />
+            </label>
+            <label>
+              Demo password
+              <input
+                value={demoForm.password}
+                onChange={(e) => setDemoForm((prev) => ({ ...prev, password: e.target.value }))}
+                placeholder="Minimum 8 characters"
+                type="password"
+              />
+            </label>
+          </div>
+          <div className="grid2">
+            <label>
+              Full name
+              <input
+                value={demoForm.full_name}
+                onChange={(e) => setDemoForm((prev) => ({ ...prev, full_name: e.target.value }))}
+                placeholder="Optional"
+              />
+            </label>
+            <label>
+              Demo type
+              <select
+                value={demoForm.demo_plan}
+                onChange={(e) =>
+                  setDemoForm((prev) => ({
+                    ...prev,
+                    demo_plan: (e.target.value as "solo" | "enterprise" | "builder") || "solo",
+                    employee_limit:
+                      e.target.value === "solo" ? 0 : Math.max(1, prev.employee_limit || 5)
+                  }))
+                }
+              >
+                <option value="solo">Solo</option>
+                <option value="enterprise">Enterprise</option>
+                <option value="builder">Builder</option>
+              </select>
+            </label>
+          </div>
+          <div className="grid2">
+            <label>
+              Company
+              <input
+                value={demoForm.company}
+                onChange={(e) => setDemoForm((prev) => ({ ...prev, company: e.target.value }))}
+                placeholder="Optional"
+              />
+            </label>
+            <label>
+              City
+              <input
+                value={demoForm.city}
+                onChange={(e) => setDemoForm((prev) => ({ ...prev, city: e.target.value }))}
+                placeholder="Optional"
+              />
+            </label>
+          </div>
+          {demoForm.demo_plan !== "solo" ? (
+            <label>
+              Employee limit
+              <input
+                value={demoForm.employee_limit}
+                onChange={(e) =>
+                  setDemoForm((prev) => ({ ...prev, employee_limit: Math.max(1, Number(e.target.value) || 1) }))
+                }
+                type="number"
+                min={1}
+              />
+            </label>
+          ) : null}
+          {demoMsg ? <div className="alert ok">{demoMsg}</div> : null}
+          <button className="btn" type="submit" disabled={demoBusy || !demoForm.email.trim() || demoForm.password.trim().length < 8}>
+            {demoBusy ? "Creating..." : "Create 5-day demo account"}
+          </button>
+        </form>
+
+        <div className="tableWrap" style={{ marginTop: 16 }}>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Demo type</th>
+                <th>Name</th>
+                <th>Company</th>
+                <th>Created</th>
+                <th>Expires</th>
+                <th>Days left</th>
+                <th>Employee limit</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeDemoAccounts.map((row) => (
+                <tr key={row.id}>
+                  <td className="tdTitle">{row.email}</td>
+                  <td>{demoPlanLabel(row)}</td>
+                  <td>{row.full_name || "-"}</td>
+                  <td>{row.company || "-"}</td>
+                  <td>{fmtDt(row.subscription_started_at)}</td>
+                  <td>{fmtDt(row.subscription_expires_at)}</td>
+                  <td>{demoDaysRemaining(row.subscription_expires_at)}</td>
+                  <td>{row.plan === "free" ? "-" : row.employee_limit}</td>
+                  <td>
+                    <button
+                      className="btn ghost"
+                      type="button"
+                      onClick={async () => {
+                        setDemoDeleteBusyId(row.id);
+                        setDemoMsg(null);
+                        try {
+                          await api<{ ok: boolean }>(`/admin/demo-accounts/${row.id}`, { method: "DELETE" });
+                          setDemoMsg(`Deleted demo account ${row.email}.`);
+                          await load();
+                        } catch (err) {
+                          setDemoMsg(err instanceof Error ? err.message : "Could not delete demo account");
+                        } finally {
+                          setDemoDeleteBusyId(null);
+                        }
+                      }}
+                      disabled={demoDeleteBusyId === row.id}
+                    >
+                      {demoDeleteBusyId === row.id ? "Deleting..." : "Delete now"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!activeDemoAccounts.length ? (
+                <tr>
+                  <td colSpan={9} className="muted">
+                    No active 5-day demo accounts yet.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="card">
