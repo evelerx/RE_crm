@@ -547,15 +547,29 @@ def users(
     online_cutoff = now - timedelta(minutes=10)
 
     user_list = session.exec(select(User).order_by(User.created_at.desc())).all()
+    user_ids = [u.id for u in user_list]
+    profiles = session.exec(select(Profile).where(Profile.owner_id.in_(user_ids))).all() if user_ids else []
+    profile_by_owner = {profile.owner_id: profile for profile in profiles}
+    employee_counts: dict[UUID, int] = {}
+    for user in user_list:
+        owner_id = getattr(user, "enterprise_owner_id", None)
+        if owner_id:
+          employee_counts[owner_id] = employee_counts.get(owner_id, 0) + 1
     out: List[dict] = []
     for u in user_list:
         last_seen_at: Optional[datetime] = _normalize_db_datetime(u.last_seen_at)
         is_online = bool(last_seen_at and last_seen_at >= online_cutoff)
+        profile = profile_by_owner.get(u.id)
 
         out.append(
             {
                 "id": str(u.id),
                 "email": u.email,
+                "full_name": profile.full_name if profile else "",
+                "phone": profile.phone if profile else "",
+                "whatsapp": profile.whatsapp if profile else "",
+                "company": profile.company if profile else "",
+                "city": profile.city if profile else "",
                 "created_at": u.created_at,
                 "last_login_at": u.last_login_at,
                 "last_seen_at": u.last_seen_at,
@@ -568,6 +582,7 @@ def users(
                 "enterprise_owner_id": str(getattr(u, "enterprise_owner_id", "") or ""),
                 "enterprise_member_role": getattr(u, "enterprise_member_role", "") or "",
                 "employee_limit": int(getattr(u, "employee_limit", 0) or 0),
+                "employee_count": employee_counts.get(u.id, 0),
                 "llm_provider": getattr(u, "llm_provider", "") or "",
                 "llm_model": getattr(u, "llm_model", "") or "",
                 "llm_allocated_at": getattr(u, "llm_allocated_at", None),

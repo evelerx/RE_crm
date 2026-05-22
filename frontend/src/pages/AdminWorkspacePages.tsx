@@ -327,7 +327,9 @@ export function AdminOwnerDealsPage() {
 }
 
 export function AdminOwnerContactsPage() {
-  const { owners, loading, error, reload } = useAdminWorkspaceData();
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [expandedOwnerId, setExpandedOwnerId] = useState<string | null>(null);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -342,37 +344,70 @@ export function AdminOwnerContactsPage() {
     city: "",
   });
 
-  const groupedOwners = useMemo(() => {
+  async function loadUsers() {
+    setLoading(true);
+    setError(null);
+    try {
+      const rows = await api<any[]>("/admin/users");
+      setUsers(rows);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load CRM users");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadUsers();
+  }, []);
+
+  const topLevelUsers = useMemo(() => {
+    const employeeMap = new Map<string, any[]>();
+    for (const user of users) {
+      if (user.enterprise_owner_id) {
+        const existing = employeeMap.get(user.enterprise_owner_id) ?? [];
+        existing.push(user);
+        employeeMap.set(user.enterprise_owner_id, existing);
+      }
+    }
+
     const query = search.trim().toLowerCase();
-    return owners.filter((owner) => {
-      if (!query) return true;
-      const ownerText = [
-        owner.owner_full_name,
-        owner.owner_phone,
-        owner.owner_whatsapp,
-        owner.owner_email,
-        owner.company,
-        owner.company_city,
-      ]
-        .join(" ")
-        .toLowerCase();
-      const employeeMatch = (owner.employees ?? []).some((employee) =>
-        [
-          employee.full_name,
-          employee.phone,
-          employee.whatsapp,
-          employee.email,
-          employee.company,
-          employee.city,
-          employee.role_label,
+    return users
+      .filter((user) => !user.enterprise_owner_id)
+      .filter((user) => {
+        if (!query) return true;
+        const ownText = [
+          user.full_name,
+          user.phone,
+          user.whatsapp,
+          user.email,
+          user.company,
+          user.city,
+          user.plan,
         ]
           .join(" ")
-          .toLowerCase()
-          .includes(query)
-      );
-      return ownerText.includes(query) || employeeMatch;
-    });
-  }, [owners, search]);
+          .toLowerCase();
+        const employeeMatch = (employeeMap.get(user.id) ?? []).some((employee) =>
+          [
+            employee.full_name,
+            employee.phone,
+            employee.whatsapp,
+            employee.email,
+            employee.company,
+            employee.city,
+            employee.enterprise_member_role,
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        );
+        return ownText.includes(query) || employeeMatch;
+      })
+      .map((user) => ({
+        ...user,
+        employees: (employeeMap.get(user.id) ?? []).sort((a, b) => String(a.full_name || a.email).localeCompare(String(b.full_name || b.email))),
+      }));
+  }, [users, search]);
 
   function startEdit(user: {
     id: string;
@@ -423,7 +458,7 @@ export function AdminOwnerContactsPage() {
         }),
       });
       setSaveMsg("Contact details updated.");
-      await reload();
+      await loadUsers();
       setEditingUserId(null);
     } catch (e) {
       setSaveErr(e instanceof Error ? e.message : "Failed to update contact details");
@@ -447,7 +482,7 @@ export function AdminOwnerContactsPage() {
             aria-label="Search owners and employees"
             style={{ minWidth: 260 }}
           />
-          <button className="btn ghost" onClick={() => void reload()} type="button">Refresh</button>
+          <button className="btn ghost" onClick={() => void loadUsers()} type="button">Refresh</button>
         </div>
       </div>
 
@@ -456,68 +491,76 @@ export function AdminOwnerContactsPage() {
       {saveErr ? <div className="alert">{saveErr}</div> : null}
       {saveMsg ? <div className="alert ok">{saveMsg}</div> : null}
 
-      {groupedOwners.length ? (
-        groupedOwners.map((owner) => {
-          const ownerKey = owner.enterprise_owner_id;
-          const isExpanded = expandedOwnerId === ownerKey;
-          const ownerEditId = `owner-${owner.enterprise_owner_id}`;
-          return (
-            <section key={owner.enterprise_owner_id} className="card">
-              <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <div className="cardTitle" style={{ margin: 0 }}>
-                  {owner.owner_full_name || owner.owner_email}
-                </div>
-                <button
-                  className="btn ghost"
-                  type="button"
-                  onClick={() => setExpandedOwnerId(isExpanded ? null : ownerKey)}
-                  aria-expanded={isExpanded}
-                >
-                  {isExpanded ? "Hide employees" : `Show employees (${owner.employee_count || 0})`}
-                </button>
-              </div>
-
-              <div className="tableWrap tableWrapWide">
-                <table className="table tableWide">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>User type</th>
-                      <th>Phone</th>
-                      <th>WhatsApp</th>
-                      <th>Email</th>
-                      <th>Company</th>
-                      <th>City</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="tdTitle">{owner.owner_full_name || "-"}</td>
-                      <td>Subscription owner</td>
-                      <td>{owner.owner_phone || "-"}</td>
-                      <td>{owner.owner_whatsapp || "-"}</td>
-                      <td>{owner.owner_email || "-"}</td>
-                      <td>{owner.company || "-"}</td>
-                      <td>{owner.company_city || "-"}</td>
+      {topLevelUsers.length ? (
+        <div className="tableWrap tableWrapWide">
+          <table className="table tableWide">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>User type</th>
+                <th>Phone</th>
+                <th>WhatsApp</th>
+                <th>Email</th>
+                <th>Company</th>
+                <th>City</th>
+                <th>Employees</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topLevelUsers.map((user) => {
+                const isOwner = !user.enterprise_owner_id && ["enterprise", "builder"].includes((user.plan || "").toLowerCase());
+                const isExpanded = expandedOwnerId === user.id;
+                const userType =
+                  user.is_admin_account ? "Admin" :
+                  isOwner ? "Subscription owner" :
+                  ((user.plan || "free").toLowerCase() === "free" ? "Solo user" : user.plan);
+                return (
+                  <>
+                    <tr key={user.id}>
+                      <td className="tdTitle">{user.full_name || "-"}</td>
+                      <td>{userType}</td>
+                      <td>{user.phone || "-"}</td>
+                      <td>{user.whatsapp || "-"}</td>
+                      <td>{user.email || "-"}</td>
+                      <td>{user.company || "-"}</td>
+                      <td>{user.city || "-"}</td>
                       <td>
-                        <button className="btn ghost" type="button" onClick={() => startEdit({
-                          id: owner.enterprise_owner_id,
-                          full_name: owner.owner_full_name,
-                          phone: owner.owner_phone,
-                          whatsapp: owner.owner_whatsapp,
-                          company: owner.company,
-                          city: owner.company_city,
-                        })}>
+                        {isOwner ? (
+                          <button
+                            className="btn ghost"
+                            type="button"
+                            onClick={() => setExpandedOwnerId(isExpanded ? null : user.id)}
+                            aria-expanded={isExpanded}
+                          >
+                            {isExpanded ? "Hide employees" : `Show employees (${user.employee_count || 0})`}
+                          </button>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          className="btn ghost"
+                          type="button"
+                          onClick={() => startEdit({
+                            id: user.id,
+                            full_name: user.full_name,
+                            phone: user.phone,
+                            whatsapp: user.whatsapp,
+                            company: user.company,
+                            city: user.city,
+                          })}
+                        >
                           Edit
                         </button>
                       </td>
                     </tr>
-                    {editingUserId === owner.enterprise_owner_id ? (
-                      <tr>
-                        <td colSpan={8}>
+                    {editingUserId === user.id ? (
+                      <tr key={`${user.id}-edit`}>
+                        <td colSpan={9}>
                           <div className="card" style={{ margin: 0 }}>
-                            <div className="cardTitle">Edit owner contact details</div>
+                            <div className="cardTitle">Edit contact details</div>
                             <div className="formGrid two">
                               <label>
                                 Full name
@@ -541,7 +584,7 @@ export function AdminOwnerContactsPage() {
                               </label>
                             </div>
                             <div className="row">
-                              <button className="btn" type="button" disabled={saving} onClick={() => void saveUser(owner.enterprise_owner_id)}>
+                              <button className="btn" type="button" disabled={saving} onClick={() => void saveUser(user.id)}>
                                 {saving ? "Saving..." : "Save"}
                               </button>
                               <button className="btn ghost" type="button" disabled={saving} onClick={stopEdit}>Cancel</button>
@@ -550,68 +593,45 @@ export function AdminOwnerContactsPage() {
                         </td>
                       </tr>
                     ) : null}
-                    {isExpanded ? (owner.employees ?? []).map((employee) => (
-                      <tr key={employee.id}>
+                    {isOwner && isExpanded ? (user.employees ?? []).map((employee: any) => (
+                      <tr key={`${user.id}-${employee.id}`}>
                         <td className="tdTitle">{employee.full_name || "-"}</td>
-                        <td>{employee.role_label || "employee"}</td>
+                        <td>{employee.enterprise_member_role || "employee"}</td>
                         <td>{employee.phone || "-"}</td>
                         <td>{employee.whatsapp || "-"}</td>
                         <td>{employee.email || "-"}</td>
-                        <td>{employee.company || owner.company || "-"}</td>
-                        <td>{employee.city || owner.company_city || "-"}</td>
+                        <td>{employee.company || user.company || "-"}</td>
+                        <td>{employee.city || user.city || "-"}</td>
+                        <td>-</td>
                         <td>
-                          <button className="btn ghost" type="button" onClick={() => startEdit(employee)}>Edit</button>
+                          <button
+                            className="btn ghost"
+                            type="button"
+                            onClick={() => startEdit({
+                              id: employee.id,
+                              full_name: employee.full_name,
+                              phone: employee.phone,
+                              whatsapp: employee.whatsapp,
+                              company: employee.company,
+                              city: employee.city,
+                            })}
+                          >
+                            Edit
+                          </button>
                         </td>
                       </tr>
                     )) : null}
-                    {isExpanded && editingUserId && owner.employees?.some((employee) => employee.id === editingUserId) ? (
-                      <tr>
-                        <td colSpan={8}>
-                          <div className="card" style={{ margin: 0 }}>
-                            <div className="cardTitle">Edit employee contact details</div>
-                            <div className="formGrid two">
-                              <label>
-                                Full name
-                                <input value={draft.full_name} onChange={(e) => setDraft({ ...draft, full_name: e.target.value })} />
-                              </label>
-                              <label>
-                                Phone
-                                <input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
-                              </label>
-                              <label>
-                                WhatsApp
-                                <input value={draft.whatsapp} onChange={(e) => setDraft({ ...draft, whatsapp: e.target.value })} />
-                              </label>
-                              <label>
-                                Company
-                                <input value={draft.company} onChange={(e) => setDraft({ ...draft, company: e.target.value })} />
-                              </label>
-                              <label>
-                                City
-                                <input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} />
-                              </label>
-                            </div>
-                            <div className="row">
-                              <button className="btn" type="button" disabled={saving} onClick={() => void saveUser(editingUserId)}>
-                                {saving ? "Saving..." : "Save"}
-                              </button>
-                              <button className="btn ghost" type="button" disabled={saving} onClick={stopEdit}>Cancel</button>
-                            </div>
-                          </div>
-                        </td>
+                    {isOwner && isExpanded && !(user.employees?.length) ? (
+                      <tr key={`${user.id}-empty`}>
+                        <td colSpan={9} className="muted">No employee contact details found for this subscription owner.</td>
                       </tr>
                     ) : null}
-                    {isExpanded && !(owner.employees?.length) ? (
-                      <tr>
-                        <td colSpan={8} className="muted">No employee contact details found for this subscription owner.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          );
-        })
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="muted">No CRM user contact details found for the current search.</div>
       )}
