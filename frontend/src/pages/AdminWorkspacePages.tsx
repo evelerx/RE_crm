@@ -390,11 +390,6 @@ export function AdminOwnerPipelinePage() {
                 if (!stageRows.length) return null;
                 return (
                   <Fragment key={stage.key}>
-                    <tr key={`${stage.key}-group`} className="groupRow">
-                      <td colSpan={7}>
-                        {stage.label} ({stageRows.length})
-                      </td>
-                    </tr>
                     {stageRows.map((row) => {
                       const isExpanded = expandedOwnerId === row.id;
                       const revealedRera = revealedReraByUserId[row.id];
