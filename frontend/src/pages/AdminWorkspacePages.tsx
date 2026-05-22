@@ -327,118 +327,116 @@ export function AdminOwnerDealsPage() {
 }
 
 export function AdminOwnerContactsPage() {
-  const { owners, selectedOwnerId, setSelectedOwnerId, loading, error, reload } = useAdminWorkspaceData();
-  const selectedOwner = owners.find((owner) => owner.enterprise_owner_id === selectedOwnerId) ?? null;
-  const [showEmployees, setShowEmployees] = useState(false);
+  const { owners, loading, error, reload } = useAdminWorkspaceData();
+  const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    setShowEmployees(false);
-  }, [selectedOwnerId]);
+  const userRows = useMemo(() => {
+    const rows = owners.flatMap((owner) => {
+      const ownerRow = {
+        id: `owner-${owner.enterprise_owner_id}`,
+        full_name: owner.owner_full_name || "-",
+        phone: owner.owner_phone || "-",
+        whatsapp: owner.owner_whatsapp || "-",
+        email: owner.owner_email || "-",
+        company: owner.company || "-",
+        city: owner.company_city || "-",
+        user_type: "Subscription owner",
+        subscription_owner: owner.owner_email || "-",
+      };
+
+      const employeeRows = (owner.employees ?? []).map((employee) => ({
+        id: employee.id,
+        full_name: employee.full_name || "-",
+        phone: employee.phone || "-",
+        whatsapp: employee.whatsapp || "-",
+        email: employee.email || "-",
+        company: employee.company || owner.company || "-",
+        city: employee.city || owner.company_city || "-",
+        user_type: employee.role_label || "employee",
+        subscription_owner: owner.owner_email || "-",
+      }));
+
+      return [ownerRow, ...employeeRows];
+    });
+
+    const query = search.trim().toLowerCase();
+    if (!query) return rows;
+
+    return rows.filter((row) =>
+      [
+        row.full_name,
+        row.phone,
+        row.whatsapp,
+        row.email,
+        row.company,
+        row.city,
+        row.user_type,
+        row.subscription_owner,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [owners, search]);
 
   return (
     <div className="page">
       <div className="pageHeader">
         <div>
           <div className="h1">Contacts</div>
-          <div className="muted">Subscription owner contact details visible to admin for account communication.</div>
+          <div className="muted">All CRM user contact details visible to admin for account communication. Client contact data is excluded from this page.</div>
         </div>
         <div className="row">
-          <OwnerSelector owners={owners} selectedOwnerId={selectedOwnerId} onChange={setSelectedOwnerId} />
-          <button className="btn ghost" onClick={() => void reload(selectedOwnerId)} type="button">Refresh</button>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search owners and employees"
+            aria-label="Search owners and employees"
+            style={{ minWidth: 260 }}
+          />
+          <button className="btn ghost" onClick={() => void reload()} type="button">Refresh</button>
         </div>
       </div>
 
       {error ? <div className="alert">{error}</div> : null}
-      {loading ? <div className="muted">Loading owner contacts...</div> : null}
+      {loading ? <div className="muted">Loading CRM user contacts...</div> : null}
 
-      <div className="tableWrap">
-        <table className="table">
+      <div className="tableWrap tableWrapWide">
+        <table className="table tableWide">
           <thead>
             <tr>
-              <th>Owner name</th>
+              <th>Name</th>
+              <th>User type</th>
               <th>Phone</th>
               <th>WhatsApp</th>
               <th>Email</th>
               <th>Company</th>
               <th>City</th>
-              <th>Employee limit</th>
-              <th>Employee count</th>
-              <th>Employees</th>
+              <th>Subscription owner</th>
             </tr>
           </thead>
           <tbody>
-            {selectedOwner ? (
-              <tr>
-                <td className="tdTitle">{selectedOwner.owner_full_name || "-"}</td>
-                <td>{selectedOwner.owner_phone || "-"}</td>
-                <td>{selectedOwner.owner_whatsapp || "-"}</td>
-                <td>{selectedOwner.owner_email || "-"}</td>
-                <td>{selectedOwner.company || "-"}</td>
-                <td>{selectedOwner.company_city || "-"}</td>
-                <td>{selectedOwner.employee_limit || 0}</td>
-                <td>{selectedOwner.employee_count || 0}</td>
-                <td>
-                  <button
-                    className="btn ghost"
-                    onClick={() => setShowEmployees((value) => !value)}
-                    type="button"
-                    aria-expanded={showEmployees}
-                    aria-label={showEmployees ? "Hide employee contacts" : "Show employee contacts"}
-                  >
-                    {showEmployees ? "↓" : "→"}
-                  </button>
-                </td>
-              </tr>
+            {userRows.length ? (
+              userRows.map((row) => (
+                <tr key={row.id}>
+                  <td className="tdTitle">{row.full_name}</td>
+                  <td>{row.user_type}</td>
+                  <td>{row.phone}</td>
+                  <td>{row.whatsapp}</td>
+                  <td>{row.email}</td>
+                  <td>{row.company}</td>
+                  <td>{row.city}</td>
+                  <td>{row.subscription_owner}</td>
+                </tr>
+              ))
             ) : (
               <tr>
-                <td colSpan={9} className="muted">No subscription owner selected.</td>
+                <td colSpan={8} className="muted">No CRM user contact details found for the current search.</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-
-      {selectedOwner && showEmployees ? (
-        <section className="card">
-          <div className="cardTitle">Employee contacts</div>
-          <div className="muted">
-            Team contact details under {selectedOwner.owner_email} visible to admin for support and oversight.
-          </div>
-          <div className="tableWrap tableWrapWide">
-            <table className="table tableWide">
-              <thead>
-                <tr>
-                  <th>Employee name</th>
-                  <th>Role</th>
-                  <th>Phone</th>
-                  <th>WhatsApp</th>
-                  <th>Email</th>
-                  <th>Company</th>
-                  <th>City</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedOwner.employees?.map((employee) => (
-                  <tr key={employee.id}>
-                    <td className="tdTitle">{employee.full_name || "-"}</td>
-                    <td>{employee.role_label || "employee"}</td>
-                    <td>{employee.phone || "-"}</td>
-                    <td>{employee.whatsapp || "-"}</td>
-                    <td>{employee.email || "-"}</td>
-                    <td>{employee.company || "-"}</td>
-                    <td>{employee.city || "-"}</td>
-                  </tr>
-                ))}
-                {!selectedOwner.employees?.length ? (
-                  <tr>
-                    <td colSpan={7} className="muted">No employee contact details found for this subscription owner.</td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }
