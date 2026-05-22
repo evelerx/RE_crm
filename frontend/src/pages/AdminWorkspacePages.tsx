@@ -467,6 +467,26 @@ export function AdminOwnerContactsPage() {
     }
   }
 
+  async function deleteUserProfile(user: { id: string; email?: string }) {
+    const confirmed = window.confirm(`Clear saved contact details for ${user.email || "this user"}?`);
+    if (!confirmed) return;
+    setSaving(true);
+    setSaveErr(null);
+    setSaveMsg(null);
+    try {
+      await api(`/admin/users/${user.id}/profile`, {
+        method: "DELETE",
+      });
+      setSaveMsg("Contact details cleared.");
+      await loadUsers();
+      if (editingUserId === user.id) setEditingUserId(null);
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : "Failed to clear contact details");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="page">
       <div className="pageHeader">
@@ -540,20 +560,30 @@ export function AdminOwnerContactsPage() {
                         )}
                       </td>
                       <td>
-                        <button
-                          className="btn ghost"
-                          type="button"
-                          onClick={() => startEdit({
-                            id: user.id,
-                            full_name: user.full_name,
-                            phone: user.phone,
-                            whatsapp: user.whatsapp,
-                            company: user.company,
-                            city: user.city,
-                          })}
-                        >
-                          Edit
-                        </button>
+                        <div className="row">
+                          <button
+                            className="btn ghost"
+                            type="button"
+                            onClick={() => startEdit({
+                              id: user.id,
+                              full_name: user.full_name,
+                              phone: user.phone,
+                              whatsapp: user.whatsapp,
+                              company: user.company,
+                              city: user.city,
+                            })}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn ghost"
+                            type="button"
+                            disabled={saving}
+                            onClick={() => void deleteUserProfile({ id: user.id, email: user.email })}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     {editingUserId === user.id ? (
@@ -604,20 +634,30 @@ export function AdminOwnerContactsPage() {
                         <td>{employee.city || user.city || "-"}</td>
                         <td>-</td>
                         <td>
-                          <button
-                            className="btn ghost"
-                            type="button"
-                            onClick={() => startEdit({
-                              id: employee.id,
-                              full_name: employee.full_name,
-                              phone: employee.phone,
-                              whatsapp: employee.whatsapp,
-                              company: employee.company,
-                              city: employee.city,
-                            })}
-                          >
-                            Edit
-                          </button>
+                          <div className="row">
+                            <button
+                              className="btn ghost"
+                              type="button"
+                              onClick={() => startEdit({
+                                id: employee.id,
+                                full_name: employee.full_name,
+                                phone: employee.phone,
+                                whatsapp: employee.whatsapp,
+                                company: employee.company,
+                                city: employee.city,
+                              })}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="btn ghost"
+                              type="button"
+                              disabled={saving}
+                              onClick={() => void deleteUserProfile({ id: employee.id, email: employee.email })}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )) : null}

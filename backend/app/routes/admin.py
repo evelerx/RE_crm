@@ -669,11 +669,16 @@ def update_user_profile(
         profile.updated_at = datetime.utcnow()
 
     session.add(profile)
+    owner_scope = (
+        target_user.id
+        if (getattr(target_user, "plan", "free") or "free") in {"enterprise", "builder"}
+        else getattr(target_user, "enterprise_owner_id", None)
+    )
     log_audit_event(
         session,
         actor=admin_user,
-        target=target_user,
-        enterprise_owner=target_user if (getattr(target_user, "plan", "free") or "free") in {"enterprise", "builder"} else session.get(User, getattr(target_user, "enterprise_owner_id", None)) if getattr(target_user, "enterprise_owner_id", None) else None,
+        target_user_id=target_user.id,
+        enterprise_owner_id=owner_scope,
         kind="admin.profile_update",
         summary="Admin updated CRM user contact profile",
         detail=f"email={target_user.email}; company={(payload.company or '').strip()}",
@@ -691,6 +696,53 @@ def update_user_profile(
         "company": profile.company or "",
         "city": profile.city or "",
     }
+
+
+@router.delete("/users/{user_id}/profile")
+def delete_user_profile(
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> dict:
+    target_user = session.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    profile = session.exec(select(Profile).where(Profile.owner_id == user_id)).first()
+    if not profile:
+        return {"ok": True, "user_id": str(user_id), "email": target_user.email}
+
+    profile.full_name = ""
+    profile.phone = None
+    profile.whatsapp = None
+    profile.company = ""
+    profile.city = ""
+    profile.areas_served = ""
+    profile.specialization = ""
+    profile.languages = ""
+    profile.bio = ""
+    profile.rera_id = encrypt_if_configured("")
+    profile.pan = encrypt_if_configured("")
+    profile.gstin = encrypt_if_configured("")
+    profile.updated_at = datetime.utcnow()
+    session.add(profile)
+
+    owner_scope = (
+        target_user.id
+        if (getattr(target_user, "plan", "free") or "free") in {"enterprise", "builder"}
+        else getattr(target_user, "enterprise_owner_id", None)
+    )
+    log_audit_event(
+        session,
+        actor=admin_user,
+        target_user_id=target_user.id,
+        enterprise_owner_id=owner_scope,
+        kind="admin.profile_delete",
+        summary="Admin cleared CRM user contact profile",
+        detail=f"email={target_user.email}",
+    )
+    _commit_or_http(session, "Unable to clear user profile")
+    return {"ok": True, "user_id": str(user_id), "email": target_user.email}
 
 
 @router.get("/demo-requests")
