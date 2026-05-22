@@ -830,6 +830,8 @@ export default function AdminPage() {
             : "Solo user";
   const aiAssignedRows = displayRows.filter((row) => hasEffectiveAiAccess(row));
   const aiUnassignedRows = displayRows.filter((row) => !hasEffectiveAiAccess(row));
+  const ownerSelectableRows = displayRows.filter((row) => !row.is_admin_account && !row.enterprise_owner_id);
+  const aiSelectableRows = displayRows.filter((row) => !row.is_demo_account);
   const filteredAiUnassignedRows = aiUnassignedRows.filter((row) => {
     const q = aiAssignmentSearch.trim().toLowerCase();
     if (!q) return true;
@@ -1404,10 +1406,17 @@ export default function AdminPage() {
           }}
         >
           <div className="grid2">
-            <label>
-              User email
-              <input value={planEmail} onChange={(e) => setPlanEmail(e.target.value)} placeholder="owner@example.com" list="admin-user-emails" />
-            </label>
+              <label>
+                User email
+                <select value={planEmail} onChange={(e) => setPlanEmail(e.target.value)}>
+                  <option value="">Select owner account</option>
+                  {ownerSelectableRows.map((row) => (
+                    <option key={row.id} value={row.email}>
+                      {row.email}{row.full_name ? ` · ${row.full_name}` : ""}{row.company ? ` · ${row.company}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
             <label>
               Plan
               <select
@@ -1638,10 +1647,19 @@ export default function AdminPage() {
           }}
         >
           <div className="grid2">
-            <label>
-              Organization owner email
-              <input value={limitEmail} onChange={(e) => setLimitEmail(e.target.value)} placeholder="owner@example.com" list="admin-user-emails" />
-            </label>
+              <label>
+                Organization owner email
+                <select value={limitEmail} onChange={(e) => setLimitEmail(e.target.value)}>
+                  <option value="">Select organization owner</option>
+                  {ownerSelectableRows
+                    .filter((row) => row.plan === "enterprise" || row.plan === "builder")
+                    .map((row) => (
+                      <option key={row.id} value={row.email}>
+                        {row.email}{row.company ? ` · ${row.company}` : ""} · {row.plan === "builder" ? "Builder" : "Enterprise"}
+                      </option>
+                    ))}
+                </select>
+              </label>
             <label>
               Employee limit
               <input value={limitValue} onChange={(e) => setLimitValue(Number(e.target.value) || 0)} type="number" min={0} />
@@ -1658,6 +1676,7 @@ export default function AdminPage() {
         <div className="cardTitle">Allocate AI key</div>
         <div className="muted">Assign one API key to a solo user, to yourself as admin, or to an enterprise / builder owner. Team underlings inherit the owner allocation automatically.</div>
         <form
+          id="admin-ai-access-form"
           className="form"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -1688,14 +1707,14 @@ export default function AdminPage() {
           <div className="grid2">
             <label>
               User email
-              <input value={llmEmail} onChange={(e) => setLlmEmail(e.target.value)} placeholder="owner-or-user@example.com" list="admin-user-emails" />
-              <datalist id="admin-user-emails">
-                {rows.map((row) => (
+              <select value={llmEmail} onChange={(e) => setLlmEmail(e.target.value)}>
+                <option value="">Select account for AI access</option>
+                {aiSelectableRows.map((row) => (
                   <option key={row.id} value={row.email}>
-                    {describeAccountType(row)}
+                    {row.email} · {describeAccountType(row)}{row.company ? ` · ${row.company}` : ""}
                   </option>
                 ))}
-              </datalist>
+              </select>
             </label>
             <label>
               Action
