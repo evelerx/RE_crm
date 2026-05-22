@@ -24,10 +24,12 @@ from ..schemas import (
     AdminSetEmployeeLimitRequest,
     AdminSetPlanRequest,
     AdminUnlockUserRequest,
+    ProfileUpsert,
     SupportChatMessageCreate,
     SupportChatMessageRead,
 )
 from ..settings import apply_runtime_settings, current_env_file_path, settings
+from .profile import _validate_profile
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -620,6 +622,60 @@ def enterprise_workspace_detail(
     if not owner or (getattr(owner, "plan", "free") or "free") not in {"enterprise", "builder"}:
         raise HTTPException(status_code=404, detail="Organization owner not found")
     return _enterprise_workspace_payload(session, owner)
+
+
+@router.put("/users/{user_id}/profile")
+def update_user_profile(
+    user_id: UUID,
+    payload: ProfileUpsert,
+    session: Session = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> dict:
+    target_user = session.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    _validate_profile(payload)
+
+    profile = session.exec(select(Profile).where(Profile.owner_id == user_id)).first()
+    if not profile:
+        data = payload.model_dump()
+        data["rera_id"] = encrypt_if_configured(data.get("rera_id") or "")
+        data["pan"] = encrypt_if_configured(data.get("pan") or "")
+        data["gstin"] = encrypt_if_configured(data.get("gstin") or "")
+        profile = Profile(owner_id=user_id, **data)
+    else:
+        data = payload.model_dump()
+        data["rera_id"] = encrypt_if_configured(data.get("rera_id") or "")
+        data["pan"] = encrypt_if_configured(data.get("pan") or "")
+        data["gstin"] = encrypt_if_configured(data.get("gstin") or "")
+        for key, value in data.items():
+            setattr(profile, key, value)
+        profile.updated_at = datetime.utcnow()
+
+    session.add(profile)
+    log_audit_event(
+        session,
+        actor=admin_user,
+        target=target_user,
+        enterprise_owner=target_user if (getattr(target_user, "plan", "free") or "free") in {"enterprise", "builder"} else session.get(User, getattr(target_user, "enterprise_owner_id", None)) if getattr(target_user, "enterprise_owner_id", None) else None,
+        kind="admin.profile_update",
+        summary="Admin updated CRM user contact profile",
+        detail=f"email={target_user.email}; company={(payload.company or '').strip()}",
+    )
+    _commit_or_http(session, "Unable to update user profile")
+    session.refresh(profile)
+
+    return {
+        "ok": True,
+        "user_id": str(user_id),
+        "email": target_user.email,
+        "full_name": profile.full_name or "",
+        "phone": profile.phone or "",
+        "whatsapp": profile.whatsapp or "",
+        "company": profile.company or "",
+        "city": profile.city or "",
+    }
 
 
 @router.get("/demo-requests")

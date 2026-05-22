@@ -329,55 +329,108 @@ export function AdminOwnerDealsPage() {
 export function AdminOwnerContactsPage() {
   const { owners, loading, error, reload } = useAdminWorkspaceData();
   const [search, setSearch] = useState("");
+  const [expandedOwnerId, setExpandedOwnerId] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [draft, setDraft] = useState({
+    full_name: "",
+    phone: "",
+    whatsapp: "",
+    company: "",
+    city: "",
+  });
 
-  const userRows = useMemo(() => {
-    const rows = owners.flatMap((owner) => {
-      const ownerRow = {
-        id: `owner-${owner.enterprise_owner_id}`,
-        full_name: owner.owner_full_name || "-",
-        phone: owner.owner_phone || "-",
-        whatsapp: owner.owner_whatsapp || "-",
-        email: owner.owner_email || "-",
-        company: owner.company || "-",
-        city: owner.company_city || "-",
-        user_type: "Subscription owner",
-        subscription_owner: owner.owner_email || "-",
-      };
-
-      const employeeRows = (owner.employees ?? []).map((employee) => ({
-        id: employee.id,
-        full_name: employee.full_name || "-",
-        phone: employee.phone || "-",
-        whatsapp: employee.whatsapp || "-",
-        email: employee.email || "-",
-        company: employee.company || owner.company || "-",
-        city: employee.city || owner.company_city || "-",
-        user_type: employee.role_label || "employee",
-        subscription_owner: owner.owner_email || "-",
-      }));
-
-      return [ownerRow, ...employeeRows];
-    });
-
+  const groupedOwners = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return rows;
-
-    return rows.filter((row) =>
-      [
-        row.full_name,
-        row.phone,
-        row.whatsapp,
-        row.email,
-        row.company,
-        row.city,
-        row.user_type,
-        row.subscription_owner,
+    return owners.filter((owner) => {
+      if (!query) return true;
+      const ownerText = [
+        owner.owner_full_name,
+        owner.owner_phone,
+        owner.owner_whatsapp,
+        owner.owner_email,
+        owner.company,
+        owner.company_city,
       ]
         .join(" ")
-        .toLowerCase()
-        .includes(query)
-    );
+        .toLowerCase();
+      const employeeMatch = (owner.employees ?? []).some((employee) =>
+        [
+          employee.full_name,
+          employee.phone,
+          employee.whatsapp,
+          employee.email,
+          employee.company,
+          employee.city,
+          employee.role_label,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(query)
+      );
+      return ownerText.includes(query) || employeeMatch;
+    });
   }, [owners, search]);
+
+  function startEdit(user: {
+    id: string;
+    full_name?: string;
+    phone?: string;
+    whatsapp?: string;
+    company?: string;
+    city?: string;
+  }) {
+    setEditingUserId(user.id);
+    setSaveMsg(null);
+    setSaveErr(null);
+    setDraft({
+      full_name: user.full_name || "",
+      phone: user.phone || "",
+      whatsapp: user.whatsapp || "",
+      company: user.company || "",
+      city: user.city || "",
+    });
+  }
+
+  function stopEdit() {
+    setEditingUserId(null);
+    setSaveMsg(null);
+    setSaveErr(null);
+  }
+
+  async function saveUser(userId: string) {
+    setSaving(true);
+    setSaveErr(null);
+    setSaveMsg(null);
+    try {
+      await api(`/admin/users/${userId}/profile`, {
+        method: "PUT",
+        body: JSON.stringify({
+          full_name: draft.full_name,
+          phone: draft.phone || null,
+          whatsapp: draft.whatsapp || null,
+          company: draft.company,
+          city: draft.city,
+          areas_served: "",
+          specialization: "",
+          rera_id: "",
+          pan: "",
+          gstin: "",
+          languages: "",
+          bio: "",
+        }),
+      });
+      setSaveMsg("Contact details updated.");
+      await reload();
+      setEditingUserId(null);
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : "Failed to update contact details");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="page">
@@ -400,43 +453,168 @@ export function AdminOwnerContactsPage() {
 
       {error ? <div className="alert">{error}</div> : null}
       {loading ? <div className="muted">Loading CRM user contacts...</div> : null}
+      {saveErr ? <div className="alert">{saveErr}</div> : null}
+      {saveMsg ? <div className="alert ok">{saveMsg}</div> : null}
 
-      <div className="tableWrap tableWrapWide">
-        <table className="table tableWide">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>User type</th>
-              <th>Phone</th>
-              <th>WhatsApp</th>
-              <th>Email</th>
-              <th>Company</th>
-              <th>City</th>
-              <th>Subscription owner</th>
-            </tr>
-          </thead>
-          <tbody>
-            {userRows.length ? (
-              userRows.map((row) => (
-                <tr key={row.id}>
-                  <td className="tdTitle">{row.full_name}</td>
-                  <td>{row.user_type}</td>
-                  <td>{row.phone}</td>
-                  <td>{row.whatsapp}</td>
-                  <td>{row.email}</td>
-                  <td>{row.company}</td>
-                  <td>{row.city}</td>
-                  <td>{row.subscription_owner}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={8} className="muted">No CRM user contact details found for the current search.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {groupedOwners.length ? (
+        groupedOwners.map((owner) => {
+          const ownerKey = owner.enterprise_owner_id;
+          const isExpanded = expandedOwnerId === ownerKey;
+          const ownerEditId = `owner-${owner.enterprise_owner_id}`;
+          return (
+            <section key={owner.enterprise_owner_id} className="card">
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div className="cardTitle" style={{ margin: 0 }}>
+                  {owner.owner_full_name || owner.owner_email}
+                </div>
+                <button
+                  className="btn ghost"
+                  type="button"
+                  onClick={() => setExpandedOwnerId(isExpanded ? null : ownerKey)}
+                  aria-expanded={isExpanded}
+                >
+                  {isExpanded ? "Hide employees" : `Show employees (${owner.employee_count || 0})`}
+                </button>
+              </div>
+
+              <div className="tableWrap tableWrapWide">
+                <table className="table tableWide">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>User type</th>
+                      <th>Phone</th>
+                      <th>WhatsApp</th>
+                      <th>Email</th>
+                      <th>Company</th>
+                      <th>City</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="tdTitle">{owner.owner_full_name || "-"}</td>
+                      <td>Subscription owner</td>
+                      <td>{owner.owner_phone || "-"}</td>
+                      <td>{owner.owner_whatsapp || "-"}</td>
+                      <td>{owner.owner_email || "-"}</td>
+                      <td>{owner.company || "-"}</td>
+                      <td>{owner.company_city || "-"}</td>
+                      <td>
+                        <button className="btn ghost" type="button" onClick={() => startEdit({
+                          id: owner.enterprise_owner_id,
+                          full_name: owner.owner_full_name,
+                          phone: owner.owner_phone,
+                          whatsapp: owner.owner_whatsapp,
+                          company: owner.company,
+                          city: owner.company_city,
+                        })}>
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                    {editingUserId === owner.enterprise_owner_id ? (
+                      <tr>
+                        <td colSpan={8}>
+                          <div className="card" style={{ margin: 0 }}>
+                            <div className="cardTitle">Edit owner contact details</div>
+                            <div className="formGrid two">
+                              <label>
+                                Full name
+                                <input value={draft.full_name} onChange={(e) => setDraft({ ...draft, full_name: e.target.value })} />
+                              </label>
+                              <label>
+                                Phone
+                                <input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
+                              </label>
+                              <label>
+                                WhatsApp
+                                <input value={draft.whatsapp} onChange={(e) => setDraft({ ...draft, whatsapp: e.target.value })} />
+                              </label>
+                              <label>
+                                Company
+                                <input value={draft.company} onChange={(e) => setDraft({ ...draft, company: e.target.value })} />
+                              </label>
+                              <label>
+                                City
+                                <input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} />
+                              </label>
+                            </div>
+                            <div className="row">
+                              <button className="btn" type="button" disabled={saving} onClick={() => void saveUser(owner.enterprise_owner_id)}>
+                                {saving ? "Saving..." : "Save"}
+                              </button>
+                              <button className="btn ghost" type="button" disabled={saving} onClick={stopEdit}>Cancel</button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                    {isExpanded ? (owner.employees ?? []).map((employee) => (
+                      <tr key={employee.id}>
+                        <td className="tdTitle">{employee.full_name || "-"}</td>
+                        <td>{employee.role_label || "employee"}</td>
+                        <td>{employee.phone || "-"}</td>
+                        <td>{employee.whatsapp || "-"}</td>
+                        <td>{employee.email || "-"}</td>
+                        <td>{employee.company || owner.company || "-"}</td>
+                        <td>{employee.city || owner.company_city || "-"}</td>
+                        <td>
+                          <button className="btn ghost" type="button" onClick={() => startEdit(employee)}>Edit</button>
+                        </td>
+                      </tr>
+                    )) : null}
+                    {isExpanded && editingUserId && owner.employees?.some((employee) => employee.id === editingUserId) ? (
+                      <tr>
+                        <td colSpan={8}>
+                          <div className="card" style={{ margin: 0 }}>
+                            <div className="cardTitle">Edit employee contact details</div>
+                            <div className="formGrid two">
+                              <label>
+                                Full name
+                                <input value={draft.full_name} onChange={(e) => setDraft({ ...draft, full_name: e.target.value })} />
+                              </label>
+                              <label>
+                                Phone
+                                <input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
+                              </label>
+                              <label>
+                                WhatsApp
+                                <input value={draft.whatsapp} onChange={(e) => setDraft({ ...draft, whatsapp: e.target.value })} />
+                              </label>
+                              <label>
+                                Company
+                                <input value={draft.company} onChange={(e) => setDraft({ ...draft, company: e.target.value })} />
+                              </label>
+                              <label>
+                                City
+                                <input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} />
+                              </label>
+                            </div>
+                            <div className="row">
+                              <button className="btn" type="button" disabled={saving} onClick={() => void saveUser(editingUserId)}>
+                                {saving ? "Saving..." : "Save"}
+                              </button>
+                              <button className="btn ghost" type="button" disabled={saving} onClick={stopEdit}>Cancel</button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                    {isExpanded && !(owner.employees?.length) ? (
+                      <tr>
+                        <td colSpan={8} className="muted">No employee contact details found for this subscription owner.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          );
+        })
+      ) : (
+        <div className="muted">No CRM user contact details found for the current search.</div>
+      )}
     </div>
   );
 }
