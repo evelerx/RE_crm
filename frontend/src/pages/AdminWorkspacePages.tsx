@@ -11,6 +11,16 @@ type EnterpriseDetail = {
   company_city: string;
   employee_limit: number;
   employee_count: number;
+  employees: {
+    id: string;
+    email: string;
+    full_name: string;
+    phone: string;
+    whatsapp: string;
+    company: string;
+    city: string;
+    role_label: string;
+  }[];
 };
 
 type OwnerPipelineStageCounts = {
@@ -319,6 +329,11 @@ export function AdminOwnerDealsPage() {
 export function AdminOwnerContactsPage() {
   const { owners, selectedOwnerId, setSelectedOwnerId, loading, error, reload } = useAdminWorkspaceData();
   const selectedOwner = owners.find((owner) => owner.enterprise_owner_id === selectedOwnerId) ?? null;
+  const [showEmployees, setShowEmployees] = useState(false);
+
+  useEffect(() => {
+    setShowEmployees(false);
+  }, [selectedOwnerId]);
 
   return (
     <div className="page">
@@ -348,6 +363,7 @@ export function AdminOwnerContactsPage() {
               <th>City</th>
               <th>Employee limit</th>
               <th>Employee count</th>
+              <th>Employees</th>
             </tr>
           </thead>
           <tbody>
@@ -361,15 +377,68 @@ export function AdminOwnerContactsPage() {
                 <td>{selectedOwner.company_city || "-"}</td>
                 <td>{selectedOwner.employee_limit || 0}</td>
                 <td>{selectedOwner.employee_count || 0}</td>
+                <td>
+                  <button
+                    className="btn ghost"
+                    onClick={() => setShowEmployees((value) => !value)}
+                    type="button"
+                    aria-expanded={showEmployees}
+                    aria-label={showEmployees ? "Hide employee contacts" : "Show employee contacts"}
+                  >
+                    {showEmployees ? "↓" : "→"}
+                  </button>
+                </td>
               </tr>
             ) : (
               <tr>
-                <td colSpan={8} className="muted">No subscription owner selected.</td>
+                <td colSpan={9} className="muted">No subscription owner selected.</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {selectedOwner && showEmployees ? (
+        <section className="card">
+          <div className="cardTitle">Employee contacts</div>
+          <div className="muted">
+            Team contact details under {selectedOwner.owner_email} visible to admin for support and oversight.
+          </div>
+          <div className="tableWrap tableWrapWide">
+            <table className="table tableWide">
+              <thead>
+                <tr>
+                  <th>Employee name</th>
+                  <th>Role</th>
+                  <th>Phone</th>
+                  <th>WhatsApp</th>
+                  <th>Email</th>
+                  <th>Company</th>
+                  <th>City</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedOwner.employees?.map((employee) => (
+                  <tr key={employee.id}>
+                    <td className="tdTitle">{employee.full_name || "-"}</td>
+                    <td>{employee.role_label || "employee"}</td>
+                    <td>{employee.phone || "-"}</td>
+                    <td>{employee.whatsapp || "-"}</td>
+                    <td>{employee.email || "-"}</td>
+                    <td>{employee.company || "-"}</td>
+                    <td>{employee.city || "-"}</td>
+                  </tr>
+                ))}
+                {!selectedOwner.employees?.length ? (
+                  <tr>
+                    <td colSpan={7} className="muted">No employee contact details found for this subscription owner.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
