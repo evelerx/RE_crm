@@ -141,6 +141,10 @@ class AdminUnlockUserRequest(BaseModel):
     email: str
 
 
+class AdminRevealSecretRequest(BaseModel):
+    password: str = Field(min_length=8)
+
+
 class AdminRuntimeConfigRead(BaseModel):
     env_file_path: str
     frontend_origin: str = ""

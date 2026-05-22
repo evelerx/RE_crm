@@ -10,14 +10,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select
 
 from ..audit import log_audit_event, redact_detail
-from ..auth import decode_token, get_current_user, hash_password, is_admin_email, normalize_email
-from ..crypto import encrypt_if_configured
+from ..auth import decode_token, get_current_user, hash_password, is_admin_email, normalize_email, verify_admin_password
+from ..crypto import decrypt_if_configured, encrypt_if_configured
 from ..db import get_session
 from ..enterprise_scope import count_org_records, employee_record_counts, org_owner_filter
 from ..models import Activity, AuditEvent, Contact, Deal, Profile, SupportChatMessage, User
 from ..schemas import (
     AdminBlacklistRequest,
     AdminResetPasswordRequest,
+    AdminRevealSecretRequest,
     AdminRuntimeConfigRead,
     AdminRuntimeConfigUpdateRequest,
     AdminSetLlmAccessRequest,
@@ -158,6 +159,9 @@ def _enterprise_detail_payload(session: Session, owner: User) -> dict:
         "owner_whatsapp": owner_profile.whatsapp if owner_profile else "",
         "company": owner_profile.company if owner_profile else "",
         "company_city": owner_profile.city if owner_profile else "",
+        "owner_areas_served": owner_profile.areas_served if owner_profile else "",
+        "owner_specialization": owner_profile.specialization if owner_profile else "",
+        "owner_has_rera_id": bool((owner_profile.rera_id if owner_profile else "") or ""),
         "llm_provider": getattr(owner, "llm_provider", "") or "",
         "llm_model": getattr(owner, "llm_model", "") or "",
         "llm_allocated_at": getattr(owner, "llm_allocated_at", None),
@@ -174,6 +178,9 @@ def _enterprise_detail_payload(session: Session, owner: User) -> dict:
                 "whatsapp": (profile_by_owner.get(employee.id).whatsapp if profile_by_owner.get(employee.id) else ""),
                 "company": (profile_by_owner.get(employee.id).company if profile_by_owner.get(employee.id) else ""),
                 "city": (profile_by_owner.get(employee.id).city if profile_by_owner.get(employee.id) else ""),
+                "areas_served": (profile_by_owner.get(employee.id).areas_served if profile_by_owner.get(employee.id) else ""),
+                "specialization": (profile_by_owner.get(employee.id).specialization if profile_by_owner.get(employee.id) else ""),
+                "has_rera_id": bool(((profile_by_owner.get(employee.id).rera_id if profile_by_owner.get(employee.id) else "") or "").strip()),
                 "role_label": getattr(employee, "enterprise_member_role", "") or "employee",
                 "created_at": employee.created_at,
                 "is_blacklisted": bool(getattr(employee, "is_blacklisted", False)),
@@ -570,6 +577,9 @@ def users(
                 "whatsapp": profile.whatsapp if profile else "",
                 "company": profile.company if profile else "",
                 "city": profile.city if profile else "",
+                "areas_served": profile.areas_served if profile else "",
+                "specialization": profile.specialization if profile else "",
+                "has_rera_id": bool((profile.rera_id if profile else "") or ""),
                 "created_at": u.created_at,
                 "last_login_at": u.last_login_at,
                 "last_seen_at": u.last_seen_at,
@@ -696,6 +706,42 @@ def update_user_profile(
         "company": profile.company or "",
         "city": profile.city or "",
     }
+
+
+@router.post("/users/{user_id}/reveal-rera")
+def reveal_user_rera(
+    user_id: UUID,
+    payload: AdminRevealSecretRequest,
+    session: Session = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> dict:
+    target_user = session.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not verify_admin_password(payload.password.strip()):
+        raise HTTPException(status_code=403, detail="Admin password is incorrect")
+
+    profile = session.exec(select(Profile).where(Profile.owner_id == user_id)).first()
+    rera_id = decrypt_if_configured((profile.rera_id if profile else "") or "").strip()
+    if not rera_id:
+        raise HTTPException(status_code=404, detail="No RERA ID saved for this user")
+
+    owner_scope = (
+        target_user.id
+        if (getattr(target_user, "plan", "free") or "free") in {"enterprise", "builder"}
+        else getattr(target_user, "enterprise_owner_id", None)
+    )
+    log_audit_event(
+        session,
+        actor=admin_user,
+        target_user_id=target_user.id,
+        enterprise_owner_id=owner_scope,
+        kind="admin.reveal_rera",
+        summary=f"Revealed RERA ID for {target_user.email}",
+        detail="admin_password_verified",
+    )
+    _commit_or_http(session, "Unable to reveal RERA ID")
+    return {"ok": True, "user_id": str(user_id), "email": target_user.email, "rera_id": rera_id}
 
 
 @router.delete("/users/{user_id}/profile")

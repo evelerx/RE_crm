@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 
 type EnterpriseDetail = {
@@ -9,6 +9,9 @@ type EnterpriseDetail = {
   owner_whatsapp: string;
   company: string;
   company_city: string;
+  owner_areas_served: string;
+  owner_specialization: string;
+  owner_has_rera_id: boolean;
   employee_limit: number;
   employee_count: number;
   employees: {
@@ -19,6 +22,9 @@ type EnterpriseDetail = {
     whatsapp: string;
     company: string;
     city: string;
+    areas_served: string;
+    specialization: string;
+    has_rera_id: boolean;
     role_label: string;
   }[];
 };
@@ -206,76 +212,143 @@ function useAdminEnterpriseWorkspaces() {
 export function AdminOwnerPipelinePage() {
   const { owners, workspaces, loading, error, reload } = useAdminEnterpriseWorkspaces();
   const [search, setSearch] = useState("");
+  const [expandedOwnerId, setExpandedOwnerId] = useState<string | null>(null);
+  const [revealedReraByUserId, setRevealedReraByUserId] = useState<Record<string, string>>({});
+  const [reraError, setReraError] = useState<string | null>(null);
+  const [revealingUserId, setRevealingUserId] = useState<string | null>(null);
 
-  const ownerMetaById = useMemo(
+  const stageLabelByKey = useMemo(
     () =>
       new Map(
-        owners.map((owner) => [
-          owner.enterprise_owner_id,
-          {
-            owner_email: owner.owner_email,
-            owner_name: owner.owner_full_name || owner.owner_email,
-            company: owner.company || "-",
-          },
-        ])
+        ADMIN_PIPELINE_STAGES.map((stage) => [stage.key, stage.label])
       ),
-    [owners]
+    []
   );
 
-  const pipelineRows = useMemo(() => {
-    const rows = workspaces.flatMap((workspace) =>
-      (workspace.deals ?? []).map((deal) => {
-        const ownerMeta = ownerMetaById.get(workspace.enterprise_owner_id);
-        return {
-          id: deal.id,
-          title: deal.title || "-",
-          stage: deal.stage || "-",
-          asset_type: deal.asset_type || "-",
-          city: deal.city || "-",
-          area: deal.area || "-",
-          typology: deal.typology || "-",
-          owner_email: ownerMeta?.owner_email || "-",
-          owner_name: ownerMeta?.owner_name || "-",
-          company: ownerMeta?.company || "-",
-          last_activity_at: deal.last_activity_at,
-          updated_at: deal.updated_at,
-        };
-      })
-    );
+  function deriveOwnerStage(stageCounts: OwnerPipelineStageCounts): AdminPipelineStageKey {
+    const ordered: AdminPipelineStageKey[] = ["active", "qualified", "new_lead", "closed", "lost"];
+    let best: AdminPipelineStageKey = "new_lead";
+    let bestCount = -1;
+    for (const stage of ordered) {
+      const count = Number(stageCounts?.[stage] || 0);
+      if (count > bestCount) {
+        best = stage;
+        bestCount = count;
+      }
+    }
+    return best;
+  }
+
+  const ownerRows = useMemo(() => {
+    const workspaceByOwnerId = new Map(workspaces.map((workspace) => [workspace.enterprise_owner_id, workspace]));
+    const rows = owners.map((owner) => {
+      const workspace = workspaceByOwnerId.get(owner.enterprise_owner_id);
+      const stageCounts = workspace?.pipeline?.stage_counts ?? {
+        new_lead: 0,
+        qualified: 0,
+        active: 0,
+        closed: 0,
+        lost: 0,
+      };
+      const stage = deriveOwnerStage(stageCounts);
+      return {
+        id: owner.enterprise_owner_id,
+        stage,
+        owner_name: owner.owner_full_name || owner.owner_email,
+        owner_email: owner.owner_email,
+        company: owner.company || "-",
+        areas_served: owner.owner_areas_served || "-",
+        specialization: owner.owner_specialization || "-",
+        has_rera_id: Boolean(owner.owner_has_rera_id),
+        employee_count: owner.employee_count || 0,
+        employees: owner.employees ?? [],
+      };
+    });
 
     const query = search.trim().toLowerCase();
     if (!query) return rows;
-    return rows.filter((row) =>
-      [
-        row.title,
-        row.stage,
-        row.asset_type,
-        row.city,
-        row.area,
-        row.typology,
-        row.owner_email,
+    return rows.filter((row) => {
+      const ownText = [
         row.owner_name,
+        row.owner_email,
         row.company,
+        row.areas_served,
+        row.specialization,
+        stageLabelByKey.get(row.stage) || row.stage,
       ]
         .join(" ")
-        .toLowerCase()
-        .includes(query)
-    );
-  }, [ownerMetaById, search, workspaces]);
+        .toLowerCase();
+      const employeeText = row.employees
+        .map((employee) =>
+          [
+            employee.full_name,
+            employee.email,
+            employee.company,
+            employee.city,
+            employee.areas_served,
+            employee.specialization,
+            employee.role_label,
+          ]
+            .join(" ")
+            .toLowerCase()
+        )
+        .join(" ");
+      return ownText.includes(query) || employeeText.includes(query);
+    });
+  }, [owners, search, stageLabelByKey, workspaces]);
+
+  const stageCounts = useMemo(() => {
+    return ADMIN_PIPELINE_STAGES.reduce<Record<AdminPipelineStageKey, number>>((acc, stage) => {
+      acc[stage.key] = ownerRows.filter((row) => row.stage === stage.key).length;
+      return acc;
+    }, {
+      new_lead: 0,
+      qualified: 0,
+      active: 0,
+      closed: 0,
+      lost: 0,
+    });
+  }, [ownerRows]);
+
+  async function revealRera(userId: string, email: string) {
+    const password = window.prompt(`Enter admin password to reveal the RERA ID for ${email}`);
+    if (!password) return;
+    setRevealingUserId(userId);
+    setReraError(null);
+    try {
+      const response = await api<{ rera_id: string }>(`/admin/users/${userId}/reveal-rera`, {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      });
+      setRevealedReraByUserId((current) => ({ ...current, [userId]: response.rera_id || "" }));
+    } catch (e) {
+      setReraError(e instanceof Error ? e.message : "Failed to reveal RERA ID");
+    } finally {
+      setRevealingUserId(null);
+    }
+  }
+
+  function hideRera(userId: string) {
+    setRevealedReraByUserId((current) => {
+      const next = { ...current };
+      delete next[userId];
+      return next;
+    });
+  }
 
   return (
     <div className="page">
       <div className="pageHeader">
         <div>
           <div className="h1">Pipeline</div>
-          <div className="muted">All live subscription-owner pipeline records visible to admin in one searchable table.</div>
+          <div className="muted">Stage-wise oversight for subscription owners only. Admin can review owner details, service areas, property focus, and protected RERA IDs without exposing client data.</div>
         </div>
         <div className="row">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search pipeline records"
-            aria-label="Search pipeline records"
+            placeholder="Search owners and employees"
+            aria-label="Search owners and employees"
             style={{ minWidth: 260 }}
           />
           <button className="btn ghost" onClick={() => void reload()} type="button">
@@ -286,40 +359,135 @@ export function AdminOwnerPipelinePage() {
 
       {error ? <div className="alert">{error}</div> : null}
       {loading ? <div className="muted">Loading admin pipeline...</div> : null}
+      {reraError ? <div className="alert">{reraError}</div> : null}
+
+      <div className="kanban" style={{ marginBottom: 16 }}>
+        {ADMIN_PIPELINE_STAGES.map((stage) => (
+          <div className="stageCard" key={stage.key}>
+            <div className="stageTitle">{stage.label}</div>
+            <div className="stageCount">{stageCounts[stage.key]}</div>
+          </div>
+        ))}
+      </div>
 
       <div className="tableWrap tableWrapWide">
         <table className="table tableWide">
           <thead>
             <tr>
-              <th>Deal</th>
+              <th>Owner name</th>
               <th>Stage</th>
-              <th>Asset</th>
-              <th>Location</th>
-              <th>Typology</th>
-              <th>Owner</th>
               <th>Company</th>
-              <th>Last activity</th>
-              <th>Updated</th>
+              <th>Areas served</th>
+              <th>Property types</th>
+              <th>RERA ID</th>
+              <th>Employees</th>
             </tr>
           </thead>
           <tbody>
-            {pipelineRows.length ? (
-              pipelineRows.map((row) => (
-                <tr key={row.id}>
-                  <td className="tdTitle">{row.title}</td>
-                  <td>{row.stage}</td>
-                  <td>{row.asset_type}</td>
-                  <td>{[row.area, row.city].filter((value) => value && value !== "-").join(", ") || "-"}</td>
-                  <td>{row.typology}</td>
-                  <td>{row.owner_name}</td>
-                  <td>{row.company}</td>
-                  <td>{fmtDt(row.last_activity_at)}</td>
-                  <td>{fmtDt(row.updated_at)}</td>
-                </tr>
-              ))
+            {ownerRows.length ? (
+              ADMIN_PIPELINE_STAGES.map((stage) => {
+                const stageRows = ownerRows.filter((row) => row.stage === stage.key);
+                if (!stageRows.length) return null;
+                return (
+                  <Fragment key={stage.key}>
+                    <tr key={`${stage.key}-group`} className="groupRow">
+                      <td colSpan={7}>
+                        {stage.label} ({stageRows.length})
+                      </td>
+                    </tr>
+                    {stageRows.map((row) => {
+                      const isExpanded = expandedOwnerId === row.id;
+                      const revealedRera = revealedReraByUserId[row.id];
+                      return (
+                        <Fragment key={row.id}>
+                          <tr key={row.id}>
+                            <td className="tdTitle">{row.owner_name}</td>
+                            <td>{stageLabelByKey.get(row.stage) || row.stage}</td>
+                            <td>{row.company}</td>
+                            <td>{row.areas_served}</td>
+                            <td>{row.specialization}</td>
+                            <td>
+                              {!row.has_rera_id ? (
+                                "-"
+                              ) : revealedRera ? (
+                                <div className="row">
+                                  <span>{revealedRera}</span>
+                                  <button className="btn ghost" type="button" onClick={() => hideRera(row.id)}>
+                                    Hide
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  className="btn ghost"
+                                  type="button"
+                                  disabled={revealingUserId === row.id}
+                                  onClick={() => void revealRera(row.id, row.owner_email)}
+                                >
+                                  {revealingUserId === row.id ? "Checking..." : "Show RERA"}
+                                </button>
+                              )}
+                            </td>
+                            <td>
+                              <button
+                                className="btn ghost"
+                                type="button"
+                                onClick={() => setExpandedOwnerId(isExpanded ? null : row.id)}
+                                aria-expanded={isExpanded}
+                              >
+                                {isExpanded ? "Hide employees" : `Show employees (${row.employee_count})`}
+                              </button>
+                            </td>
+                          </tr>
+                          {isExpanded ? row.employees.map((employee) => {
+                            const employeeRera = revealedReraByUserId[employee.id];
+                            return (
+                              <tr key={`${row.id}-${employee.id}`}>
+                                <td className="tdTitle">{employee.full_name || employee.email}</td>
+                                <td>{employee.role_label || "employee"}</td>
+                                <td>{employee.company || row.company}</td>
+                                <td>{employee.areas_served || "-"}</td>
+                                <td>{employee.specialization || "-"}</td>
+                                <td>
+                                  {!employee.has_rera_id ? (
+                                    "-"
+                                  ) : employeeRera ? (
+                                    <div className="row">
+                                      <span>{employeeRera}</span>
+                                      <button className="btn ghost" type="button" onClick={() => hideRera(employee.id)}>
+                                        Hide
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      className="btn ghost"
+                                      type="button"
+                                      disabled={revealingUserId === employee.id}
+                                      onClick={() => void revealRera(employee.id, employee.email)}
+                                    >
+                                      {revealingUserId === employee.id ? "Checking..." : "Show RERA"}
+                                    </button>
+                                  )}
+                                </td>
+                                <td>-</td>
+                              </tr>
+                            );
+                          }) : null}
+                          {isExpanded && !row.employees.length ? (
+                            <tr key={`${row.id}-empty`}>
+                              <td colSpan={7} className="muted">
+                                No employee details linked to this subscription owner.
+                              </td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
+                      );
+                    })}
+                  </Fragment>
+                );
+              })
             ) : (
               <tr>
-                <td colSpan={9} className="muted">No pipeline records found for the current search.</td>
+                <td colSpan={7} className="muted">No subscription-owner pipeline records found for the current search.</td>
               </tr>
             )}
           </tbody>
