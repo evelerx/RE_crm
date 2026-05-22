@@ -283,10 +283,18 @@ class GoogleConnectionTestResponse(BaseModel):
     scopes: list[str] = []
 
 
+class GoogleEmailAttachment(BaseModel):
+    file_name: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(min_length=1, max_length=200)
+    content_base64: str = Field(min_length=1)
+    size_bytes: int = Field(ge=1, le=10_000_000)
+
+
 class GoogleSendEmailRequest(BaseModel):
     to_email: str
     subject: str = Field(min_length=1, max_length=200)
     body_text: str = Field(min_length=1, max_length=10000)
+    attachments: list[GoogleEmailAttachment] = []
 
 
 class GoogleSendEmailResponse(BaseModel):

@@ -24,6 +24,7 @@ from ..models import AppIntegrationConnection, User
 from ..schemas import (
     GoogleCalendarEventCreateRequest,
     GoogleCalendarEventResponse,
+    GoogleEmailAttachment,
     GoogleConnectionTestResponse,
     GoogleSendEmailRequest,
     GoogleSendEmailResponse,
@@ -34,6 +35,8 @@ from ..settings import settings
 
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
+
+MAX_GMAIL_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 
 GOOGLE_SCOPES = [
@@ -725,6 +728,24 @@ async def google_send_email(
     message["Subject"] = payload.subject.strip()
     message["From"] = row.connected_account_email.strip() or "me"
     message.set_content(payload.body_text.strip())
+    total_attachment_bytes = 0
+    for attachment in payload.attachments:
+        total_attachment_bytes += int(attachment.size_bytes or 0)
+        if total_attachment_bytes > MAX_GMAIL_ATTACHMENT_BYTES:
+            raise HTTPException(status_code=400, detail="Total attachment size exceeds the 10 MB limit")
+        try:
+            file_bytes = base64.b64decode(attachment.content_base64, validate=True)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Attachment decode failed for {attachment.file_name}") from e
+        if len(file_bytes) != int(attachment.size_bytes or 0):
+            raise HTTPException(status_code=400, detail=f"Attachment size mismatch for {attachment.file_name}")
+        main_type, _, sub_type = (attachment.content_type or "application/octet-stream").partition("/")
+        message.add_attachment(
+            file_bytes,
+            maintype=main_type or "application",
+            subtype=sub_type or "octet-stream",
+            filename=attachment.file_name,
+        )
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode().rstrip("=")
     res = await _google_api_request(
         method="POST",
@@ -742,7 +763,7 @@ async def google_send_email(
         actor=user,
         kind="integration.google.gmail_sent",
         summary=f"Sent Gmail message to {payload.to_email.strip()}",
-        detail=f"subject={payload.subject.strip()[:120]}",
+        detail=f"subject={payload.subject.strip()[:120]}; attachments={len(payload.attachments)}",
         enterprise_owner_id=owner_id,
         target_user_id=user.id,
     )

@@ -1,3 +1,4 @@
+import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { ApiError, api } from "../api/client";
@@ -48,6 +49,13 @@ type GoogleSendEmailResponse = {
   to_email: string;
   subject: string;
   provider_message_id: string;
+};
+
+type GmailAttachmentDraft = {
+  file_name: string;
+  content_type: string;
+  content_base64: string;
+  size_bytes: number;
 };
 
 type GoogleCalendarEventResponse = {
@@ -259,6 +267,7 @@ export default function AppsPage() {
     subject: "",
     body_text: ""
   });
+  const [gmailAttachments, setGmailAttachments] = useState<GmailAttachmentDraft[]>([]);
   const [calendarForm, setCalendarForm] = useState({
     title: "",
     description: "",
@@ -510,16 +519,69 @@ export default function AppsPage() {
     try {
       const result = await api<GoogleSendEmailResponse>("/integrations/google/gmail/send", {
         method: "POST",
-        body: JSON.stringify(gmailForm)
+        body: JSON.stringify({
+          ...gmailForm,
+          attachments: gmailAttachments,
+        })
       });
       setGmailResult(result);
       setActionMsg(`Gmail sent to ${result.to_email}.`);
       setGmailForm((prev) => ({ ...prev, subject: "", body_text: "" }));
+      setGmailAttachments([]);
     } catch (e) {
       setActionMsg(e instanceof ApiError ? e.message : "Unable to send Gmail right now.");
     } finally {
       setGmailBusy(false);
     }
+  }
+
+  async function onGmailAttachmentPick(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    if (!files.length) return;
+    setActionMsg(null);
+    try {
+      const drafts = await Promise.all(
+        files.map(
+          (file) =>
+            new Promise<GmailAttachmentDraft>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const result = typeof reader.result === "string" ? reader.result : "";
+                const content_base64 = result.includes(",") ? result.split(",", 2)[1] : "";
+                if (!content_base64) {
+                  reject(new Error(`Unable to read ${file.name}`));
+                  return;
+                }
+                resolve({
+                  file_name: file.name,
+                  content_type: file.type || "application/octet-stream",
+                  content_base64,
+                  size_bytes: file.size,
+                });
+              };
+              reader.onerror = () => reject(new Error(`Unable to read ${file.name}`));
+              reader.readAsDataURL(file);
+            })
+        )
+      );
+      setGmailAttachments((current) => [...current, ...drafts]);
+      event.target.value = "";
+    } catch (e) {
+      setActionMsg(e instanceof Error ? e.message : "Unable to attach the selected file.");
+    }
+  }
+
+  function removeGmailAttachment(target: GmailAttachmentDraft) {
+    setGmailAttachments((current) =>
+      current.filter(
+        (file) =>
+          !(
+            file.file_name === target.file_name &&
+            file.size_bytes === target.size_bytes &&
+            file.content_type === target.content_type
+          )
+      )
+    );
   }
 
   async function createGoogleCalendarEvent() {
@@ -743,6 +805,38 @@ export default function AppsPage() {
                                     rows={5}
                                   />
                                 </label>
+                                <div className="stack" style={{ gap: 10 }}>
+                                  <label>
+                                    Attach files
+                                    <input
+                                      type="file"
+                                      multiple
+                                      onChange={(e) => void onGmailAttachmentPick(e)}
+                                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar"
+                                    />
+                                  </label>
+                                  <div className="muted">
+                                    Add images, PDFs, documents, spreadsheets, presentations, or zip references. Total attachment size should stay under 10 MB.
+                                  </div>
+                                  {gmailAttachments.length ? (
+                                    <div className="stack" style={{ gap: 8 }}>
+                                      {gmailAttachments.map((file) => (
+                                        <div
+                                          key={`${file.file_name}-${file.size_bytes}-${file.content_type}`}
+                                          className="row"
+                                          style={{ justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+                                        >
+                                          <div>
+                                            {file.file_name} ({Math.max(1, Math.round(file.size_bytes / 1024))} KB)
+                                          </div>
+                                          <button className="btn ghost" type="button" onClick={() => removeGmailAttachment(file)}>
+                                            Remove
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                </div>
                                 <button
                                   className="btn"
                                   onClick={() => void sendGoogleEmail()}
