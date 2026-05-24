@@ -37,6 +37,12 @@ PLAN_RULES = {
     "custom": {"monthly": 0, "included_seats": 10, "extra_seat_monthly": 0, "mapped_plan": "free"},
 }
 
+MARKETING_RULES = {
+    "none": {"monthly": 0, "label": "CRM only"},
+    "marketing_assist": {"monthly": 14999, "label": "CRM + Marketing Assist"},
+    "managed_marketing": {"monthly": 29999, "label": "CRM + Managed Marketing"},
+}
+
 BILLING_MONTHS = {
     "monthly": 1,
     "six_month": 6,
@@ -68,10 +74,13 @@ def _normalize_seats(plan: str, seats: int) -> int:
     return max(1, seats)
 
 
-def _quote_subscription(plan: str, billing_cycle: str, seats: int) -> dict[str, int | str]:
+def _quote_subscription(plan: str, billing_cycle: str, seats: int, marketing_package: str = "none") -> dict[str, int | str]:
     rules = PLAN_RULES.get(plan)
     if not rules:
         raise HTTPException(status_code=400, detail="Unsupported plan")
+    marketing_rules = MARKETING_RULES.get(marketing_package)
+    if not marketing_rules:
+        raise HTTPException(status_code=400, detail="Unsupported marketing package")
     months = BILLING_MONTHS.get(billing_cycle)
     if not months:
         raise HTTPException(status_code=400, detail="Unsupported billing cycle")
@@ -83,14 +92,16 @@ def _quote_subscription(plan: str, billing_cycle: str, seats: int) -> dict[str, 
             "billing_cycle": billing_cycle,
             "seats": normalized_seats,
             "included_seats": int(rules["included_seats"]),
+            "marketing_package": marketing_package,
             "amount_inr": 0,
         }
 
     base_monthly = int(rules["monthly"])
+    marketing_monthly = int(marketing_rules["monthly"])
     included_seats = int(rules["included_seats"])
     extra_monthly = int(rules["extra_seat_monthly"])
     extra_seats = max(normalized_seats - included_seats, 0)
-    monthly_total = base_monthly + (extra_seats * extra_monthly)
+    monthly_total = base_monthly + (extra_seats * extra_monthly) + marketing_monthly
     total = monthly_total * months
     if billing_cycle == "yearly":
         total = round(total * 0.95)
@@ -100,17 +111,18 @@ def _quote_subscription(plan: str, billing_cycle: str, seats: int) -> dict[str, 
         "billing_cycle": billing_cycle,
         "seats": normalized_seats,
         "included_seats": included_seats,
+        "marketing_package": marketing_package,
         "amount_inr": int(total),
     }
 
 
-def _verify_requested_amount(plan: str, billing_cycle: str, seats: int, amount_inr: int) -> dict[str, int | str]:
-    quote = _quote_subscription(plan, billing_cycle, seats)
+def _verify_requested_amount(plan: str, billing_cycle: str, seats: int, amount_inr: int, marketing_package: str = "none") -> dict[str, int | str]:
+    quote = _quote_subscription(plan, billing_cycle, seats, marketing_package)
     expected = int(quote["amount_inr"])
     if expected != int(amount_inr):
         raise HTTPException(
             status_code=400,
-            detail=f"Displayed amount mismatch. Expected INR {expected} for this plan, cycle, and seat count.",
+            detail=f"Displayed amount mismatch. Expected INR {expected} for this plan, marketing package, cycle, and seat count.",
         )
     return quote
 
@@ -153,7 +165,13 @@ async def checkout_order(payload: PublicCheckoutOrderRequest):
     if not key_id or not key_secret:
         raise HTTPException(status_code=503, detail="Online payment is not configured yet.")
 
-    quote = _verify_requested_amount(payload.product_plan, payload.billing_cycle, payload.seats, payload.amount_inr)
+    quote = _verify_requested_amount(
+        payload.product_plan,
+        payload.billing_cycle,
+        payload.seats,
+        payload.amount_inr,
+        payload.marketing_package,
+    )
     amount_paise = int(quote["amount_inr"]) * 100
     receipt = f"northstone-{payload.product_plan}-{normalize_email(payload.email).replace('@', '-')}-{int(datetime.now().timestamp())}"
     order_payload = {
@@ -162,6 +180,7 @@ async def checkout_order(payload: PublicCheckoutOrderRequest):
         "receipt": receipt[:40],
         "notes": {
             "plan": payload.product_plan,
+            "marketing_package": payload.marketing_package,
             "billing_cycle": payload.billing_cycle,
             "seats": str(int(quote["seats"])),
             "company_name": payload.company_name,
@@ -190,7 +209,13 @@ async def checkout_order(payload: PublicCheckoutOrderRequest):
 @router.post("/payment-link-request", response_model=PublicPaymentLinkResponse)
 def payment_link_request(payload: PublicPaymentLinkRequest, session: Session = Depends(get_session)):
     email = normalize_email(payload.email)
-    quote = _verify_requested_amount(payload.product_plan, payload.billing_cycle, payload.seats, payload.amount_inr)
+    quote = _verify_requested_amount(
+        payload.product_plan,
+        payload.billing_cycle,
+        payload.seats,
+        payload.amount_inr,
+        payload.marketing_package,
+    )
     payment_url = _payment_link_for_plan(payload.product_plan)
     if not payment_url:
         raise HTTPException(status_code=503, detail="Payment link is not configured for this plan yet.")
@@ -214,7 +239,7 @@ def payment_link_request(payload: PublicPaymentLinkRequest, session: Session = D
         summary=f"Payment link opened for {email}",
         detail=(
             f"plan={payload.product_plan}; cycle={payload.billing_cycle}; seats={int(quote['seats'])}; "
-            f"amount_inr={int(quote['amount_inr'])}; company={payload.company_name.strip()}; "
+            f"marketing_package={payload.marketing_package}; amount_inr={int(quote['amount_inr'])}; company={payload.company_name.strip()}; "
             f"city={payload.city.strip()}; notes={payload.notes.strip()}"
         ),
         target_user_id=user.id,
@@ -236,7 +261,13 @@ def payment_link_request(payload: PublicPaymentLinkRequest, session: Session = D
 @router.post("/subscribe", response_model=PublicSubscriptionResponse)
 def subscribe(payload: PublicSubscriptionRequest, session: Session = Depends(get_session)):
     email = normalize_email(payload.email)
-    quote = _verify_requested_amount(payload.product_plan, payload.billing_cycle, payload.seats, payload.amount_inr)
+    quote = _verify_requested_amount(
+        payload.product_plan,
+        payload.billing_cycle,
+        payload.seats,
+        payload.amount_inr,
+        payload.marketing_package,
+    )
     normalized_seats = int(quote["seats"])
     amount_inr = int(quote["amount_inr"])
     now = _utc_now_naive()
@@ -279,7 +310,10 @@ def subscribe(payload: PublicSubscriptionRequest, session: Session = Depends(get
         actor=user,
         kind="public.subscribe",
         summary=f"Provisioned {payload.product_plan} subscription for {email}",
-        detail=f"cycle={payload.billing_cycle}; seats={normalized_seats}; amount_inr={amount_inr}",
+        detail=(
+            f"cycle={payload.billing_cycle}; seats={normalized_seats}; "
+            f"marketing_package={payload.marketing_package}; amount_inr={amount_inr}"
+        ),
         target_user_id=user.id,
     )
     _commit_or_http(session, "Could not provision the account")

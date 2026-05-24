@@ -956,6 +956,69 @@
             </div>
           </div>
         </div>
+        <div class="overviewGrid" style="margin-top:22px">
+          <div class="card">
+            <div class="cardTitle">CRM + Marketing Assist</div>
+            <div class="cardText">For subscription users who want the Northstone marketing team to help launch, monitor, and improve property promotion without building a full in-house ads desk.</div>
+            <div class="priceAmount">&#8377;14,999<span class="pricePeriod">/ month add-on</span></div>
+            <div class="list" style="margin-top:16px">
+              <div class="listRow"><span class="tick">+</span><span>Request-led marketing support from the Northstone team</span></div>
+              <div class="listRow"><span class="tick">+</span><span>Campaign planning and setup support for one active property push</span></div>
+              <div class="listRow"><span class="tick">+</span><span>Monthly review on lead cost, quality, and spend direction</span></div>
+            </div>
+            <div class="heroActions" style="margin-top:18px">
+              <button class="btn btnSecondary choose-plan" data-plan="solo" data-marketing="marketing_assist" data-cycle="monthly" data-amount="16198" data-seats="1">Start CRM + Marketing Assist</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="cardTitle">CRM + Managed Marketing</div>
+            <div class="cardText">For owners who want Northstone to handle the working marketing lane more aggressively, with tighter optimization support and a more active performance desk.</div>
+            <div class="priceAmount">&#8377;29,999<span class="pricePeriod">/ month add-on</span></div>
+            <div class="list" style="margin-top:16px">
+              <div class="listRow"><span class="tick">+</span><span>Marketing team handles request intake, campaign direction, and active follow-through</span></div>
+              <div class="listRow"><span class="tick">+</span><span>Better fit for builders, broker owners, and serious launch pushes</span></div>
+              <div class="listRow"><span class="tick">+</span><span>Stronger reporting on spend needed to reach qualified property leads</span></div>
+            </div>
+            <div class="heroActions" style="margin-top:18px">
+              <button class="btn btnPrimary choose-plan" data-plan="enterprise" data-marketing="managed_marketing" data-cycle="monthly" data-amount="36998" data-seats="5">Start CRM + Managed Marketing</button>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:22px">
+          <div class="cardTitle">Combined monthly pricing examples</div>
+          <div class="comparison" style="margin-top:14px">
+            <table>
+              <thead>
+                <tr>
+                  <th>CRM base plan</th>
+                  <th>CRM only</th>
+                  <th>+ Marketing Assist</th>
+                  <th>+ Managed Marketing</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Solo</td>
+                  <td>&#8377;1,199</td>
+                  <td>&#8377;16,198</td>
+                  <td>&#8377;31,198</td>
+                </tr>
+                <tr>
+                  <td>Enterprise</td>
+                  <td>&#8377;6,999</td>
+                  <td>&#8377;21,998</td>
+                  <td>&#8377;36,998</td>
+                </tr>
+                <tr>
+                  <td>Builder</td>
+                  <td>&#8377;11,999</td>
+                  <td>&#8377;26,998</td>
+                  <td>&#8377;41,998</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1166,6 +1229,14 @@
                   </select>
                 </div>
                 <div class="field">
+                  <label for="marketing_package">Marketing add-on</label>
+                  <select id="marketing_package" name="marketing_package">
+                    <option value="none">CRM only</option>
+                    <option value="marketing_assist">CRM + Marketing Assist</option>
+                    <option value="managed_marketing">CRM + Managed Marketing</option>
+                  </select>
+                </div>
+                <div class="field">
                   <label for="billing_cycle">Billing cycle</label>
                   <select id="billing_cycle" name="billing_cycle" required>
                     <option value="monthly">1 month</option>
@@ -1193,7 +1264,7 @@
               <div id="formMessage" class="message"></div>
               <button class="btn btnPrimary" type="submit" style="width:100%;margin-top:16px">Continue to payment</button>
               <div class="finePrint">
-                Monthly and 6-month billing stay at the standard commercial rate. One-year billing applies a 5% discount to the same plan and seat structure.
+                Monthly and 6-month billing stay at the standard commercial rate. One-year billing applies a 5% discount to the same CRM plan and marketing add-on structure.
               </div>
             </form>
           </div>
@@ -1271,8 +1342,14 @@
       builder: { billing_cycle: "monthly", amount_inr: 11999, seats: 5 },
       custom: { billing_cycle: "monthly", amount_inr: 0, seats: 10 }
     };
+    const MARKETING_PRICING = {
+      none: { monthly: 0, label: "CRM only" },
+      marketing_assist: { monthly: 14999, label: "CRM + Marketing Assist" },
+      managed_marketing: { monthly: 29999, label: "CRM + Managed Marketing" }
+    };
 
     const planField = document.getElementById("product_plan");
+    const marketingField = document.getElementById("marketing_package");
     const cycleField = document.getElementById("billing_cycle");
     const amountField = document.getElementById("amount_inr");
     const seatsField = document.getElementById("seats");
@@ -1401,10 +1478,23 @@
       button.addEventListener("click", () => applyHeroMode(button.dataset.mode || "solo"));
     });
 
-    function recommendedAmount(plan, seats, cycle) {
+    function normalizeMarketingPackage(value) {
+      return MARKETING_PRICING[value] ? value : "none";
+    }
+
+    function quoteMarketingMonthly(marketingPackage) {
+      return (MARKETING_PRICING[normalizeMarketingPackage(marketingPackage)] || MARKETING_PRICING.none).monthly;
+    }
+
+    function recommendedAmount(plan, seats, cycle, marketingPackage) {
       const pricing = PLAN_PRICING[plan] || PLAN_PRICING.solo;
       if (plan === "custom") return 0;
-      if (plan === "solo") return pricing[cycle];
+      const months = cycle === "yearly" ? 12 : cycle === "six_month" ? 6 : 1;
+      let marketingAmount = quoteMarketingMonthly(marketingPackage) * months;
+      if (cycle === "yearly") {
+        marketingAmount = Math.round(marketingAmount * 0.95);
+      }
+      if (plan === "solo") return pricing[cycle] + marketingAmount;
       const included = pricing.includedSeats || 1;
       const extraSeats = Math.max(Number(seats || included) - included, 0);
       const extraSeatPrice = cycle === "yearly"
@@ -1412,35 +1502,41 @@
         : cycle === "six_month"
           ? pricing.extraSeatSixMonth
           : pricing.extraSeatMonthly;
-      return pricing[cycle] + (extraSeats * extraSeatPrice);
+      const crmAmount = pricing[cycle] + (extraSeats * extraSeatPrice);
+      return crmAmount + marketingAmount;
     }
 
     function refreshPricingHint() {
       const plan = planField.value;
+      const marketingPackage = normalizeMarketingPackage(marketingField.value);
+      const marketingLabel = MARKETING_PRICING[marketingPackage].label;
       const cycle = cycleField.value === "yearly" ? "yearly" : cycleField.value === "six_month" ? "six_month" : "monthly";
       const cycleLabel = cycle === "yearly" ? "1-year" : cycle === "six_month" ? "6-month" : "1-month";
       if (plan === "enterprise") {
         const seats = Number(seatsField.value || 5);
         const extra = Math.max(seats - 5, 0);
-        pricingHintField.value = extra > 0
+        const crmHint = extra > 0
           ? `Enterprise includes 5 IDs. Extra IDs: ${extra} x ₹${(cycle === "yearly" ? 10249 : cycle === "six_month" ? 5394 : 899).toLocaleString("en-IN")} on the ${cycleLabel} cycle.`
           : `Enterprise includes 5 IDs. ${cycle === "yearly" ? "One-year billing applies a 5% discount." : cycle === "six_month" ? "6-month billing keeps the same monthly commercial rate." : "Extra IDs are billed at ₹899 each per month."}`;
+        pricingHintField.value = marketingPackage === "none" ? crmHint : `${crmHint} Add-on: ${marketingLabel}.`;
         return;
       }
       if (plan === "builder") {
         const seats = Number(seatsField.value || 5);
         const extra = Math.max(seats - 5, 0);
-        pricingHintField.value = extra > 0
+        const crmHint = extra > 0
           ? `Builder includes 5 IDs. Extra IDs: ${extra} x ₹${(cycle === "yearly" ? 17089 : cycle === "six_month" ? 8994 : 1499).toLocaleString("en-IN")} on the ${cycleLabel} cycle.`
           : `Builder includes 5 IDs. ${cycle === "yearly" ? "One-year billing applies a 5% discount." : cycle === "six_month" ? "6-month billing keeps the same monthly commercial rate." : "Builder is priced for active developer teams that need owner controls, AI builder documents, org reporting, and project-facing communication without entering ERP-level budgets."}`;
+        pricingHintField.value = marketingPackage === "none" ? crmHint : `${crmHint} Add-on: ${marketingLabel}.`;
         return;
       }
       if (plan === "solo") {
-        pricingHintField.value = cycle === "yearly"
+        const crmHint = cycle === "yearly"
           ? "Solo yearly billing applies a 5% discount to the same single-user subscription."
           : cycle === "six_month"
             ? "Solo 6-month billing keeps the same monthly commercial rate with a longer commitment."
             : "Solo is a clean single-user commercial tier for independent closers.";
+        pricingHintField.value = marketingPackage === "none" ? crmHint : `${crmHint} Add-on: ${marketingLabel}.`;
         return;
       }
       pricingHintField.value = "Custom plans are finalized with rollout scope, seat structure, onboarding requirements, and commercial terms.";
@@ -1448,13 +1544,15 @@
 
     function syncAmount() {
       const cycle = cycleField.value === "yearly" ? "yearly" : cycleField.value === "six_month" ? "six_month" : "monthly";
-      amountField.value = String(recommendedAmount(planField.value, Number(seatsField.value || 1), cycle));
+      amountField.value = String(recommendedAmount(planField.value, Number(seatsField.value || 1), cycle, marketingField.value));
       refreshPricingHint();
     }
 
     function applyPlan(plan, cycle, amount, seats, options = {}) {
       const shouldScroll = Boolean(options.scroll);
+      const marketingPackage = normalizeMarketingPackage(options.marketingPackage || marketingField.value || "none");
       planField.value = plan;
+      marketingField.value = marketingPackage;
       cycleField.value = cycle;
       amountField.value = amount;
       seatsField.value = seats;
@@ -1483,6 +1581,7 @@
         company_name: document.getElementById("company_name").value.trim(),
         city: document.getElementById("city").value.trim(),
         product_plan: planField.value,
+        marketing_package: marketingField.value,
         billing_cycle: cycleField.value,
         amount_inr: Number(amountField.value || 0),
         seats: Number(seatsField.value || 1),
@@ -1513,6 +1612,7 @@
           phone: payload.phone,
           company_name: payload.company_name,
           product_plan: payload.product_plan,
+          marketing_package: payload.marketing_package,
           billing_cycle: payload.billing_cycle,
           amount_inr: payload.amount_inr,
           seats: payload.seats
@@ -1561,7 +1661,7 @@
           amount: order.amount_paise,
           currency: order.currency || "INR",
           name: "Northstone",
-          description: `${payload.product_plan} subscription`,
+          description: `${payload.product_plan} ${payload.marketing_package !== "none" ? `+ ${payload.marketing_package}` : ""} subscription`,
           order_id: order.order_id,
           handler: function (response) {
             resolve({
@@ -1594,16 +1694,16 @@
     }
 
     document.querySelectorAll(".choose-plan").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        applyPlan(
-          btn.dataset.plan || "solo",
-          btn.dataset.cycle || "monthly",
-          btn.dataset.amount || "0",
-          btn.dataset.seats || "1",
-          { scroll: true }
-        );
+        btn.addEventListener("click", () => {
+          applyPlan(
+            btn.dataset.plan || "solo",
+            btn.dataset.cycle || "monthly",
+            btn.dataset.amount || "0",
+            btn.dataset.seats || "1",
+            { scroll: true, marketingPackage: btn.dataset.marketing || "none" }
+          );
+        });
       });
-    });
 
     planField.addEventListener("change", () => {
       const next = planDefaults[planField.value] || planDefaults.solo;
@@ -1613,6 +1713,10 @@
       seatsField.min = planField.value === "enterprise" || planField.value === "builder" ? "5" : "1";
       seatsField.readOnly = planField.value === "solo";
       cycleField.disabled = false;
+      syncAmount();
+    });
+
+    marketingField.addEventListener("change", () => {
       syncAmount();
     });
 
@@ -1715,7 +1819,7 @@
     });
 
     applyHeroMode("solo");
-    applyPlan(planField.value, cycleField.value, amountField.value, seatsField.value, { scroll: false });
+    applyPlan(planField.value, cycleField.value, amountField.value, seatsField.value, { scroll: false, marketingPackage: marketingField.value });
   </script>
 </body>
 </html>
