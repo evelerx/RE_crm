@@ -4,7 +4,7 @@
   "rewrites": [
     {
       "source": "/builders/:slug",
-      "destination": "/landing-only/builder-site.html"
+      "destination": "/builder-site.html"
     },
     {
       "source": "/",
