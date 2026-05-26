@@ -13,6 +13,8 @@ from .models import (
     AppIntegrationConnection,
     AuditEvent,
     BuilderDocument,
+    BuilderWebsite,
+    BuilderWebsiteProperty,
     Contact,
     Deal,
     DealStageEvent,
@@ -125,6 +127,8 @@ def delete_demo_account_tree(session: Session, root_user: User) -> dict[str, int
         "deal_stage_events": 0,
         "support_messages": 0,
         "builder_documents": 0,
+        "builder_websites": 0,
+        "builder_website_properties": 0,
         "password_reset_tokens": 0,
         "integration_connections": 0,
         "audit_events": 0,
@@ -149,6 +153,13 @@ def delete_demo_account_tree(session: Session, root_user: User) -> dict[str, int
             )
         ).all(),
     )
+    website_rows = session.exec(select(BuilderWebsite).where(BuilderWebsite.owner_id == owner_id)).all()
+    website_ids = [row.id for row in website_rows]
+    counts["builder_website_properties"] += _delete_rows(
+        session,
+        session.exec(select(BuilderWebsiteProperty).where(BuilderWebsiteProperty.website_id.in_(website_ids))).all() if website_ids else [],
+    )
+    counts["builder_websites"] += _delete_rows(session, website_rows)
     counts["deal_stage_events"] += _delete_rows(
         session,
         session.exec(

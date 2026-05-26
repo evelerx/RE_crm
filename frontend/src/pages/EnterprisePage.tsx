@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../api/client";
 import type { Profile } from "../api/types";
+import BuilderWebsiteDesk from "../components/BuilderWebsiteDesk";
 
 type MarketInsightRow = {
   city: string;
@@ -814,6 +815,8 @@ export default function EnterprisePage() {
           </button>
         </form>
       </section>
+
+      {isEnterpriseOwner && overview?.owner_plan === "builder" ? <BuilderWebsiteDesk /> : null}
 
       <section className="card premiumPanel">
         <div className="cardTitle">Builder and construction document desk</div>

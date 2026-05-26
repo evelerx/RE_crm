@@ -978,3 +978,251 @@ textarea.textarea {
   padding: 6px 0;
   text-align: left;
 }
+
+.enterprisePreviewCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  background: rgba(10, 18, 31, 0.72);
+}
+
+.builderSiteShell {
+  min-height: 100vh;
+  background: #f7f4ee;
+  color: #162033;
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+.builderSiteHeader {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px min(6vw, 64px);
+  background: rgba(247, 244, 238, 0.92);
+  border-bottom: 1px solid rgba(22, 32, 51, 0.12);
+  backdrop-filter: blur(12px);
+}
+
+.builderSiteBrand,
+.builderSiteHeader nav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.builderSiteBrand img {
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.builderSiteBrand span {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.builderSiteHeader a {
+  color: inherit;
+  font-weight: 800;
+}
+
+.builderHero {
+  position: relative;
+  min-height: 70vh;
+  display: grid;
+  align-items: end;
+  padding: min(8vw, 72px);
+  overflow: hidden;
+  background: #172033;
+  color: white;
+}
+
+.builderHero > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.62;
+}
+
+.builderHero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(6, 11, 22, 0.86), rgba(6, 11, 22, 0.28));
+}
+
+.builderHeroCopy {
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+}
+
+.builderHero h1 {
+  margin: 0 0 14px;
+  font-size: clamp(44px, 8vw, 92px);
+  line-height: 0.95;
+}
+
+.builderHero p {
+  max-width: 680px;
+  margin: 0 0 24px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: clamp(18px, 2.3vw, 26px);
+}
+
+.builderHeroActions,
+.builderSectionHead,
+.builderFactGrid,
+.builderThumbs {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.builderBand {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 54px 0;
+}
+
+.builderBand h2 {
+  margin: 0 0 12px;
+  font-size: clamp(30px, 4vw, 48px);
+}
+
+.builderBand p {
+  color: rgba(22, 32, 51, 0.72);
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+.builderFactGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 24px;
+}
+
+.builderFactGrid div,
+.builderPropertyCard {
+  border: 1px solid rgba(22, 32, 51, 0.14);
+  border-radius: 10px;
+  background: white;
+  padding: 18px;
+}
+
+.builderFactGrid b,
+.builderFactGrid span {
+  display: block;
+}
+
+.builderFactGrid span {
+  margin-top: 8px;
+  color: rgba(22, 32, 51, 0.68);
+}
+
+.builderSectionHead {
+  justify-content: space-between;
+  align-items: end;
+  margin-bottom: 18px;
+}
+
+.builderPropertyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.builderPropertyCard {
+  overflow: hidden;
+  padding: 0;
+}
+
+.builderPropertyCard > img {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+}
+
+.builderPropertyCard > div {
+  padding: 18px;
+}
+
+.builderPropertyCard h3 {
+  margin: 4px 0 8px;
+  font-size: 24px;
+}
+
+.builderPropertyMeta {
+  color: #54627b;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+.builderThumbs img {
+  width: 68px;
+  height: 54px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.builderContactBand {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.builderContactForm {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 10px;
+  background: white;
+  border: 1px solid rgba(22, 32, 51, 0.14);
+}
+
+.builderContactForm input,
+.builderContactForm textarea {
+  width: 100%;
+  border: 1px solid rgba(22, 32, 51, 0.16);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font: inherit;
+}
+
+.builderContactForm textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.builderSiteEmpty {
+  width: min(620px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 20vh 0;
+}
+
+@media (max-width: 760px) {
+  .builderSiteHeader {
+    position: static;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .builderHero {
+    min-height: 66vh;
+    padding: 42px 20px;
+  }
+
+  .builderFactGrid,
+  .builderContactBand {
+    grid-template-columns: 1fr;
+  }
+}

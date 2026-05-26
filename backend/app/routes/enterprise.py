@@ -21,11 +21,29 @@ from ..enterprise_scope import (
     user_can_access_record,
     user_read_filter,
 )
-from ..models import AppIntegrationConnection, Activity, AuditEvent, BuilderDocument, Contact, Deal, Profile, SupportChatMessage, User
+from ..models import (
+    AppIntegrationConnection,
+    Activity,
+    AuditEvent,
+    BuilderDocument,
+    BuilderWebsite,
+    BuilderWebsiteProperty,
+    Contact,
+    Deal,
+    Profile,
+    SupportChatMessage,
+    User,
+)
 from ..schemas import (
     BuilderDocumentCreateRequest,
     BuilderDocumentGenerateRequest,
     BuilderDocumentRead,
+    BuilderWebsiteGenerateCopyRequest,
+    BuilderWebsiteGenerateCopyResponse,
+    BuilderWebsitePropertyInput,
+    BuilderWebsitePropertyRead,
+    BuilderWebsiteRead,
+    BuilderWebsiteUpsertRequest,
     DealScoreResponse,
     EnterpriseEmployeeBlacklistRequest,
     EnterpriseEmployeeCreateRequest,
@@ -37,6 +55,14 @@ from ..schemas import (
     SupportChatMessageRead,
 )
 from ..settings import settings
+from ..services.builder_websites import (
+    builder_website_image_list,
+    builder_website_key_active,
+    ensure_builder_website,
+    provision_builder_website_key,
+    public_url_for_slug,
+    replace_website_properties,
+)
 from ..services.openrouter import OpenRouterError, chat_completion
 
 
@@ -58,6 +84,13 @@ def _normalize_db_datetime(value: datetime | None) -> datetime | None:
 def require_enterprise_owner(user: User = Depends(require_enterprise)) -> User:
     if not is_enterprise_owner(user):
         raise HTTPException(status_code=403, detail="Enterprise owner only")
+    return user
+
+
+def require_builder_owner(user: User = Depends(require_enterprise_owner)) -> User:
+    plan = (getattr(user, "plan", "") or "free").strip().lower()
+    if plan != "builder":
+        raise HTTPException(status_code=403, detail="Builder subscription required")
     return user
 
 
@@ -194,6 +227,61 @@ def _builder_document_row(row: BuilderDocument) -> BuilderDocumentRead:
         instructions=row.instructions,
         generated_text=row.generated_text,
         status=row.status,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _builder_website_property_row(row: BuilderWebsiteProperty) -> BuilderWebsitePropertyRead:
+    return BuilderWebsitePropertyRead(
+        id=row.id,
+        title=row.title,
+        property_type=row.property_type,
+        address=row.address,
+        city=row.city,
+        area=row.area,
+        price_label=row.price_label,
+        description=row.description,
+        image_urls=builder_website_image_list(row.image_urls),
+        sort_order=row.sort_order,
+    )
+
+
+def _builder_website_row(session: Session, row: BuilderWebsite) -> BuilderWebsiteRead:
+    properties = session.exec(
+        select(BuilderWebsiteProperty)
+        .where(BuilderWebsiteProperty.website_id == row.id)
+        .order_by(BuilderWebsiteProperty.sort_order.asc(), BuilderWebsiteProperty.created_at.asc())
+    ).all()
+    return BuilderWebsiteRead(
+        id=row.id,
+        owner_id=row.owner_id,
+        slug=row.slug,
+        status=row.status,
+        template_key=row.template_key,
+        site_name=row.site_name,
+        tagline=row.tagline,
+        about_text=row.about_text,
+        logo_url=row.logo_url,
+        hero_image_url=row.hero_image_url,
+        office_address=row.office_address,
+        office_city=row.office_city,
+        office_state=row.office_state,
+        office_pincode=row.office_pincode,
+        contact_email=row.contact_email,
+        contact_phone=row.contact_phone,
+        contact_whatsapp=row.contact_whatsapp,
+        service_areas=row.service_areas,
+        property_types=row.property_types,
+        formspree_endpoint=row.formspree_endpoint,
+        custom_domain=row.custom_domain,
+        public_url=public_url_for_slug(row.slug),
+        ai_key_name=row.website_llm_key_name,
+        ai_limit_usd=float(row.website_llm_limit_usd or 0.08),
+        ai_ready=builder_website_key_active(row),
+        ai_last_error=row.website_llm_last_error,
+        properties=[_builder_website_property_row(item) for item in properties],
+        published_at=row.published_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -346,6 +434,212 @@ def builder_documents(
         .limit(100)
     ).all()
     return [_builder_document_row(row) for row in rows]
+
+
+@router.get("/builder-website", response_model=BuilderWebsiteRead)
+def get_builder_website(
+    session: Session = Depends(get_session),
+    user: User = Depends(require_builder_owner),
+):
+    website = ensure_builder_website(session, user)
+    return _builder_website_row(session, website)
+
+
+@router.put("/builder-website", response_model=BuilderWebsiteRead)
+async def save_builder_website(
+    payload: BuilderWebsiteUpsertRequest,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_builder_owner),
+):
+    website = ensure_builder_website(session, user)
+    website.template_key = payload.template_key
+    website.site_name = payload.site_name.strip()
+    website.tagline = payload.tagline.strip()
+    website.about_text = payload.about_text.strip()
+    website.logo_url = payload.logo_url.strip()
+    website.hero_image_url = payload.hero_image_url.strip()
+    website.office_address = payload.office_address.strip()
+    website.office_city = payload.office_city.strip()
+    website.office_state = payload.office_state.strip()
+    website.office_pincode = payload.office_pincode.strip()
+    website.contact_email = payload.contact_email.strip() or user.email
+    website.contact_phone = payload.contact_phone.strip()
+    website.contact_whatsapp = payload.contact_whatsapp.strip()
+    website.service_areas = payload.service_areas.strip()
+    website.property_types = payload.property_types.strip()
+    website.formspree_endpoint = payload.formspree_endpoint.strip() or (settings.formspree_endpoint or "").strip()
+    website.custom_domain = payload.custom_domain.strip().lower()
+    website.updated_at = _utc_now_naive()
+    session.add(website)
+    session.commit()
+    replace_website_properties(session, website.id, [item.model_dump() for item in payload.properties])
+    session.refresh(website)
+
+    if not builder_website_key_active(website):
+        ok, message = await provision_builder_website_key(website, seed_name=website.site_name)
+        website.website_llm_last_error = "" if ok else message
+        session.add(website)
+        session.commit()
+        session.refresh(website)
+
+    log_audit_event(
+        session,
+        actor=user,
+        kind="enterprise.builder_website_saved",
+        summary=f"Saved builder website draft for {website.site_name}",
+        detail=f"slug={website.slug}; template={website.template_key}; properties={len(payload.properties)}",
+        enterprise_owner_id=user.id,
+        target_user_id=user.id,
+    )
+    session.commit()
+    return _builder_website_row(session, website)
+
+
+@router.post("/builder-website/publish", response_model=BuilderWebsiteRead)
+async def publish_builder_website(
+    session: Session = Depends(get_session),
+    user: User = Depends(require_builder_owner),
+):
+    website = ensure_builder_website(session, user)
+    if not website.site_name.strip():
+        raise HTTPException(status_code=400, detail="Website name is required before publishing.")
+    if not website.contact_email.strip():
+        raise HTTPException(status_code=400, detail="Contact email is required before publishing.")
+    if not website.formspree_endpoint.strip() and not (settings.formspree_endpoint or "").strip():
+        raise HTTPException(status_code=400, detail="Add a Formspree endpoint before publishing.")
+    if not builder_website_key_active(website):
+        ok, message = await provision_builder_website_key(website, seed_name=website.site_name)
+        if not ok:
+            session.add(website)
+            session.commit()
+            raise HTTPException(status_code=400, detail=message)
+    website.status = "published"
+    website.published_at = _utc_now_naive()
+    website.updated_at = _utc_now_naive()
+    session.add(website)
+    log_audit_event(
+        session,
+        actor=user,
+        kind="enterprise.builder_website_published",
+        summary=f"Published builder website {website.slug}",
+        detail=public_url_for_slug(website.slug),
+        enterprise_owner_id=user.id,
+        target_user_id=user.id,
+    )
+    session.commit()
+    session.refresh(website)
+    return _builder_website_row(session, website)
+
+
+@router.post("/builder-website/unpublish", response_model=BuilderWebsiteRead)
+def unpublish_builder_website(
+    session: Session = Depends(get_session),
+    user: User = Depends(require_builder_owner),
+):
+    website = ensure_builder_website(session, user)
+    website.status = "draft"
+    website.updated_at = _utc_now_naive()
+    session.add(website)
+    log_audit_event(
+        session,
+        actor=user,
+        kind="enterprise.builder_website_unpublished",
+        summary=f"Unpublished builder website {website.slug}",
+        enterprise_owner_id=user.id,
+        target_user_id=user.id,
+    )
+    session.commit()
+    session.refresh(website)
+    return _builder_website_row(session, website)
+
+
+@router.post("/builder-website/generate-copy", response_model=BuilderWebsiteGenerateCopyResponse)
+async def generate_builder_website_copy(
+    payload: BuilderWebsiteGenerateCopyRequest,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_builder_owner),
+):
+    website = ensure_builder_website(session, user)
+    if not builder_website_key_active(website):
+        ok, message = await provision_builder_website_key(website, seed_name=payload.site_name)
+        if not ok:
+            session.add(website)
+            session.commit()
+            return BuilderWebsiteGenerateCopyResponse(ok=False, ai_ready=False, ai_last_error=message)
+        session.add(website)
+        session.commit()
+        session.refresh(website)
+
+    api_key = decrypt_if_configured(website.website_llm_api_key or "").strip()
+    if not api_key or api_key.startswith("enc:"):
+        message = "Builder website AI key is not ready yet."
+        website.website_llm_last_error = message
+        session.add(website)
+        session.commit()
+        return BuilderWebsiteGenerateCopyResponse(ok=False, ai_ready=False, ai_last_error=message)
+
+    property_lines = []
+    for item in payload.properties[:6]:
+        property_lines.append(
+            f"- {item.title} | {item.property_type or 'property'} | {item.area or item.city or item.address}"
+        )
+    user_message = (
+        f"Builder company: {payload.site_name}\n"
+        f"Service areas: {payload.service_areas or 'Not specified'}\n"
+        f"Property types: {payload.property_types or 'Not specified'}\n"
+        f"Office city: {payload.office_city or 'Not specified'}\n"
+        f"Current inventory:\n{chr(10).join(property_lines) if property_lines else '- No inventory yet'}\n\n"
+        "Write a premium but believable tagline under 14 words and a short homepage about section in Indian real-estate tone. "
+        "Avoid hype, fake awards, and robotic phrases."
+    )
+    try:
+        generated = await chat_completion(
+            api_key=api_key,
+            model="openai/gpt-5-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You write polished website copy for Indian builders and developers. Output exactly two sections: TAGLINE and ABOUT.",
+                },
+                {"role": "user", "content": user_message},
+            ],
+            max_tokens=350,
+        )
+    except OpenRouterError as exc:
+        website.website_llm_last_error = str(exc)
+        session.add(website)
+        session.commit()
+        return BuilderWebsiteGenerateCopyResponse(ok=False, ai_ready=True, ai_last_error=str(exc))
+
+    tagline = ""
+    about_text = ""
+    current = ""
+    for raw_line in generated.splitlines():
+        line = raw_line.strip()
+        upper = line.upper()
+        if upper.startswith("TAGLINE"):
+            current = "tagline"
+            tagline = line.split(":", 1)[1].strip() if ":" in line else ""
+            continue
+        if upper.startswith("ABOUT"):
+            current = "about"
+            about_text = line.split(":", 1)[1].strip() if ":" in line else ""
+            continue
+        if current == "tagline" and line:
+            tagline = f"{tagline} {line}".strip()
+        elif current == "about" and line:
+            about_text = f"{about_text}\n{line}".strip()
+
+    website.website_llm_last_error = ""
+    session.add(website)
+    session.commit()
+    return BuilderWebsiteGenerateCopyResponse(
+        ok=True,
+        tagline=tagline.strip(),
+        about_text=about_text.strip(),
+        ai_ready=True,
+        ai_last_error="",
+    )
 
 
 @router.post("/builder-documents", response_model=BuilderDocumentRead)

@@ -101,6 +101,8 @@ def _runtime_config_payload() -> AdminRuntimeConfigRead:
         frontend_origin=settings.frontend_origin or "",
         public_app_url=settings.public_app_url or "",
         openrouter_base_url=settings.openrouter_base_url or "",
+        openrouter_management_api_key_configured=bool((settings.openrouter_management_api_key or "").strip()),
+        builder_sites_base_url=settings.builder_sites_base_url or "",
         admin_email=settings.admin_email or "",
         jwt_secret_configured=(settings.jwt_secret or "").strip() not in {"", "change-me"},
         admin_password_mode=(
@@ -401,6 +403,8 @@ def update_runtime_config(
     set_text("frontend_origin", "FRONTEND_ORIGIN", payload.frontend_origin)
     set_text("public_app_url", "PUBLIC_APP_URL", payload.public_app_url)
     set_text("openrouter_base_url", "OPENROUTER_BASE_URL", payload.openrouter_base_url)
+    set_text("openrouter_management_api_key", "OPENROUTER_MANAGEMENT_API_KEY", payload.openrouter_management_api_key)
+    set_text("builder_sites_base_url", "BUILDER_SITES_BASE_URL", payload.builder_sites_base_url)
     if payload.admin_email is not None:
         normalized = normalize_email(payload.admin_email)
         env_updates["ADMIN_EMAIL"] = normalized

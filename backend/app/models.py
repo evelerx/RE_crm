@@ -173,6 +173,56 @@ class BuilderDocument(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class BuilderWebsite(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    owner_id: UUID = Field(foreign_key="user.id", index=True, unique=True)
+    slug: str = Field(index=True, unique=True)
+    status: str = Field(default="draft", index=True)
+    template_key: str = Field(default="signature_builder", index=True)
+    site_name: str = ""
+    tagline: str = ""
+    about_text: str = ""
+    logo_url: str = ""
+    hero_image_url: str = ""
+    office_address: str = ""
+    office_city: str = ""
+    office_state: str = ""
+    office_pincode: str = ""
+    contact_email: str = ""
+    contact_phone: str = ""
+    contact_whatsapp: str = ""
+    service_areas: str = ""
+    property_types: str = ""
+    formspree_endpoint: str = ""
+    custom_domain: str = ""
+    website_llm_provider: str = ""
+    website_llm_api_key: str = ""
+    website_llm_key_name: str = ""
+    website_llm_key_hash: str = ""
+    website_llm_limit_usd: float = 0.08
+    website_llm_provisioned_at: Optional[datetime] = None
+    website_llm_last_error: str = ""
+    published_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class BuilderWebsiteProperty(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    website_id: UUID = Field(foreign_key="builderwebsite.id", index=True)
+    title: str = ""
+    property_type: str = ""
+    address: str = ""
+    city: str = ""
+    area: str = ""
+    price_label: str = ""
+    description: str = ""
+    image_urls: str = ""
+    sort_order: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class PasswordResetToken(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     user_id: UUID = Field(foreign_key="user.id", index=True)

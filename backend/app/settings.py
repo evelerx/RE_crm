@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     pbkdf2_rounds: int = 60_000
     data_encryption_key: str = ""  # Fernet key (base64), optional but recommended
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_management_api_key: str = ""
     google_client_id: str = ""
     google_client_secret: str = ""
     microsoft_client_id: str = ""
@@ -46,6 +47,7 @@ class Settings(BaseSettings):
     payment_link_builder: str = ""
     formspree_endpoint: str = ""
     formspree_bearer_token: str = ""
+    builder_sites_base_url: str = "https://northstonecrm.com/builders"
     login_max_attempts: int = 5
     login_lockout_minutes: int = 15
     jwt_exp_days: int = 30

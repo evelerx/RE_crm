@@ -196,7 +196,10 @@ type ComplianceReport = {
 type RuntimeConfig = {
   env_file_path: string;
   frontend_origin: string;
+  public_app_url?: string;
   openrouter_base_url: string;
+  openrouter_management_api_key_configured: boolean;
+  builder_sites_base_url: string;
   admin_email: string;
   jwt_secret_configured: boolean;
   admin_password_mode: string;
@@ -655,7 +658,10 @@ export default function AdminPage() {
   const [configMsg, setConfigMsg] = useState<string | null>(null);
   const [configForm, setConfigForm] = useState({
     frontend_origin: "",
+    public_app_url: "",
     openrouter_base_url: "",
+    openrouter_management_api_key: "",
+    builder_sites_base_url: "",
     admin_email: "",
     jwt_secret: "",
     admin_password: "",
@@ -757,7 +763,9 @@ export default function AdminPage() {
       setConfigForm((prev) => ({
         ...prev,
         frontend_origin: runtime.frontend_origin || "",
+        public_app_url: runtime.public_app_url || "",
         openrouter_base_url: runtime.openrouter_base_url || "",
+        builder_sites_base_url: runtime.builder_sites_base_url || "https://northstonecrm.com/builders",
         admin_email: runtime.admin_email || "",
         pbkdf2_rounds: runtime.pbkdf2_rounds || 120000,
         login_max_attempts: runtime.login_max_attempts || 5,
@@ -1012,7 +1020,9 @@ export default function AdminPage() {
               try {
                 const payload = {
                   frontend_origin: configForm.frontend_origin,
+                  public_app_url: configForm.public_app_url,
                   openrouter_base_url: configForm.openrouter_base_url,
+                  builder_sites_base_url: configForm.builder_sites_base_url,
                   admin_email: configForm.admin_email,
                   pbkdf2_rounds: configForm.pbkdf2_rounds,
                   login_max_attempts: configForm.login_max_attempts,
@@ -1021,14 +1031,15 @@ export default function AdminPage() {
                   store_admin_password_as_hash: configForm.store_admin_password_as_hash,
                   ...(configForm.jwt_secret.trim() ? { jwt_secret: configForm.jwt_secret } : {}),
                   ...(configForm.admin_password.trim() ? { admin_password: configForm.admin_password } : {}),
-                  ...(configForm.data_encryption_key.trim() ? { data_encryption_key: configForm.data_encryption_key } : {})
+                  ...(configForm.data_encryption_key.trim() ? { data_encryption_key: configForm.data_encryption_key } : {}),
+                  ...(configForm.openrouter_management_api_key.trim() ? { openrouter_management_api_key: configForm.openrouter_management_api_key } : {})
                 };
                 const updated = await api<RuntimeConfig>("/admin/runtime-config", {
                   method: "POST",
                   body: JSON.stringify(payload)
                 });
                 setRuntimeConfig(updated);
-                setConfigForm((prev) => ({ ...prev, jwt_secret: "", admin_password: "", data_encryption_key: "" }));
+                setConfigForm((prev) => ({ ...prev, jwt_secret: "", admin_password: "", data_encryption_key: "", openrouter_management_api_key: "" }));
                 setConfigMsg("Admin runtime configuration updated.");
                 await load(selectedEnterpriseId);
               } catch (err) {
@@ -1054,6 +1065,11 @@ export default function AdminPage() {
                 <div className="statValue">{runtimeConfig.jwt_secret_configured ? "Configured" : "Missing"}</div>
                 <div className="statHint">Controls token signing security.</div>
               </div>
+              <div className="statCard">
+                <div className="statLabel">Builder site AI</div>
+                <div className="statValue">{runtimeConfig.openrouter_management_api_key_configured ? "Ready" : "Missing"}</div>
+                <div className="statHint">Creates one $0.08 OpenRouter child key per builder website.</div>
+              </div>
             </div>
             <div className="grid2">
               <label>
@@ -1067,9 +1083,30 @@ export default function AdminPage() {
             </div>
             <div className="grid2">
               <label>
+                Public app URL
+                <input value={configForm.public_app_url} onChange={(e) => setConfigForm((prev) => ({ ...prev, public_app_url: e.target.value }))} placeholder="https://app.northstonecrm.com" />
+              </label>
+              <label>
+                Builder sites base URL
+                <input value={configForm.builder_sites_base_url} onChange={(e) => setConfigForm((prev) => ({ ...prev, builder_sites_base_url: e.target.value }))} placeholder="https://northstonecrm.com/builders" />
+              </label>
+            </div>
+            <div className="grid2">
+              <label>
                 OpenRouter base URL
                 <input value={configForm.openrouter_base_url} onChange={(e) => setConfigForm((prev) => ({ ...prev, openrouter_base_url: e.target.value }))} />
               </label>
+              <label>
+                OpenRouter management API key
+                <input
+                  value={configForm.openrouter_management_api_key}
+                  onChange={(e) => setConfigForm((prev) => ({ ...prev, openrouter_management_api_key: e.target.value }))}
+                  placeholder={runtimeConfig.openrouter_management_api_key_configured ? "Paste only to rotate the management key" : "Paste OpenRouter management key"}
+                  type="password"
+                />
+              </label>
+            </div>
+            <div className="grid2">
               <label>
                 Data encryption key
                 <input

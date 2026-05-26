@@ -7,6 +7,7 @@ import AdminPage from "./pages/AdminPage";
 import { AdminOwnerContactsPage, AdminOwnerDealsPage, AdminOwnerPipelinePage } from "./pages/AdminWorkspacePages";
 import AccountPage from "./pages/AccountPage";
 import AppsPage from "./pages/AppsPage";
+import BuilderPublicPage from "./pages/BuilderPublicPage";
 import CalculatorPage from "./pages/CalculatorPage";
 import ContactsPage from "./pages/ContactsPage";
 import DealDetailPage from "./pages/DealDetailPage";
@@ -260,6 +261,10 @@ export default function App() {
     setEnterpriseBadge(null);
     setReraCompleted(true);
     navigate("/login");
+  }
+
+  if (location.pathname.startsWith("/builders/")) {
+    return <BuilderPublicPage />;
   }
 
   if (!authed) {

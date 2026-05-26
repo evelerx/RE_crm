@@ -3,6 +3,10 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/builders/:slug",
+      "destination": "/landing-only/builder-site.html"
+    },
+    {
       "source": "/",
       "destination": "/Northstone-landing.html"
     }

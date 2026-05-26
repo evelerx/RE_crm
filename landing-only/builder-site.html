@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Builder website | Northstone</title>
+<link rel="icon" href="./northstone-logo-icon.png" type="image/png" />
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: #f7f4ee; color: #162033; }
+  a { color: inherit; text-decoration: none; }
+  .header { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 18px min(6vw, 64px); border-bottom: 1px solid rgba(22,32,51,.12); background: rgba(247,244,238,.94); position: sticky; top: 0; z-index: 3; backdrop-filter: blur(12px); }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 900; font-size: 18px; }
+  .brand img { width: 42px; height: 42px; object-fit: cover; border-radius: 10px; }
+  nav { display: flex; gap: 16px; font-weight: 800; }
+  .hero { min-height: 70vh; display: grid; align-items: end; padding: min(8vw,72px); position: relative; overflow: hidden; background: #172033; color: white; }
+  .hero > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .62; }
+  .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(6,11,22,.86), rgba(6,11,22,.28)); }
+  .heroCopy { position: relative; z-index: 1; max-width: 760px; }
+  h1 { margin: 0 0 14px; font-size: clamp(44px,8vw,92px); line-height: .95; }
+  h2 { margin: 0 0 12px; font-size: clamp(30px,4vw,48px); }
+  h3 { margin: 4px 0 8px; font-size: 24px; }
+  p { line-height: 1.7; }
+  .hero p { font-size: clamp(18px,2.3vw,26px); color: rgba(255,255,255,.86); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 12px 18px; border-radius: 8px; border: 1px solid #162033; background: #162033; color: white; font-weight: 900; }
+  .btn.ghost { background: transparent; color: inherit; }
+  .hero .btn.ghost { color: white; border-color: rgba(255,255,255,.5); }
+  .actions, .facts, .thumbs, .sectionHead { display: flex; gap: 12px; flex-wrap: wrap; }
+  .band { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 54px 0; }
+  .facts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin-top: 24px; }
+  .facts div, .property, .contactForm { border: 1px solid rgba(22,32,51,.14); border-radius: 10px; background: white; padding: 18px; }
+  .facts b, .facts span { display: block; }
+  .facts span, .muted { color: rgba(22,32,51,.68); }
+  .sectionHead { justify-content: space-between; align-items: end; margin-bottom: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 18px; }
+  .property { overflow: hidden; padding: 0; }
+  .property > img { width: 100%; height: 220px; object-fit: cover; }
+  .property > div { padding: 18px; }
+  .meta { color: #54627b; font-weight: 800; text-transform: uppercase; font-size: 12px; }
+  .thumbs img { width: 68px; height: 54px; border-radius: 8px; object-fit: cover; }
+  .contact { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  .contactForm { display: grid; gap: 12px; }
+  input, textarea { width: 100%; border: 1px solid rgba(22,32,51,.16); border-radius: 8px; padding: 12px 14px; font: inherit; }
+  textarea { min-height: 120px; resize: vertical; }
+  .empty { width: min(620px, calc(100% - 32px)); margin: 0 auto; padding: 20vh 0; }
+  @media (max-width: 760px) { .header { position: static; align-items: flex-start; flex-direction: column; } .hero { min-height: 66vh; padding: 42px 20px; } .facts, .contact { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="root" class="empty">Loading builder website...</div>
+<script>
+const API_BASE = "https://api.northstonecrm.com";
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[ch]));
+}
+function splitList(value) {
+  return String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
+}
+function contactBlock(site) {
+  const parts = [site.office_address, site.office_city, site.office_state, site.office_pincode].filter(Boolean).join(", ");
+  if (!site.formspree_endpoint) {
+    return `<div class="contactForm"><a class="btn" href="mailto:${escapeHtml(site.contact_email)}">Email builder</a>${site.contact_whatsapp ? `<a class="btn ghost" href="https://wa.me/${escapeHtml(site.contact_whatsapp).replace(/[^\d]/g, "")}" target="_blank" rel="noreferrer">WhatsApp</a>` : ""}</div>`;
+  }
+  return `<form class="contactForm" action="${escapeHtml(site.formspree_endpoint)}" method="POST">
+    <input name="name" placeholder="Your name" required />
+    <input name="phone" placeholder="Phone number" required />
+    <input name="email" type="email" placeholder="Email address" />
+    <textarea name="message" placeholder="What are you looking for?" required></textarea>
+    <input type="hidden" name="builder_site" value="${escapeHtml(site.site_name)}" />
+    <button class="btn" type="submit">Send enquiry</button>
+  </form>`;
+}
+function render(site) {
+  const areas = splitList(site.service_areas);
+  const types = splitList(site.property_types);
+  const address = [site.office_address, site.office_city, site.office_state, site.office_pincode].filter(Boolean).join(", ");
+  document.title = `${site.site_name} | Northstone Builder`;
+  document.getElementById("root").className = "";
+  document.getElementById("root").innerHTML = `
+    <header class="header">
+      <a class="brand" href="/builders/${escapeHtml(site.slug)}">${site.logo_url ? `<img src="${site.logo_url}" alt="${escapeHtml(site.site_name)} logo" />` : ""}<span>${escapeHtml(site.site_name)}</span></a>
+      <nav><a href="#properties">Properties</a><a href="#contact">Contact</a></nav>
+    </header>
+    <main>
+      <section class="hero">
+        ${site.hero_image_url ? `<img src="${site.hero_image_url}" alt="${escapeHtml(site.site_name)} project showcase" />` : ""}
+        <div class="heroCopy">
+          <h1>${escapeHtml(site.site_name)}</h1>
+          <p>${escapeHtml(site.tagline || "Builder projects, locations, and contact details in one place.")}</p>
+          <div class="actions"><a class="btn" href="#contact">Enquire now</a>${site.contact_whatsapp ? `<a class="btn ghost" href="https://wa.me/${escapeHtml(site.contact_whatsapp).replace(/[^\d]/g, "")}" target="_blank" rel="noreferrer">WhatsApp</a>` : ""}</div>
+        </div>
+      </section>
+      <section class="band">
+        <h2>About</h2>
+        <p>${escapeHtml(site.about_text || `${site.site_name} works across selected real-estate projects and builder-led opportunities.`)}</p>
+        <div class="facts">
+          <div><b>Areas</b><span>${escapeHtml(areas.length ? areas.join(", ") : "Contact office")}</span></div>
+          <div><b>Property focus</b><span>${escapeHtml(types.length ? types.join(", ") : "Residential and commercial")}</span></div>
+          <div><b>Office</b><span>${escapeHtml(address || "Address available on request")}</span></div>
+        </div>
+      </section>
+      <section id="properties" class="band">
+        <div class="sectionHead"><h2>Properties</h2><p class="muted">${site.properties.length} listed project${site.properties.length === 1 ? "" : "s"}</p></div>
+        <div class="grid">
+          ${site.properties.map((property) => `
+            <article class="property">
+              ${property.image_urls?.[0] ? `<img src="${property.image_urls[0]}" alt="${escapeHtml(property.title)}" />` : ""}
+              <div>
+                <div class="meta">${escapeHtml(property.property_type || "Property")}${property.price_label ? ` | ${escapeHtml(property.price_label)}` : ""}</div>
+                <h3>${escapeHtml(property.title)}</h3>
+                <p>${escapeHtml(property.description || "Contact the builder for current availability and details.")}</p>
+                <div class="muted">${escapeHtml([property.address, property.area, property.city].filter(Boolean).join(", "))}</div>
+                ${property.image_urls?.length > 1 ? `<div class="thumbs">${property.image_urls.slice(1, 5).map((url, index) => `<img src="${url}" alt="${escapeHtml(property.title)} ${index + 2}" />`).join("")}</div>` : ""}
+              </div>
+            </article>`).join("")}
+        </div>
+      </section>
+      <section id="contact" class="band contact">
+        <div><h2>Contact ${escapeHtml(site.site_name)}</h2><p>${escapeHtml(site.contact_phone || site.contact_whatsapp || site.contact_email || "")}</p><p>${escapeHtml(address)}</p></div>
+        ${contactBlock(site)}
+      </section>
+    </main>`;
+}
+async function boot() {
+  const slug = location.pathname.split("/").filter(Boolean).pop() || "";
+  try {
+    const res = await fetch(`${API_BASE}/public/builder-sites/${encodeURIComponent(slug)}`);
+    if (!res.ok) throw new Error("This builder has not published their website yet.");
+    render(await res.json());
+  } catch (error) {
+    document.getElementById("root").className = "empty";
+    document.getElementById("root").innerHTML = `<h1>Builder website unavailable</h1><p>${escapeHtml(error.message || "Website not found")}</p><a class="btn" href="/">Back to Northstone</a>`;
+  }
+}
+boot();
+</script>
+</body>
+</html>

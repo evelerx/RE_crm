@@ -189,6 +189,8 @@ class AdminRuntimeConfigRead(BaseModel):
     frontend_origin: str = ""
     public_app_url: str = ""
     openrouter_base_url: str = ""
+    openrouter_management_api_key_configured: bool = False
+    builder_sites_base_url: str = ""
     admin_email: str = ""
     jwt_secret_configured: bool = False
     admin_password_mode: str = "missing"
@@ -210,6 +212,8 @@ class AdminRuntimeConfigUpdateRequest(BaseModel):
     frontend_origin: str | None = None
     public_app_url: str | None = None
     openrouter_base_url: str | None = None
+    openrouter_management_api_key: str | None = None
+    builder_sites_base_url: str | None = None
     admin_email: str | None = None
     jwt_secret: str | None = None
     admin_password: str | None = None
@@ -409,6 +413,100 @@ class BuilderDocumentRead(BaseModel):
     status: str = "draft"
     created_at: datetime
     updated_at: datetime
+
+
+class BuilderWebsitePropertyInput(BaseModel):
+    title: str = Field(min_length=1, max_length=160)
+    property_type: str = Field(default="", max_length=80)
+    address: str = Field(default="", max_length=240)
+    city: str = Field(default="", max_length=120)
+    area: str = Field(default="", max_length=120)
+    price_label: str = Field(default="", max_length=120)
+    description: str = Field(default="", max_length=4000)
+    image_urls: list[str] = []
+
+
+class BuilderWebsiteUpsertRequest(BaseModel):
+    template_key: str = Field(default="signature_builder", pattern="^(signature_builder|project_launch|modern_realty)$")
+    site_name: str = Field(min_length=2, max_length=160)
+    tagline: str = Field(default="", max_length=220)
+    about_text: str = Field(default="", max_length=6000)
+    logo_url: str = ""
+    hero_image_url: str = ""
+    office_address: str = Field(default="", max_length=240)
+    office_city: str = Field(default="", max_length=120)
+    office_state: str = Field(default="", max_length=120)
+    office_pincode: str = Field(default="", max_length=40)
+    contact_email: str = ""
+    contact_phone: str = Field(default="", max_length=40)
+    contact_whatsapp: str = Field(default="", max_length=40)
+    service_areas: str = Field(default="", max_length=400)
+    property_types: str = Field(default="", max_length=240)
+    formspree_endpoint: str = ""
+    custom_domain: str = ""
+    properties: list[BuilderWebsitePropertyInput] = []
+
+
+class BuilderWebsiteGenerateCopyRequest(BaseModel):
+    site_name: str = Field(min_length=2, max_length=160)
+    service_areas: str = Field(default="", max_length=400)
+    property_types: str = Field(default="", max_length=240)
+    office_city: str = Field(default="", max_length=120)
+    properties: list[BuilderWebsitePropertyInput] = []
+
+
+class BuilderWebsitePropertyRead(BaseModel):
+    id: UUID
+    title: str
+    property_type: str = ""
+    address: str = ""
+    city: str = ""
+    area: str = ""
+    price_label: str = ""
+    description: str = ""
+    image_urls: list[str] = []
+    sort_order: int = 0
+
+
+class BuilderWebsiteRead(BaseModel):
+    id: UUID
+    owner_id: UUID
+    slug: str
+    status: str
+    template_key: str
+    site_name: str
+    tagline: str = ""
+    about_text: str = ""
+    logo_url: str = ""
+    hero_image_url: str = ""
+    office_address: str = ""
+    office_city: str = ""
+    office_state: str = ""
+    office_pincode: str = ""
+    contact_email: str = ""
+    contact_phone: str = ""
+    contact_whatsapp: str = ""
+    service_areas: str = ""
+    property_types: str = ""
+    formspree_endpoint: str = ""
+    custom_domain: str = ""
+    public_url: str = ""
+    ai_key_name: str = ""
+    ai_limit_usd: float = 0.08
+    ai_ready: bool = False
+    ai_last_error: str = ""
+    properties: list[BuilderWebsitePropertyRead] = []
+    published_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class BuilderWebsiteGenerateCopyResponse(BaseModel):
+    ok: bool
+    tagline: str = ""
+    about_text: str = ""
+    ai_ready: bool = False
+    ai_last_error: str = ""
 
 
 class SupportChatMessageCreate(BaseModel):

@@ -12,8 +12,11 @@ from sqlmodel import Session, select
 from ..audit import log_audit_event
 from ..auth import get_or_create_user, get_user_by_email, hash_password, normalize_email
 from ..db import get_session
-from ..models import Profile, User
+from ..models import BuilderWebsite, BuilderWebsiteProperty, Profile, User
+from ..services.builder_websites import builder_website_image_list, ensure_builder_website, public_url_for_slug
 from ..schemas import (
+    BuilderWebsitePropertyRead,
+    BuilderWebsiteRead,
     PublicCheckoutConfigRead,
     PublicCheckoutOrderRead,
     PublicCheckoutOrderRequest,
@@ -48,6 +51,55 @@ BILLING_MONTHS = {
     "six_month": 6,
     "yearly": 12,
 }
+
+
+def _public_builder_website_payload(website: BuilderWebsite, properties: list[BuilderWebsiteProperty]) -> BuilderWebsiteRead:
+    return BuilderWebsiteRead(
+        id=website.id,
+        owner_id=website.owner_id,
+        slug=website.slug,
+        status=website.status,
+        template_key=website.template_key,
+        site_name=website.site_name,
+        tagline=website.tagline,
+        about_text=website.about_text,
+        logo_url=website.logo_url,
+        hero_image_url=website.hero_image_url,
+        office_address=website.office_address,
+        office_city=website.office_city,
+        office_state=website.office_state,
+        office_pincode=website.office_pincode,
+        contact_email=website.contact_email,
+        contact_phone=website.contact_phone,
+        contact_whatsapp=website.contact_whatsapp,
+        service_areas=website.service_areas,
+        property_types=website.property_types,
+        formspree_endpoint=website.formspree_endpoint or (settings.formspree_endpoint or "").strip(),
+        custom_domain=website.custom_domain,
+        public_url=public_url_for_slug(website.slug),
+        ai_key_name="",
+        ai_limit_usd=float(website.website_llm_limit_usd or 0.08),
+        ai_ready=False,
+        ai_last_error="",
+        properties=[
+            BuilderWebsitePropertyRead(
+                id=row.id,
+                title=row.title,
+                property_type=row.property_type,
+                address=row.address,
+                city=row.city,
+                area=row.area,
+                price_label=row.price_label,
+                description=row.description,
+                image_urls=builder_website_image_list(row.image_urls),
+                sort_order=row.sort_order,
+            )
+            for row in properties
+        ],
+        published_at=website.published_at,
+        created_at=website.created_at,
+        updated_at=website.updated_at,
+    )
 
 
 def _utc_now_naive() -> datetime:
@@ -158,6 +210,19 @@ def checkout_config():
     return PublicCheckoutConfigRead(enabled=False, provider="", key_id="", plan_links={})
 
 
+@router.get("/builder-sites/{slug}", response_model=BuilderWebsiteRead)
+def public_builder_site(slug: str, session: Session = Depends(get_session)):
+    website = session.exec(select(BuilderWebsite).where(BuilderWebsite.slug == slug.strip().lower())).first()
+    if not website or website.status != "published":
+        raise HTTPException(status_code=404, detail="Builder website not found")
+    properties = session.exec(
+        select(BuilderWebsiteProperty)
+        .where(BuilderWebsiteProperty.website_id == website.id)
+        .order_by(BuilderWebsiteProperty.sort_order.asc(), BuilderWebsiteProperty.created_at.asc())
+    ).all()
+    return _public_builder_website_payload(website, properties)
+
+
 @router.post("/checkout-order", response_model=PublicCheckoutOrderRead)
 async def checkout_order(payload: PublicCheckoutOrderRequest):
     key_id = (settings.razorpay_key_id or "").strip()
@@ -231,6 +296,9 @@ def payment_link_request(payload: PublicPaymentLinkRequest, session: Session = D
     profile.city = payload.city.strip()
     profile.updated_at = now
     session.add(profile)
+
+    if payload.product_plan == "builder":
+        ensure_builder_website(session, user)
 
     log_audit_event(
         session,
