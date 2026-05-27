@@ -105,6 +105,22 @@ function mapWebsiteToForm(website: BuilderWebsite): BuilderWebsiteForm {
   };
 }
 
+function apiProperties(properties: BuilderWebsiteProperty[]) {
+  return properties
+    .filter((item) => item.title.trim())
+    .map((item, index) => ({
+      title: item.title.trim(),
+      property_type: item.property_type.trim(),
+      address: item.address.trim(),
+      city: item.city.trim(),
+      area: item.area.trim(),
+      price_label: item.price_label.trim(),
+      description: item.description.trim(),
+      image_urls: item.image_urls.map((url) => url.trim()).filter(Boolean),
+      sort_order: index
+    }));
+}
+
 async function fileToDataUrl(file: File): Promise<string> {
   return await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -153,10 +169,7 @@ export default function BuilderWebsiteDesk() {
         method: "PUT",
         body: JSON.stringify({
           ...form,
-          properties: form.properties.map((item, index) => ({
-            ...item,
-            sort_order: index
-          }))
+          properties: apiProperties(form.properties)
         })
       });
       setWebsite(row);
@@ -179,10 +192,7 @@ export default function BuilderWebsiteDesk() {
         method: "PUT",
         body: JSON.stringify({
           ...form,
-          properties: form.properties.map((item, index) => ({
-            ...item,
-            sort_order: index
-          }))
+          properties: apiProperties(form.properties)
         })
       });
       const row = await api<BuilderWebsite>("/enterprise/builder-website/publish", { method: "POST" });
@@ -225,7 +235,7 @@ export default function BuilderWebsiteDesk() {
           service_areas: form.service_areas,
           property_types: form.property_types,
           office_city: form.office_city,
-          properties: form.properties
+          properties: apiProperties(form.properties)
         })
       });
       if (result.tagline || result.about_text) {
