@@ -170,14 +170,25 @@ export default function BuilderWebsiteDesk() {
   }
 
   async function publishWebsite() {
+    if (!form) return;
     setBusy(true);
     setMessage(null);
     setError(null);
     try {
+      await api<BuilderWebsite>("/enterprise/builder-website", {
+        method: "PUT",
+        body: JSON.stringify({
+          ...form,
+          properties: form.properties.map((item, index) => ({
+            ...item,
+            sort_order: index
+          }))
+        })
+      });
       const row = await api<BuilderWebsite>("/enterprise/builder-website/publish", { method: "POST" });
       setWebsite(row);
       setForm(mapWebsiteToForm(row));
-      setMessage("Builder website published.");
+      setMessage("Builder website published. Open the live page to review it.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not publish builder website");
     } finally {

@@ -505,14 +505,12 @@ async def publish_builder_website(
         raise HTTPException(status_code=400, detail="Website name is required before publishing.")
     if not website.contact_email.strip():
         raise HTTPException(status_code=400, detail="Contact email is required before publishing.")
-    if not website.formspree_endpoint.strip() and not (settings.formspree_endpoint or "").strip():
-        raise HTTPException(status_code=400, detail="Add a Formspree endpoint before publishing.")
+    if not website.formspree_endpoint.strip() and (settings.formspree_endpoint or "").strip():
+        website.formspree_endpoint = (settings.formspree_endpoint or "").strip()
     if not builder_website_key_active(website):
         ok, message = await provision_builder_website_key(website, seed_name=website.site_name)
         if not ok:
-            session.add(website)
-            session.commit()
-            raise HTTPException(status_code=400, detail=message)
+            website.website_llm_last_error = message
     website.status = "published"
     website.published_at = _utc_now_naive()
     website.updated_at = _utc_now_naive()
