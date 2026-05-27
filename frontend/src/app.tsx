@@ -176,7 +176,6 @@ function BottomNav() {
 export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getToken()));
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isEnterprise, setIsEnterprise] = useState(false);
   const [enterpriseBadge, setEnterpriseBadge] = useState<string | null>(null);
   const [reraCompleted, setReraCompleted] = useState(true);
   const navigate = useNavigate();
@@ -187,7 +186,6 @@ export default function App() {
       if ((e.key === "northstonecrm_token" || e.key === "dealios_token") && !e.newValue) {
         setAuthed(false);
         setIsAdmin(false);
-        setIsEnterprise(false);
         setEnterpriseBadge(null);
         setReraCompleted(true);
       }
@@ -199,7 +197,6 @@ export default function App() {
   useEffect(() => {
     if (!authed) {
       setIsAdmin(false);
-      setIsEnterprise(false);
       setEnterpriseBadge(null);
       setReraCompleted(true);
       return;
@@ -221,8 +218,6 @@ export default function App() {
           const plan = (me.plan || "free").toLowerCase();
           const ownerMode = plan === "enterprise" || plan === "builder";
           const memberRole = (me.enterprise_member_role || "").toLowerCase();
-          const memberMode = Boolean(me.enterprise_owner_id) && (memberRole === "broker" || memberRole === "cp");
-          setIsEnterprise(ownerMode || memberMode);
           setEnterpriseBadge(
             me.enterprise_company_name?.trim() ||
               (
@@ -242,7 +237,6 @@ export default function App() {
       } catch {
         if (!cancelled) {
           setIsAdmin(false);
-          setIsEnterprise(false);
           setEnterpriseBadge(null);
           setReraCompleted(true);
         }
@@ -257,7 +251,6 @@ export default function App() {
     clearSession();
     setAuthed(false);
     setIsAdmin(false);
-    setIsEnterprise(false);
     setEnterpriseBadge(null);
     setReraCompleted(true);
     navigate("/login");
@@ -306,7 +299,6 @@ export default function App() {
       </main>
       <TutorialBubble
         isAdmin={isAdmin}
-        isEnterprise={isEnterprise}
         reraCompleted={reraCompleted || isAdmin}
         email={getEmail() || ""}
       />

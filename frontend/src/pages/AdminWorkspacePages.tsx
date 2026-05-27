@@ -72,6 +72,25 @@ type OwnerWorkspace = {
   contacts: OwnerContactRow[];
 };
 
+type AdminUserRow = {
+  id: string;
+  email: string;
+  full_name?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  company?: string | null;
+  city?: string | null;
+  plan?: string | null;
+  enterprise_owner_id?: string | null;
+  enterprise_member_role?: string | null;
+  employee_count?: number;
+  is_admin_account?: boolean;
+};
+
+type AdminContactRow = AdminUserRow & {
+  employees: AdminUserRow[];
+};
+
 function fmtDt(value: string | null) {
   if (!value) return "-";
   const d = new Date(value);
@@ -84,6 +103,10 @@ function formatRupees(value: number | null) {
   return `Rs ${Math.round(value).toLocaleString("en-IN")}`;
 }
 
+function textValue(value: string | null | undefined) {
+  return value ?? "";
+}
+
 const ADMIN_PIPELINE_STAGES = [
   { key: "new_lead", label: "New lead" },
   { key: "qualified", label: "Qualified" },
@@ -93,85 +116,6 @@ const ADMIN_PIPELINE_STAGES = [
 ] as const;
 
 type AdminPipelineStageKey = (typeof ADMIN_PIPELINE_STAGES)[number]["key"];
-
-function useAdminWorkspaceData() {
-  const [owners, setOwners] = useState<EnterpriseDetail[]>([]);
-  const [selectedOwnerId, setSelectedOwnerId] = useState("");
-  const [workspace, setWorkspace] = useState<OwnerWorkspace | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  async function load(ownerIdOverride?: string) {
-    setLoading(true);
-    setError(null);
-    try {
-      const enterpriseRows = await api<EnterpriseDetail[]>("/admin/enterprises");
-      setOwners(enterpriseRows);
-      const nextOwnerId = ownerIdOverride || selectedOwnerId || enterpriseRows[0]?.enterprise_owner_id || "";
-      setSelectedOwnerId(nextOwnerId);
-
-      const nextWorkspace = nextOwnerId ? await api<OwnerWorkspace>(`/admin/enterprises/${nextOwnerId}/workspace`) : null;
-      setWorkspace(nextWorkspace);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load admin workspace data");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function selectOwner(nextOwnerId: string) {
-    setSelectedOwnerId(nextOwnerId);
-    setLoading(true);
-    setError(null);
-    try {
-      const nextWorkspace = nextOwnerId ? await api<OwnerWorkspace>(`/admin/enterprises/${nextOwnerId}/workspace`) : null;
-      setWorkspace(nextWorkspace);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load owner workspace");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return {
-    owners,
-    selectedOwnerId,
-    setSelectedOwnerId: selectOwner,
-    workspace,
-    loading,
-    error,
-    reload: load
-  };
-}
-
-function OwnerSelector({
-  owners,
-  selectedOwnerId,
-  onChange
-}: {
-  owners: EnterpriseDetail[];
-  selectedOwnerId: string;
-  onChange: (ownerId: string) => Promise<void> | void;
-}) {
-  return (
-    <label>
-      Subscription owner
-      <select value={selectedOwnerId} onChange={(e) => void onChange(e.target.value)}>
-        {owners.map((owner) => (
-          <option key={owner.enterprise_owner_id} value={owner.enterprise_owner_id}>
-            {owner.owner_email}
-          </option>
-        ))}
-        {owners.length === 0 ? <option value="">No subscription owners yet</option> : null}
-      </select>
-    </label>
-  );
-}
 
 function useAdminEnterpriseWorkspaces() {
   const [owners, setOwners] = useState<EnterpriseDetail[]>([]);
@@ -614,7 +558,7 @@ export function AdminOwnerDealsPage() {
 }
 
 export function AdminOwnerContactsPage() {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -635,7 +579,7 @@ export function AdminOwnerContactsPage() {
     setLoading(true);
     setError(null);
     try {
-      const rows = await api<any[]>("/admin/users");
+      const rows = await api<AdminUserRow[]>("/admin/users");
       setUsers(rows);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load CRM users");
@@ -649,7 +593,7 @@ export function AdminOwnerContactsPage() {
   }, []);
 
   const topLevelUsers = useMemo(() => {
-    const employeeMap = new Map<string, any[]>();
+    const employeeMap = new Map<string, AdminUserRow[]>();
     for (const user of users) {
       if (user.enterprise_owner_id) {
         const existing = employeeMap.get(user.enterprise_owner_id) ?? [];
@@ -690,7 +634,7 @@ export function AdminOwnerContactsPage() {
         );
         return ownText.includes(query) || employeeMatch;
       })
-      .map((user) => ({
+      .map<AdminContactRow>((user) => ({
         ...user,
         employees: (employeeMap.get(user.id) ?? []).sort((a, b) => String(a.full_name || a.email).localeCompare(String(b.full_name || b.email))),
       }));
@@ -853,11 +797,11 @@ export function AdminOwnerContactsPage() {
                             type="button"
                             onClick={() => startEdit({
                               id: user.id,
-                              full_name: user.full_name,
-                              phone: user.phone,
-                              whatsapp: user.whatsapp,
-                              company: user.company,
-                              city: user.city,
+                              full_name: textValue(user.full_name),
+                              phone: textValue(user.phone),
+                              whatsapp: textValue(user.whatsapp),
+                              company: textValue(user.company),
+                              city: textValue(user.city),
                             })}
                           >
                             Edit
@@ -910,7 +854,7 @@ export function AdminOwnerContactsPage() {
                         </td>
                       </tr>
                     ) : null}
-                    {isOwner && isExpanded ? (user.employees ?? []).map((employee: any) => (
+                    {isOwner && isExpanded ? user.employees.map((employee) => (
                       <tr key={`${user.id}-${employee.id}`}>
                         <td className="tdTitle">{employee.full_name || "-"}</td>
                         <td>{employee.enterprise_member_role || "employee"}</td>
@@ -927,11 +871,11 @@ export function AdminOwnerContactsPage() {
                               type="button"
                               onClick={() => startEdit({
                                 id: employee.id,
-                                full_name: employee.full_name,
-                                phone: employee.phone,
-                                whatsapp: employee.whatsapp,
-                                company: employee.company,
-                                city: employee.city,
+                                full_name: textValue(employee.full_name),
+                                phone: textValue(employee.phone),
+                                whatsapp: textValue(employee.whatsapp),
+                                company: textValue(employee.company),
+                                city: textValue(employee.city),
                               })}
                             >
                               Edit

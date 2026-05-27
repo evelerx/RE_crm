@@ -78,12 +78,12 @@ function render(site) {
   document.getElementById("root").className = "";
   document.getElementById("root").innerHTML = `
     <header class="header">
-      <a class="brand" href="/builders/${escapeHtml(site.slug)}">${site.logo_url ? `<img src="${site.logo_url}" alt="${escapeHtml(site.site_name)} logo" />` : ""}<span>${escapeHtml(site.site_name)}</span></a>
+      <a class="brand" href="/builders/${escapeHtml(site.slug)}">${site.logo_url ? `<img src="${site.logo_url}" alt="${escapeHtml(site.site_name)} logo" loading="lazy" decoding="async" />` : ""}<span>${escapeHtml(site.site_name)}</span></a>
       <nav><a href="#properties">Properties</a><a href="#contact">Contact</a></nav>
     </header>
     <main>
       <section class="hero">
-        ${site.hero_image_url ? `<img src="${site.hero_image_url}" alt="${escapeHtml(site.site_name)} project showcase" />` : ""}
+        ${site.hero_image_url ? `<img src="${site.hero_image_url}" alt="${escapeHtml(site.site_name)} project showcase" decoding="async" />` : ""}
         <div class="heroCopy">
           <h1>${escapeHtml(site.site_name)}</h1>
           <p>${escapeHtml(site.tagline || "Builder projects, locations, and contact details in one place.")}</p>
@@ -104,13 +104,13 @@ function render(site) {
         <div class="grid">
           ${site.properties.map((property) => `
             <article class="property">
-              ${property.image_urls?.[0] ? `<img src="${property.image_urls[0]}" alt="${escapeHtml(property.title)}" />` : ""}
+              ${property.image_urls?.[0] ? `<img src="${property.image_urls[0]}" alt="${escapeHtml(property.title)}" loading="lazy" decoding="async" />` : ""}
               <div>
                 <div class="meta">${escapeHtml(property.property_type || "Property")}${property.price_label ? ` | ${escapeHtml(property.price_label)}` : ""}</div>
                 <h3>${escapeHtml(property.title)}</h3>
                 <p>${escapeHtml(property.description || "Contact the builder for current availability and details.")}</p>
                 <div class="muted">${escapeHtml([property.address, property.area, property.city].filter(Boolean).join(", "))}</div>
-                ${property.image_urls?.length > 1 ? `<div class="thumbs">${property.image_urls.slice(1, 5).map((url, index) => `<img src="${url}" alt="${escapeHtml(property.title)} ${index + 2}" />`).join("")}</div>` : ""}
+                ${property.image_urls?.length > 1 ? `<div class="thumbs">${property.image_urls.slice(1, 5).map((url, index) => `<img src="${url}" alt="${escapeHtml(property.title)} ${index + 2}" loading="lazy" decoding="async" />`).join("")}</div>` : ""}
               </div>
             </article>`).join("")}
         </div>

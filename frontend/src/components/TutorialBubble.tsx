@@ -17,12 +17,10 @@ function routeMatches(pathname: string, path?: string) {
 
 export default function TutorialBubble({
   isAdmin,
-  isEnterprise,
   reraCompleted,
   email
 }: {
   isAdmin: boolean;
-  isEnterprise: boolean;
   reraCompleted: boolean;
   email: string;
 }) {
@@ -172,7 +170,7 @@ export default function TutorialBubble({
     }
 
     return base;
-  }, [isAdmin, isEnterprise, reraCompleted]);
+  }, [isAdmin, reraCompleted]);
 
   useEffect(() => {
     const hidden = window.localStorage.getItem(storageKey) === "1";

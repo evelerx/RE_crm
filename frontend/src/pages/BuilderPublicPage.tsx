@@ -93,7 +93,7 @@ export default function BuilderPublicPage() {
     <div className={`builderSiteShell builderTemplate-${site.template_key}`}>
       <header className="builderSiteHeader">
         <a className="builderSiteBrand" href={`/builders/${site.slug}`}>
-          {site.logo_url ? <img src={site.logo_url} alt={`${site.site_name} logo`} /> : null}
+          {site.logo_url ? <img src={site.logo_url} alt={`${site.site_name} logo`} loading="lazy" decoding="async" /> : null}
           <span>{site.site_name}</span>
         </a>
         <nav>
@@ -104,7 +104,7 @@ export default function BuilderPublicPage() {
 
       <main>
         <section className="builderHero">
-          {site.hero_image_url ? <img src={site.hero_image_url} alt={`${site.site_name} project showcase`} /> : null}
+          {site.hero_image_url ? <img src={site.hero_image_url} alt={`${site.site_name} project showcase`} decoding="async" /> : null}
           <div className="builderHeroCopy">
             <h1>{site.site_name}</h1>
             <p>{site.tagline || "Builder projects, locations, and contact details in one place."}</p>
@@ -135,7 +135,7 @@ export default function BuilderPublicPage() {
           <div className="builderPropertyGrid">
             {site.properties.map((property) => (
               <article key={property.id} className="builderPropertyCard">
-                {property.image_urls[0] ? <img src={property.image_urls[0]} alt={property.title} /> : null}
+                {property.image_urls[0] ? <img src={property.image_urls[0]} alt={property.title} loading="lazy" decoding="async" /> : null}
                 <div>
                   <div className="builderPropertyMeta">{property.property_type || "Property"}{property.price_label ? ` | ${property.price_label}` : ""}</div>
                   <h3>{property.title}</h3>
@@ -144,7 +144,7 @@ export default function BuilderPublicPage() {
                   {property.image_urls.length > 1 ? (
                     <div className="builderThumbs">
                       {property.image_urls.slice(1, 5).map((url, index) => (
-                        <img key={`${property.id}-${index}`} src={url} alt={`${property.title} ${index + 2}`} />
+                        <img key={`${property.id}-${index}`} src={url} alt={`${property.title} ${index + 2}`} loading="lazy" decoding="async" />
                       ))}
                     </div>
                   ) : null}

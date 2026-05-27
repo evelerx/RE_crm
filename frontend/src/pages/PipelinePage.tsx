@@ -86,10 +86,10 @@ export default function PipelinePage() {
           <div className="muted">Track deals by stage.</div>
         </div>
         <div className="row">
-          <button className="btn" onClick={() => setCreateOpen(true)}>
+          <button className="btn" onClick={() => setCreateOpen(true)} type="button">
             + New Deal
           </button>
-          <button className="btn ghost" onClick={() => void load()}>
+          <button className="btn ghost" onClick={() => void load()} type="button">
             Refresh
           </button>
         </div>

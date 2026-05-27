@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api } from "../api/client";
 import type { Activity, Contact, Deal } from "../api/types";
@@ -65,7 +65,7 @@ export default function DealDetailPage() {
     risk_flags: ""
   });
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!dealId) return;
     setError(null);
     try {
@@ -98,11 +98,11 @@ export default function DealDetailPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deal");
     }
-  }
+  }, [dealId]);
 
   useEffect(() => {
     void load();
-  }, [dealId]);
+  }, [load]);
 
   async function saveNotes() {
     if (!dealId) return;
@@ -228,7 +228,7 @@ export default function DealDetailPage() {
             {deal ? `${deal.asset_type} | ${deal.stage} | ${deal.area}${deal.city ? `, ${deal.city}` : ""}` : "Loading deal..."}
           </div>
         </div>
-        <button className="btn ghost" onClick={() => void load()}>
+        <button className="btn ghost" onClick={() => void load()} type="button">
           Refresh
         </button>
         <button className="btn ghost" onClick={() => void deleteDeal()} disabled={deleteBusy} type="button">
@@ -388,7 +388,7 @@ export default function DealDetailPage() {
             <div className="cardTitle">Notes</div>
             <textarea className="textarea" value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} />
             <div className="row right">
-              <button className="btn" onClick={() => void saveNotes()}>
+              <button className="btn" onClick={() => void saveNotes()} type="button">
                 {notesBusy ? "Saving..." : "Save notes"}
               </button>
             </div>

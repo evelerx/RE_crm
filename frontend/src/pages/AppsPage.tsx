@@ -747,16 +747,16 @@ export default function AppsPage() {
                           <>
                             <div className="row" style={{ gap: 14, flexWrap: "wrap", justifyContent: "flex-start" }}>
                               {googlePrimary?.can_connect && !googlePrimary.connected ? (
-                                <button className="btn" onClick={() => void connectGoogle()} disabled={googleBusy}>
+                                <button className="btn" onClick={() => void connectGoogle()} disabled={googleBusy} type="button">
                                   {googleBusy ? "Connecting..." : "Connect Google Workspace"}
                                 </button>
                               ) : null}
                               {googlePrimary?.connected ? (
                                 <>
-                                  <button className="btn" onClick={() => void testGoogleConnection()} disabled={googleTestBusy}>
+                                  <button className="btn" onClick={() => void testGoogleConnection()} disabled={googleTestBusy} type="button">
                                     {googleTestBusy ? "Testing..." : "Test Google connection"}
                                   </button>
-                                  <button className="btn secondary" onClick={() => void disconnectGoogle()} disabled={googleBusy}>
+                                  <button className="btn secondary" onClick={() => void disconnectGoogle()} disabled={googleBusy} type="button">
                                     {googleBusy ? "Working..." : "Disconnect Google Workspace"}
                                   </button>
                                 </>
@@ -1075,16 +1075,16 @@ export default function AppsPage() {
                       <div className="stack" style={{ gap: 14, marginTop: 18 }}>
                         <div className="row" style={{ gap: 14, flexWrap: "wrap", justifyContent: "flex-start" }}>
                           {microsoftPrimary?.can_connect && !microsoftPrimary.connected ? (
-                            <button className="btn" onClick={() => void connectMicrosoft()} disabled={microsoftBusy}>
+                            <button className="btn" onClick={() => void connectMicrosoft()} disabled={microsoftBusy} type="button">
                               {microsoftBusy ? "Connecting..." : "Connect Microsoft Workspace"}
                             </button>
                           ) : null}
                           {microsoftPrimary?.connected ? (
                             <>
-                              <button className="btn" onClick={() => void testMicrosoftConnection()} disabled={microsoftTestBusy}>
+                              <button className="btn" onClick={() => void testMicrosoftConnection()} disabled={microsoftTestBusy} type="button">
                                 {microsoftTestBusy ? "Testing..." : "Test Microsoft connection"}
                               </button>
-                              <button className="btn secondary" onClick={() => void disconnectMicrosoft()} disabled={microsoftBusy}>
+                              <button className="btn secondary" onClick={() => void disconnectMicrosoft()} disabled={microsoftBusy} type="button">
                                 {microsoftBusy ? "Working..." : "Disconnect Microsoft Workspace"}
                               </button>
                             </>
@@ -1106,16 +1106,16 @@ export default function AppsPage() {
                       <div className="stack" style={{ gap: 14, marginTop: 18 }}>
                         <div className="row" style={{ gap: 14, flexWrap: "wrap", justifyContent: "flex-start" }}>
                           {zoomPrimary?.can_connect && !zoomPrimary.connected ? (
-                            <button className="btn" onClick={() => void connectZoom()} disabled={zoomBusy}>
+                            <button className="btn" onClick={() => void connectZoom()} disabled={zoomBusy} type="button">
                               {zoomBusy ? "Connecting..." : "Connect Zoom Workspace"}
                             </button>
                           ) : null}
                           {zoomPrimary?.connected ? (
                             <>
-                              <button className="btn" onClick={() => void testZoomConnection()} disabled={zoomTestBusy}>
+                              <button className="btn" onClick={() => void testZoomConnection()} disabled={zoomTestBusy} type="button">
                                 {zoomTestBusy ? "Testing..." : "Test Zoom connection"}
                               </button>
-                              <button className="btn secondary" onClick={() => void disconnectZoom()} disabled={zoomBusy}>
+                              <button className="btn secondary" onClick={() => void disconnectZoom()} disabled={zoomBusy} type="button">
                                 {zoomBusy ? "Working..." : "Disconnect Zoom"}
                               </button>
                             </>

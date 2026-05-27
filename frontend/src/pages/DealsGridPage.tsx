@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, apiBlob, apiForm } from "../api/client";
 import type { Deal } from "../api/types";
@@ -39,21 +39,21 @@ export default function DealsGridPage() {
   const [bulkStage, setBulkStage] = useState<Deal["stage"]>("lead");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  async function load(search?: string) {
+  const load = useCallback(async (search: string) => {
     setError(null);
     try {
-      const qq = (search ?? q).trim();
+      const qq = search.trim();
       const data = await api<Deal[]>(qq ? `/deals?q=${encodeURIComponent(qq)}` : "/deals");
       setDeals(data);
       setSelected({});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deals");
     }
-  }
+  }, []);
 
   useEffect(() => {
     void load("");
-  }, []);
+  }, [load]);
 
   async function deleteDeal(deal: Deal) {
     const confirmed = window.confirm(`Delete deal "${deal.title}"? This cannot be undone.`);
@@ -91,7 +91,7 @@ export default function DealsGridPage() {
             className="row"
             onSubmit={(e) => {
               e.preventDefault();
-              void load();
+              void load(q);
             }}
           >
             <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, location, typology, phase, stage, or any keyword" />
@@ -162,7 +162,7 @@ export default function DealsGridPage() {
                     method: "PATCH",
                     body: JSON.stringify({ ids: selectedIds, stage: bulkStage })
                   });
-                  await load();
+                  await load(q);
                 } catch (e) {
                   setError(e instanceof Error ? e.message : "Bulk update failed");
                 }
