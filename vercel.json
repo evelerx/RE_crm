@@ -3,7 +3,7 @@
   "framework": null,
   "rewrites": [
     {
-      "source": "/builders/:slug",
+      "source": "/builders/:path*",
       "destination": "/builder-site.html"
     },
     {
