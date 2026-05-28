@@ -1,5 +1,10 @@
-import { useEffect, useState } from "react";
+// MODIFIED: Phase 5 — Admin portal efficiency overhaul — Adds admin navigation, quick stats, user management, debounced search, pagination, and audited support actions.
+import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../api/client";
+import RevenueGraph from "../components/RevenueGraph";
+import SubscriberDataTable from "../components/SubscriberDataTable";
+
+// MODIFIED: Phase 2 — Admin revenue section mount — Adds subscription revenue analytics to the admin portal.
 
 type AdminUserRow = {
   id: string;
@@ -323,6 +328,16 @@ export default function AdminPage() {
   const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastKpiRefreshAt, setLastKpiRefreshAt] = useState<Date | null>(null);
+  const [adminSearchInput, setAdminSearchInput] = useState("");
+  const [adminSearch, setAdminSearch] = useState("");
+  const [adminRoleFilter, setAdminRoleFilter] = useState("all");
+  const [adminPlanFilter, setAdminPlanFilter] = useState("all");
+  const [adminStatusFilter, setAdminStatusFilter] = useState("all");
+  const [adminPageSize, setAdminPageSize] = useState(25);
+  const [adminPageIndex, setAdminPageIndex] = useState(1);
+  const [selectedAdminUserIds, setSelectedAdminUserIds] = useState<Record<string, boolean>>({});
+  const [adminActionMsg, setAdminActionMsg] = useState<string | null>(null);
 
   const [resetEmail, setResetEmail] = useState("");
   const [resetPassword, setResetPassword] = useState("");
@@ -477,6 +492,7 @@ export default function AdminPage() {
       setSubscriptionAnalytics(subscriptionData);
       setDemoRequests(demoRows);
       setRuntimeConfig(runtime);
+      setLastKpiRefreshAt(new Date());
       setAdminEmail(adminMe.email || "");
       setConfigForm((prev) => ({
         ...prev,
@@ -631,6 +647,101 @@ export default function AdminPage() {
     });
   })();
 
+  const activeSubscriptions = displayRows.filter((row) => !row.enterprise_owner_id && !row.is_blacklisted && row.subscription_plan && row.subscription_plan !== "demo");
+  const estimatedMrr = activeSubscriptions.reduce((sum, row) => {
+    const amount = Number(row.subscription_amount_inr || 0);
+    if (amount > 0) {
+      return sum + (row.subscription_cycle === "annual" || row.subscription_cycle === "yearly" ? amount / 12 : amount);
+    }
+    if (row.plan === "enterprise") return sum + 6999;
+    if (row.plan === "builder") return sum + 11999;
+    return sum + (row.subscription_plan === "solo" ? 1199 : 0);
+  }, 0);
+  const todayKey = new Date().toDateString();
+  const newSignupsToday = displayRows.filter((row) => new Date(row.created_at).toDateString() === todayKey).length;
+  const recentActivityRows = displayAuditRows.slice(0, 10);
+  const kpiAgeSeconds = lastKpiRefreshAt ? Math.max(0, Math.round((Date.now() - lastKpiRefreshAt.getTime()) / 1000)) : 0;
+
+  const filteredAdminUsers = useMemo(() => {
+    const q = adminSearch.trim().toLowerCase();
+    return displayRows.filter((row) => {
+      const status = row.is_blacklisted ? "inactive" : "active";
+      const role = row.is_admin_account ? "admin" : row.enterprise_owner_id ? "employee" : row.plan === "builder" ? "builder" : row.plan === "enterprise" ? "owner" : "main";
+      const haystack = [row.id, row.full_name, row.email, row.company, row.city, row.plan, row.subscription_plan, role]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return (
+        (!q || haystack.includes(q)) &&
+        (adminRoleFilter === "all" || role === adminRoleFilter) &&
+        (adminPlanFilter === "all" || row.plan === adminPlanFilter || row.subscription_plan === adminPlanFilter) &&
+        (adminStatusFilter === "all" || status === adminStatusFilter)
+      );
+    });
+  }, [adminPlanFilter, adminRoleFilter, adminSearch, adminStatusFilter, displayRows]);
+
+  const adminTotalPages = Math.max(1, Math.ceil(filteredAdminUsers.length / adminPageSize));
+  const adminVisibleUsers = filteredAdminUsers.slice((adminPageIndex - 1) * adminPageSize, adminPageIndex * adminPageSize);
+  const selectedAdminUsers = displayRows.filter((row) => selectedAdminUserIds[row.id]);
+
+  function exportAdminUsers(rowsToExport = filteredAdminUsers) {
+    const header = ["id", "name", "email", "role", "plan", "status", "last_login"];
+    const csv = [
+      header.join(","),
+      ...rowsToExport.map((row) =>
+        [
+          row.id,
+          row.full_name || "",
+          row.email,
+          describeAccountType(row),
+          row.subscription_plan || row.plan,
+          row.is_blacklisted ? "inactive" : "active",
+          row.last_login_at || "",
+        ]
+          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+          .join(",")
+      ),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "northstone-admin-users.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function bulkSetActive(active: boolean) {
+    if (!selectedAdminUsers.length) return;
+    setAdminActionMsg(null);
+    for (const row of selectedAdminUsers) {
+      await api<{ ok: boolean }>("/admin/blacklist", {
+        method: "POST",
+        body: JSON.stringify({ email: row.email, reason: active ? "" : "Bulk admin deactivation", blacklisted: !active }),
+      });
+    }
+    setAdminActionMsg(active ? "Selected users activated." : "Selected users deactivated.");
+    setSelectedAdminUserIds({});
+    await load();
+  }
+
+  async function updateUserPlan(row: AdminUserRow, plan: "free" | "enterprise" | "builder") {
+    setAdminActionMsg(null);
+    await api<{ ok: boolean }>("/admin/set-plan", {
+      method: "POST",
+      body: JSON.stringify({ email: row.email, plan }),
+    });
+    setAdminActionMsg(`Updated ${row.email} to ${plan}.`);
+    await load();
+  }
+
+  async function impersonateForSupport(row: AdminUserRow) {
+    setAdminActionMsg(null);
+    await api<{ ok: boolean }>(`/admin/users/${row.id}/impersonate`, { method: "POST" });
+    setAdminActionMsg(`Support impersonation audit logged for ${row.email}.`);
+    await loadAuditFeed(auditLimit);
+  }
+
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -645,6 +756,14 @@ export default function AdminPage() {
     void loadSubscriptionAnalytics(subscriptionGrain);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscriptionGrain]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setAdminSearch(adminSearchInput);
+      setAdminPageIndex(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [adminSearchInput]);
 
   return (
     <div className="page">
@@ -663,8 +782,251 @@ export default function AdminPage() {
       {error ? <div className="alert">{error}</div> : null}
       {loading ? <div className="muted">Loading...</div> : null}
 
+      <nav className="adminSidebarNav" aria-label="Admin portal sections">
+        {[
+          ["Dashboard", "admin-dashboard", "D"],
+          ["Users", "admin-users", "U"],
+          ["Subscriptions", "admin-subscriptions", "S"],
+          ["Revenue", "admin-revenue", "R"],
+          ["Ads Manager", "admin-ads", "A"],
+          ["CRM Settings", "admin-settings", "C"],
+          ["Org & Demo", "admin-organization", "O"],
+          ["AI Assign", "admin-ai-assignment", "I"],
+          ["Support", "admin-support", "P"],
+          ["Logs", "admin-logs", "L"],
+        ].map(([label, href, shortcut]) => (
+          <a key={href} href={`#${href}`} className="adminNavItem">
+            <span>{label}</span>
+            <kbd>{shortcut}</kbd>
+          </a>
+        ))}
+      </nav>
+
+      <section id="admin-dashboard" className="card premiumPanel">
+        <div className="sectionHeader">
+          <div>
+            <div className="cardTitle">Dashboard home</div>
+            <div className="muted">Clickable operations snapshot. Last updated: {kpiAgeSeconds}s ago.</div>
+          </div>
+          <button className="btn ghost" type="button" onClick={() => void load()}>Refresh KPIs</button>
+        </div>
+        <div className="statsGrid">
+          <a className="statCard adminStatLink" href="#admin-users">
+            <div className="statLabel">Total users</div>
+            <div className="statValue">{displayRows.length}</div>
+            <div className="statHint">Open user management</div>
+          </a>
+          <a className="statCard adminStatLink" href="#admin-subscriptions">
+            <div className="statLabel">Active subscriptions</div>
+            <div className="statValue">{activeSubscriptions.length}</div>
+            <div className="statHint">Review subscriber health</div>
+          </a>
+          <a className="statCard adminStatLink" href="#admin-revenue">
+            <div className="statLabel">Revenue today</div>
+            <div className="statValue">{formatRupees(Math.round(estimatedMrr / 30))}</div>
+            <div className="statHint">Estimated daily MRR run-rate</div>
+          </a>
+          <a className="statCard adminStatLink" href="#admin-support">
+            <div className="statLabel">Open support tickets</div>
+            <div className="statValue">{chatRows.length}</div>
+            <div className="statHint">Open support messages</div>
+          </a>
+          <a className="statCard adminStatLink" href="#admin-users">
+            <div className="statLabel">New signups today</div>
+            <div className="statValue">{newSignupsToday}</div>
+            <div className="statHint">Check onboarding</div>
+          </a>
+        </div>
+        <div className="adminQuickOps" aria-label="Important admin actions">
+          <a className="card adminQuickCard" href="#admin-organization">
+            <span className="pill">Org access</span>
+            <strong>Plans and 5-day demo accounts</strong>
+            <span className="muted">Assign Enterprise, Builder, Free, or create temporary demo logins.</span>
+          </a>
+          <button
+            className="card adminQuickCard"
+            type="button"
+            onClick={() => {
+              setAiAssignmentExpanded(true);
+              window.setTimeout(() => {
+                document.getElementById("admin-ai-assignment")?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start"
+                });
+              }, 0);
+            }}
+          >
+            <span className="pill">AI access</span>
+            <strong>{aiAssignedRows.length} assigned / {aiUnassignedRows.length} unassigned</strong>
+            <span className="muted">Open the unassigned account list and assign AI keys from one place.</span>
+          </button>
+          <a className="card adminQuickCard" href="#admin-subscriptions">
+            <span className="pill">Subscribers</span>
+            <strong>Revenue and subscriber health</strong>
+            <span className="muted">Review active plans, renewals, payment state, and churn risk.</span>
+          </a>
+        </div>
+        <div className="card adminActivityFeed">
+          <div className="cardTitle">Recent activity</div>
+          {recentActivityRows.length ? (
+            <div className="list">
+              {recentActivityRows.map((item) => (
+                <a key={item.id} className="listItem adminActivityItem" href="#admin-logs">
+                  <span>{item.readable_summary || item.summary || item.kind}</span>
+                  <span className="muted">{fmtDt(item.created_at)}</span>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className="muted">No recent activity loaded yet.</div>
+          )}
+        </div>
+      </section>
+
+      <section id="admin-users" className="card premiumPanel">
+        <div className="sectionHeader">
+          <div>
+            <div className="cardTitle">User management</div>
+            <div className="muted">Search, filter, paginate, export, activate/deactivate, and audit support access.</div>
+          </div>
+          <button className="btn secondary" type="button" onClick={() => exportAdminUsers()}>
+            Export users
+          </button>
+        </div>
+        {adminActionMsg ? <div className="alert ok">{adminActionMsg}</div> : null}
+        <div className="adminTableToolbar">
+          <input value={adminSearchInput} onChange={(e) => setAdminSearchInput(e.target.value)} placeholder="Search name, email, company" />
+          <select value={adminRoleFilter} onChange={(e) => { setAdminRoleFilter(e.target.value); setAdminPageIndex(1); }}>
+            <option value="all">All roles</option>
+            <option value="admin">Admin</option>
+            <option value="main">Main</option>
+            <option value="owner">Owner</option>
+            <option value="builder">Builder</option>
+            <option value="employee">Employee</option>
+          </select>
+          <select value={adminPlanFilter} onChange={(e) => { setAdminPlanFilter(e.target.value); setAdminPageIndex(1); }}>
+            <option value="all">All plans</option>
+            <option value="free">Free</option>
+            <option value="solo">Solo</option>
+            <option value="enterprise">Enterprise</option>
+            <option value="builder">Builder</option>
+            <option value="demo">Demo</option>
+          </select>
+          <select value={adminStatusFilter} onChange={(e) => { setAdminStatusFilter(e.target.value); setAdminPageIndex(1); }}>
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <select value={adminPageSize} onChange={(e) => { setAdminPageSize(Number(e.target.value) || 25); setAdminPageIndex(1); }}>
+            <option value={25}>25 rows</option>
+            <option value={50}>50 rows</option>
+            <option value={100}>100 rows</option>
+          </select>
+        </div>
+        <div className="adminTableToolbar">
+          <button className="btn secondary" type="button" disabled={!selectedAdminUsers.length} onClick={() => exportAdminUsers(selectedAdminUsers)}>
+            Export selected
+          </button>
+          <button className="btn secondary" type="button" disabled={!selectedAdminUsers.length} onClick={() => void bulkSetActive(true)}>
+            Activate selected
+          </button>
+          <button className="btn secondary" type="button" disabled={!selectedAdminUsers.length} onClick={() => void bulkSetActive(false)}>
+            Deactivate selected
+          </button>
+          <a className="btn secondary" href={`mailto:${selectedAdminUsers.map((row) => row.email).join(",")}`}>
+            Bulk email
+          </a>
+        </div>
+        <div className="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    checked={adminVisibleUsers.length > 0 && adminVisibleUsers.every((row) => selectedAdminUserIds[row.id])}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setSelectedAdminUserIds((current) => {
+                        const next = { ...current };
+                        adminVisibleUsers.forEach((row) => {
+                          next[row.id] = checked;
+                        });
+                        return next;
+                      });
+                    }}
+                  />
+                </th>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Plan</th>
+                <th>Status</th>
+                <th>Last login</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && adminVisibleUsers.length === 0 ? (
+                <tr><td colSpan={9} className="muted">Loading user rows...</td></tr>
+              ) : null}
+              {adminVisibleUsers.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={!!selectedAdminUserIds[row.id]}
+                      onChange={(e) => setSelectedAdminUserIds((current) => ({ ...current, [row.id]: e.target.checked }))}
+                    />
+                  </td>
+                  <td>{row.id.slice(0, 8)}</td>
+                  <td>{row.full_name || "-"}</td>
+                  <td>{row.email}</td>
+                  <td>{describeAccountType(row)}</td>
+                  <td>
+                    <select value={row.plan} onChange={(e) => void updateUserPlan(row, e.target.value as "free" | "enterprise" | "builder")} disabled={row.is_admin_account}>
+                      <option value="free">Free</option>
+                      <option value="enterprise">Enterprise</option>
+                      <option value="builder">Builder</option>
+                    </select>
+                  </td>
+                  <td><span className={`healthBadge ${row.is_blacklisted ? "healthRisk" : "healthPower"}`}>{row.is_blacklisted ? "Inactive" : "Active"}</span></td>
+                  <td>{fmtDt(row.last_login_at)}</td>
+                  <td>
+                    <div className="row adminRowActions">
+                      <button className="btn ghost" type="button" onClick={() => void impersonateForSupport(row)}>Impersonate</button>
+                      <a className="btn ghost" href={`mailto:${row.email}`}>Email</a>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!loading && adminVisibleUsers.length === 0 ? (
+                <tr><td colSpan={9} className="muted">No users match these filters.</td></tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+        <div className="adminPagination">
+          <button className="btn secondary" type="button" disabled={adminPageIndex <= 1} onClick={() => setAdminPageIndex((page) => Math.max(1, page - 1))}>Previous</button>
+          <span>Page {adminPageIndex} of {adminTotalPages} | {filteredAdminUsers.length} users</span>
+          <button className="btn secondary" type="button" disabled={adminPageIndex >= adminTotalPages} onClick={() => setAdminPageIndex((page) => Math.min(adminTotalPages, page + 1))}>Next</button>
+        </div>
+      </section>
+
+      <section id="admin-revenue">
+        <RevenueGraph />
+      </section>
+      <section id="admin-subscriptions">
+        <SubscriberDataTable />
+      </section>
+      <div id="admin-ads" className="adminAnchorTarget" />
+      <div id="admin-settings" className="adminAnchorTarget" />
+      <div id="admin-support" className="adminAnchorTarget" />
+      <div id="admin-logs" className="adminAnchorTarget" />
+
       {displaySecurity ? (
-        <section className="card premiumPanel">
+        <section id="admin-security" className="card premiumPanel adminAnchorTarget">
           <div className="cardTitle">Security posture</div>
           <div className="statsGrid">
             <div className="statCard">
@@ -914,7 +1276,7 @@ export default function AdminPage() {
       ) : null}
 
       {displaySubscriptionAnalytics ? (
-        <section className="card premiumPanel">
+        <section id="admin-subscription-trend" className="card premiumPanel adminAnchorTarget">
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
             <div>
               <div className="cardTitle">Subscription trend graph</div>
@@ -1005,7 +1367,7 @@ export default function AdminPage() {
         </section>
       ) : null}
 
-      <section className="card">
+      <section id="admin-organization" className="card adminAnchorTarget">
         <div className="cardTitle">Reset user password</div>
         <form
           id="admin-ai-access-form"
@@ -1194,7 +1556,7 @@ export default function AdminPage() {
           </button>
         </form>
 
-        <div className="card" style={{ marginTop: 18 }}>
+        <div className="card adminNestedCard">
           <div className="cardTitle">5-day demo access</div>
         <div className="muted">
           Create a real demo login inside organization access. Demo accounts stay live for 5 days, then the backend automatically removes that demo workspace and its data.
@@ -1314,7 +1676,7 @@ export default function AdminPage() {
           </button>
         </form>
 
-        <div className="tableWrap" style={{ marginTop: 16 }}>
+        <div className="tableWrap adminTableOffset">
           <table className="table">
             <thead>
               <tr>
@@ -2002,7 +2364,7 @@ export default function AdminPage() {
       </section>
 
       {displayCompliance ? (
-        <section className="card premiumPanel">
+        <section id="admin-ai-assignment" className="card premiumPanel adminAnchorTarget">
           <div className="cardTitle">Compliance evidence</div>
           <div className="statsGrid">
             <div className="statCard">
@@ -2015,9 +2377,8 @@ export default function AdminPage() {
                 <div className="statValue">{displayCompliance.counts.ai_assigned_accounts}</div>
                 <div className="statHint">{aiAssignedRows.length} assigned, {aiUnassignedRows.length} unassigned.</div>
                 <button
-                  className="btn ghost"
+                  className="btn ghost adminButtonOffset"
                   type="button"
-                  style={{ marginTop: 12 }}
                   onClick={() => setAiAssignmentExpanded((prev) => !prev)}
                 >
                   {aiAssignmentExpanded ? "Hide AI assignment list" : "Show AI assignment list"}
@@ -2053,23 +2414,23 @@ export default function AdminPage() {
               </div>
             </div>
             {aiAssignmentExpanded ? (
-              <div className="card" style={{ marginTop: 16 }}>
+              <div className="card adminNestedCard">
                 <div className="cardTitle">AI assignment dropdown</div>
                 <div className="muted">
                   Only accounts without active AI access are shown here. Click any row to load that account into the AI allocation form below.
                 </div>
-                <div className="row" style={{ marginTop: 12, gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                <div className="row adminAiSearchRow">
                   <input
                     value={aiAssignmentSearch}
                     onChange={(e) => setAiAssignmentSearch(e.target.value)}
                     placeholder="Search unassigned accounts by name, email, company, city, or type"
-                    style={{ minWidth: 320, flex: "1 1 320px" }}
+                    className="adminAiSearchInput"
                   />
                   <div className="muted small">
                     {filteredAiUnassignedRows.length} of {aiUnassignedRows.length} unassigned accounts
                   </div>
                 </div>
-                <div className="tableWrap" style={{ marginTop: 14 }}>
+                <div className="tableWrap adminTableOffset">
                   <table className="table">
                     <thead>
                       <tr>

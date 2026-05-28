@@ -40,6 +40,8 @@ from ..settings import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# MODIFIED: Phase 1 — Account role metadata — Lets the client hide Deal Intelligence before employees/staff can even see it.
+
 
 def _utc_now_naive() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -462,6 +464,8 @@ def me(
         enterprise_company_name = company_profile.company if company_profile and company_profile.company else ""
     ai_enabled, ai_model, ai_scope = _llm_access_meta(session, user)
     profile_progress = _profile_completion(profile)
+    member_role = (getattr(user, "enterprise_member_role", "") or "").strip().lower()
+    account_role = "employee" if enterprise_owner_id or member_role in {"employee", "staff"} else "owner" if company_owner_id else "main"
 
     return {
         "email": user.email,
@@ -474,6 +478,7 @@ def me(
         "subscription_expires_at": getattr(user, "subscription_expires_at", None),
         "can_install_app": bool((getattr(user, "subscription_plan", "") or "").strip()) and not enterprise_owner_id and not is_admin,
         "enterprise_owner_id": enterprise_owner_id,
+        "account_role": account_role,
         "enterprise_company_name": enterprise_company_name,
         "enterprise_member_role": getattr(user, "enterprise_member_role", "") or "",
         "rera_completed": _rera_completed(session, user) if not is_admin else True,

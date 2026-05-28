@@ -1,3 +1,4 @@
+// MODIFIED: Phase 4 — Removed Zoom mention from tutorial copy — Keeps onboarding aligned with supported integrations.
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -125,7 +126,7 @@ export default function TutorialBubble({
         title: "Apps",
         description: "Use Apps to show clients how Northstone will connect communication and meeting workflows over time.",
         bullets: [
-          "Clients can preview Gmail, Teams, Zoom, Meet, Calendar, and Outlook connection options.",
+          "Clients can preview Gmail, Meet, Calendar, and ad campaign options.",
           "This is the right place to explain future communication integrations during demos.",
           "Production OAuth and sync can be rolled out app by app."
         ],

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+// MODIFIED: Phase 5 — Added admin inactivity timeout — Clears admin sessions after 30 minutes without activity.
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { api } from "./api/client";
 import { clearSession, getEmail, getToken } from "./auth";
@@ -178,6 +179,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [enterpriseBadge, setEnterpriseBadge] = useState<string | null>(null);
   const [reraCompleted, setReraCompleted] = useState(true);
+  const adminIdleTimerRef = useRef<number | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -255,6 +257,35 @@ export default function App() {
     setReraCompleted(true);
     navigate("/login");
   }
+
+  useEffect(() => {
+    if (!authed || !isAdmin) {
+      if (adminIdleTimerRef.current) {
+        window.clearTimeout(adminIdleTimerRef.current);
+        adminIdleTimerRef.current = null;
+      }
+      return;
+    }
+    const resetAdminIdleTimer = () => {
+      if (adminIdleTimerRef.current) window.clearTimeout(adminIdleTimerRef.current);
+      adminIdleTimerRef.current = window.setTimeout(() => {
+        clearSession();
+        setAuthed(false);
+        setIsAdmin(false);
+        setEnterpriseBadge(null);
+        setReraCompleted(true);
+        navigate("/login");
+      }, 30 * 60 * 1000);
+    };
+    const events: Array<keyof WindowEventMap> = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
+    events.forEach((eventName) => window.addEventListener(eventName, resetAdminIdleTimer, { passive: true }));
+    resetAdminIdleTimer();
+    return () => {
+      events.forEach((eventName) => window.removeEventListener(eventName, resetAdminIdleTimer));
+      if (adminIdleTimerRef.current) window.clearTimeout(adminIdleTimerRef.current);
+      adminIdleTimerRef.current = null;
+    };
+  }, [authed, isAdmin, navigate]);
 
   if (location.pathname.startsWith("/builders/")) {
     return <BuilderPublicPage />;

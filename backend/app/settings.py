@@ -1,3 +1,4 @@
+# MODIFIED: Phase 4 — Removed Zoom settings from active configuration — Prevents dead OAuth credentials from being used.
 from pathlib import Path
 from typing import Any
 
@@ -38,8 +39,7 @@ class Settings(BaseSettings):
     microsoft_client_id: str = ""
     microsoft_client_secret: str = ""
     microsoft_tenant_id: str = ""
-    zoom_client_id: str = ""
-    zoom_client_secret: str = ""
+    # REMOVED: ZOOM — no active Zoom OAuth settings are loaded.
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
     payment_link_solo: str = ""

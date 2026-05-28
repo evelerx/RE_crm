@@ -3,8 +3,11 @@ import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { api } from "../api/client";
 import type { AssetType, Contact, Deal, DealCreate, Stage } from "../api/types";
+import DealPriorityDashboard from "../components/DealPriorityDashboard";
 import DealCard from "../components/DealCard";
 import Modal from "../components/Modal";
+
+// MODIFIED: Phase 1 — Deal Intelligence mounting — Hides the widget from employee/staff sessions before rendering.
 
 const STAGES: Stage[] = ["lead", "visit", "negotiation", "closed", "lost"];
 
@@ -29,6 +32,7 @@ export default function PipelinePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [canSeeDealPriority, setCanSeeDealPriority] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -47,6 +51,24 @@ export default function PipelinePage() {
 
   useEffect(() => {
     void load();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await api<{ account_role?: string; enterprise_owner_id?: string | null; enterprise_member_role?: string }>("/auth/me");
+        const role = (me.account_role || "").toLowerCase();
+        const memberRole = (me.enterprise_member_role || "").toLowerCase();
+        const isEmployeeSession = Boolean(me.enterprise_owner_id) || role === "employee" || role === "staff" || memberRole === "employee" || memberRole === "staff";
+        if (!cancelled) setCanSeeDealPriority(!isEmployeeSession && (role === "main" || role === "owner" || !role));
+      } catch {
+        if (!cancelled) setCanSeeDealPriority(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const byStage = useMemo(() => {
@@ -97,6 +119,7 @@ export default function PipelinePage() {
 
       {error ? <div className="alert">{error}</div> : null}
       {loading ? <div className="muted">Loading pipeline...</div> : null}
+      <DealPriorityDashboard visible={canSeeDealPriority} />
 
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="kanban">

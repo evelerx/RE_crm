@@ -1,3 +1,4 @@
+# MODIFIED: Phase 4 — Updated integration provider comment after Zoom removal — Keeps model documentation aligned with supported providers.
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -235,7 +236,7 @@ class PasswordResetToken(SQLModel, table=True):
 class AppIntegrationConnection(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     enterprise_owner_id: UUID = Field(foreign_key="user.id", index=True)
-    provider_key: str = Field(index=True)  # google | microsoft | zoom
+    provider_key: str = Field(index=True)  # google | microsoft
     provider_label: str = ""
     access_scope: str = Field(default="organization", index=True)
     status: str = Field(default="disconnected", index=True)

@@ -1,3 +1,4 @@
+/* MODIFIED: Phase 1-4 — Deal intelligence, admin analytics, subscriber tracking, and Hotstar ads styles — Supports production dashboard and ads workflows. */
 :root {
   color-scheme: dark;
   --bg: #0f1723;
@@ -12,6 +13,8 @@
   --success: #4da08a;
   --warning: #caa468;
 }
+
+/* MODIFIED: Phase 1 — Deal Intelligence dashboard styles — Provides responsive two-card priority UI with urgent/important/on-track color states. */
 
 * {
   box-sizing: border-box;
@@ -184,6 +187,400 @@ a {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.h2 {
+  font-size: 20px;
+  font-weight: 760;
+  letter-spacing: 0.01em;
+}
+
+.eyebrowText {
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.small {
+  font-size: 13px;
+}
+
+.compact {
+  padding: 7px 10px;
+  min-height: 34px;
+}
+
+.dealPriorityShell {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.priorityHero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(95, 135, 198, 0.22);
+  border-radius: 22px;
+  background:
+    radial-gradient(520px 180px at 8% 0%, rgba(95, 135, 198, 0.16), transparent 70%),
+    linear-gradient(180deg, rgba(22, 31, 45, 0.98), rgba(17, 25, 39, 0.98));
+}
+
+.priorityActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.priorityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.priorityCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.priorityCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.priorityRows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.priorityRow {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.priorityRow:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.priorityRow.urgent {
+  border-color: rgba(230, 92, 92, 0.38);
+  background: rgba(130, 35, 35, 0.16);
+}
+
+.priorityRow.important {
+  border-color: rgba(202, 164, 104, 0.4);
+  background: rgba(137, 96, 28, 0.14);
+}
+
+.priorityRow.track {
+  border-color: rgba(77, 160, 138, 0.35);
+  background: rgba(42, 107, 89, 0.12);
+}
+
+.priorityTopline {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.priorityTopline b,
+.priorityTopline span {
+  display: block;
+}
+
+.priorityTopline span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.priorityBadge {
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.priorityBadge.urgent {
+  color: #ffd9d9;
+  background: rgba(230, 92, 92, 0.22);
+}
+
+.priorityBadge.important {
+  color: #ffe7ba;
+  background: rgba(202, 164, 104, 0.22);
+}
+
+.priorityBadge.track {
+  color: #c7f4e7;
+  background: rgba(77, 160, 138, 0.2);
+}
+
+.priorityMetrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.priorityMetrics span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(244, 247, 251, 0.86);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.priorityRow p {
+  margin: 0;
+  color: rgba(244, 247, 251, 0.9);
+}
+
+.priorityEmpty {
+  padding: 18px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* MODIFIED: Phase 2 — Revenue analytics styles — Adds admin KPI cards, charts, legends, filters, and responsive graph layout. */
+.adminSectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.adminFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.adminFilters select,
+.adminFilters input {
+  min-height: 40px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+.revenueSection {
+  gap: 16px;
+}
+
+.revenueKpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metricChange {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 8px;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.metricChange.ok {
+  color: #c7f4e7;
+  background: rgba(77, 160, 138, 0.18);
+}
+
+.metricChange.danger {
+  color: #ffd9d9;
+  background: rgba(224, 100, 100, 0.18);
+}
+
+.revenueCharts {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+  gap: 14px;
+}
+
+.chartCard {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.chartCard.wide {
+  min-height: 260px;
+}
+
+.chartCard svg {
+  width: 100%;
+  height: auto;
+  color: var(--text);
+}
+
+.donutChart {
+  max-width: 240px;
+  margin: 0 auto;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.legend.vertical {
+  flex-direction: column;
+}
+
+.legend span::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 999px;
+  background: var(--legend-color, var(--brand));
+}
+
+.legend .blue::before { background: #5f87c6; }
+.legend .green::before { background: #4da08a; }
+.legend .orange::before { background: #caa468; }
+.legend .red::before { background: #e06464; }
+
+.compactTable {
+  max-height: 280px;
+}
+
+/* MODIFIED: Phase 3 — Subscriber data panel styles — Supports summary bar, wide admin table, health/status badges, modals, and bulk actions. */
+.summaryStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.summaryStrip span {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+}
+
+.summaryStrip b {
+  color: var(--text);
+}
+
+.adminFilters.left {
+  justify-content: flex-start;
+}
+
+.subscriberTable {
+  max-height: 620px;
+  overflow: auto;
+}
+
+.subscriberTable table {
+  min-width: 2600px;
+}
+
+.dangerText {
+  color: #ffb4b4;
+  font-weight: 800;
+}
+
+.statusPill,
+.healthPill {
+  display: inline-flex;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.statusPill.active,
+.healthPill.poweruser {
+  color: #c7f4e7;
+  background: rgba(77, 160, 138, 0.18);
+}
+
+.statusPill.expiringsoon,
+.healthPill.stable {
+  color: #ffe7ba;
+  background: rgba(202, 164, 104, 0.18);
+}
+
+.statusPill.expired,
+.statusPill.cancelled,
+.healthPill.atrisk {
+  color: #ffd9d9;
+  background: rgba(224, 100, 100, 0.18);
+}
+
+.actionCell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 320px;
+}
+
+.inlineModal {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.48);
+}
+
+.inlineModal .card {
+  width: min(680px, 100%);
+}
+
+.inlineModal textarea {
+  width: 100%;
+  min-height: 140px;
+  margin: 14px 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 12px;
 }
 
 .pageHeader {
@@ -935,6 +1332,23 @@ textarea.textarea {
   .row {
     flex-wrap: wrap;
   }
+  .priorityHero,
+  .priorityGrid {
+    grid-template-columns: 1fr;
+  }
+  .revenueKpis,
+  .revenueCharts {
+    grid-template-columns: 1fr;
+  }
+  .adminFilters {
+    justify-content: flex-start;
+  }
+  .priorityHero {
+    flex-direction: column;
+  }
+  .priorityActions {
+    justify-content: flex-start;
+  }
   .grid2 {
     grid-template-columns: 1fr;
   }
@@ -1223,6 +1637,310 @@ textarea.textarea {
 
   .builderFactGrid,
   .builderContactBand {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hotstarUpload {
+  display: grid;
+  gap: 18px;
+}
+
+.hotstarMessage {
+  margin-top: 0;
+}
+
+.hotstarGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.hotstarPanel {
+  display: grid;
+  gap: 14px;
+}
+
+.hotstarPanelTitle,
+.hotstarCampaignTitle {
+  font-size: 18px;
+}
+
+.hotstarProgressWrap {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.hotstarFileRow {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hotstarProgress {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.hotstarProgress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8, #22c55e);
+  transition: width 220ms ease;
+}
+
+.hotstarPreview {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #030712;
+}
+
+.hotstarPreview img,
+.hotstarPreview video {
+  display: block;
+  width: 100%;
+  max-height: 340px;
+  object-fit: contain;
+}
+
+.hotstarCampaignList {
+  display: grid;
+  gap: 12px;
+}
+
+.hotstarCampaign {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.78);
+}
+
+.hotstarMetrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.hotstarMetrics span {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.hotstarActions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.adminSidebarNav {
+  position: sticky;
+  top: 12px;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(8, 13, 22, 0.82);
+  backdrop-filter: blur(14px);
+}
+
+.adminNavItem,
+.adminStatLink,
+.adminActivityItem {
+  color: inherit;
+  text-decoration: none;
+}
+
+.adminNavItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.adminNavItem:hover,
+.adminNavItem:focus-visible {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: rgba(95, 135, 198, 0.12);
+  outline: none;
+}
+
+.adminNavItem kbd {
+  min-width: 24px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  text-align: center;
+  font: inherit;
+  font-size: 12px;
+}
+
+.adminStatLink {
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.adminStatLink:hover,
+.adminStatLink:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(95, 135, 198, 0.48);
+  background: rgba(95, 135, 198, 0.1);
+  outline: none;
+}
+
+.adminActivityFeed {
+  margin-top: 18px;
+}
+
+.adminQuickOps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.adminQuickCard {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  text-decoration: none;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.adminQuickCard:hover,
+.adminQuickCard:focus-visible {
+  border-color: rgba(95, 135, 198, 0.56);
+  background: rgba(95, 135, 198, 0.1);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+.adminNestedCard {
+  margin-top: 18px;
+}
+
+.adminTableOffset {
+  margin-top: 16px;
+}
+
+.adminButtonOffset {
+  margin-top: 12px;
+}
+
+.adminAiSearchRow {
+  margin-top: 12px;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.adminAiSearchInput {
+  min-width: 320px;
+  flex: 1 1 320px;
+}
+
+.adminActivityItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.adminTableToolbar {
+  display: grid;
+  grid-template-columns: 2fr repeat(4, minmax(140px, 1fr));
+  gap: 10px;
+  align-items: center;
+  margin: 14px 0;
+}
+
+.adminTableToolbar + .adminTableToolbar {
+  grid-template-columns: repeat(4, max-content);
+  justify-content: start;
+}
+
+.adminRowActions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.adminPagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  color: var(--muted);
+}
+
+.adminAnchorTarget {
+  scroll-margin-top: 96px;
+}
+
+@media (max-width: 900px) {
+  .adminSidebarNav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .adminTableToolbar,
+  .adminTableToolbar + .adminTableToolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .adminQuickOps {
+    grid-template-columns: 1fr;
+  }
+
+  .hotstarGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .hotstarMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .adminSidebarNav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .adminTableToolbar,
+  .adminTableToolbar + .adminTableToolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .adminPagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .hotstarMetrics {
     grid-template-columns: 1fr;
   }
 }

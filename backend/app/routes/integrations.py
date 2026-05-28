@@ -1,3 +1,4 @@
+# MODIFIED: Phase 4 — Removed Zoom OAuth/API routes and meeting creation — Google Meet is the supported meeting integration.
 from __future__ import annotations
 
 import asyncio
@@ -28,8 +29,6 @@ from ..schemas import (
     GoogleConnectionTestResponse,
     GoogleSendEmailRequest,
     GoogleSendEmailResponse,
-    ZoomMeetingCreateRequest,
-    ZoomMeetingResponse,
 )
 from ..settings import settings
 
@@ -57,13 +56,6 @@ MICROSOFT_SCOPES = [
     "Calendars.ReadWrite",
     "OnlineMeetings.ReadWrite",
 ]
-
-ZOOM_SCOPES = [
-    "meeting:write",
-    "meeting:read",
-    "user:read",
-]
-
 
 def _utc_now_naive() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -95,10 +87,6 @@ def _microsoft_redirect_uri() -> str:
     return f"{_backend_base_url()}/integrations/microsoft/callback"
 
 
-def _zoom_redirect_uri() -> str:
-    return f"{_backend_base_url()}/integrations/zoom/callback"
-
-
 def _require_google_credentials() -> None:
     if not (settings.google_client_id or "").strip() or not (settings.google_client_secret or "").strip():
         raise HTTPException(status_code=400, detail="Google OAuth credentials are not configured")
@@ -111,13 +99,6 @@ def _require_microsoft_credentials() -> None:
         raise HTTPException(status_code=400, detail="Microsoft OAuth credentials are not configured")
     if not (settings.data_encryption_key or "").strip():
         raise HTTPException(status_code=400, detail="Set DATA_ENCRYPTION_KEY before connecting Microsoft integrations")
-
-
-def _require_zoom_credentials() -> None:
-    if not (settings.zoom_client_id or "").strip() or not (settings.zoom_client_secret or "").strip():
-        raise HTTPException(status_code=400, detail="Zoom OAuth credentials are not configured")
-    if not (settings.data_encryption_key or "").strip():
-        raise HTTPException(status_code=400, detail="Set DATA_ENCRYPTION_KEY before connecting Zoom integrations")
 
 
 def _encode_google_state(*, enterprise_owner_id: UUID, actor_user_id: UUID) -> str:
@@ -164,28 +145,6 @@ def _decode_microsoft_state(token: str) -> dict[str, Any]:
     return payload
 
 
-def _encode_zoom_state(*, enterprise_owner_id: UUID, actor_user_id: UUID) -> str:
-    now = datetime.now(timezone.utc)
-    payload = {
-        "purpose": "zoom_oauth",
-        "enterprise_owner_id": str(enterprise_owner_id),
-        "actor_user_id": str(actor_user_id),
-        "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=15)).timestamp()),
-    }
-    return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
-
-
-def _decode_zoom_state(token: str) -> dict[str, Any]:
-    try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
-    except jwt.PyJWTError as e:
-        raise HTTPException(status_code=400, detail="Invalid Zoom OAuth state") from e
-    if payload.get("purpose") != "zoom_oauth":
-        raise HTTPException(status_code=400, detail="Invalid Zoom OAuth state purpose")
-    return payload
-
-
 def _google_connection_url(state: str) -> str:
     query = urlencode(
         {
@@ -215,18 +174,6 @@ def _microsoft_connection_url(state: str) -> str:
         }
     )
     return f"https://login.microsoftonline.com/{_microsoft_tenant()}/oauth2/v2.0/authorize?{query}"
-
-
-def _zoom_connection_url(state: str) -> str:
-    query = urlencode(
-        {
-            "response_type": "code",
-            "client_id": (settings.zoom_client_id or "").strip(),
-            "redirect_uri": _zoom_redirect_uri(),
-            "state": state,
-        }
-    )
-    return f"https://zoom.us/oauth/authorize?{query}"
 
 
 async def _google_exchange_code(code: str) -> dict[str, Any]:
@@ -263,20 +210,6 @@ async def _microsoft_exchange_code(code: str) -> dict[str, Any]:
     return res.json()
 
 
-async def _zoom_exchange_code(code: str) -> dict[str, Any]:
-    data = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": _zoom_redirect_uri(),
-    }
-    auth = ((settings.zoom_client_id or "").strip(), (settings.zoom_client_secret or "").strip())
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        res = await client.post("https://zoom.us/oauth/token", data=data, auth=auth)
-    if res.status_code >= 400:
-        raise HTTPException(status_code=400, detail=f"Zoom token exchange failed: {res.text}")
-    return res.json()
-
-
 async def _google_userinfo(access_token: str) -> dict[str, Any]:
     async with httpx.AsyncClient(timeout=20.0) as client:
         res = await client.get(
@@ -296,17 +229,6 @@ async def _microsoft_me(access_token: str) -> dict[str, Any]:
         )
     if res.status_code >= 400:
         raise HTTPException(status_code=400, detail=f"Microsoft profile lookup failed: {res.text}")
-    return res.json()
-
-
-async def _zoom_me(access_token: str) -> dict[str, Any]:
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        res = await client.get(
-            "https://api.zoom.us/v2/users/me",
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-    if res.status_code >= 400:
-        raise HTTPException(status_code=400, detail=f"Zoom profile lookup failed: {res.text}")
     return res.json()
 
 
@@ -343,19 +265,6 @@ async def _microsoft_refresh_access_token(refresh_token: str) -> dict[str, Any]:
     return res.json()
 
 
-async def _zoom_refresh_access_token(refresh_token: str) -> dict[str, Any]:
-    data = {
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-    }
-    auth = ((settings.zoom_client_id or "").strip(), (settings.zoom_client_secret or "").strip())
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        res = await client.post("https://zoom.us/oauth/token", data=data, auth=auth)
-    if res.status_code >= 400:
-        raise HTTPException(status_code=400, detail=f"Zoom token refresh failed: {res.text}")
-    return res.json()
-
-
 def _google_connection_or_400(session: Session, owner_id: UUID) -> AppIntegrationConnection:
     row = session.exec(
         select(AppIntegrationConnection).where(
@@ -377,18 +286,6 @@ def _microsoft_connection_or_400(session: Session, owner_id: UUID) -> AppIntegra
     ).first()
     if not row or row.status != "connected":
         raise HTTPException(status_code=400, detail="Microsoft Workspace is not connected for this organization yet")
-    return row
-
-
-def _zoom_connection_or_400(session: Session, owner_id: UUID) -> AppIntegrationConnection:
-    row = session.exec(
-        select(AppIntegrationConnection).where(
-            AppIntegrationConnection.enterprise_owner_id == owner_id,
-            AppIntegrationConnection.provider_key == "zoom",
-        )
-    ).first()
-    if not row or row.status != "connected":
-        raise HTTPException(status_code=400, detail="Zoom is not connected for this organization yet")
     return row
 
 
@@ -439,36 +336,6 @@ async def _microsoft_access_token_for_owner(session: Session, owner_id: UUID) ->
     scope_string = (token_data.get("scope") or row.scopes or "").strip()
     if not new_access_token:
         raise HTTPException(status_code=400, detail="Microsoft did not return a usable access token.")
-    row.encrypted_access_token = encrypt_if_configured(new_access_token)
-    if (token_data.get("refresh_token") or "").strip():
-        row.encrypted_refresh_token = encrypt_if_configured((token_data.get("refresh_token") or "").strip())
-    row.token_expires_at = now + timedelta(seconds=expires_in) if expires_in > 0 else None
-    row.scopes = scope_string
-    row.last_error = ""
-    row.updated_at = now
-    session.add(row)
-    session.commit()
-    session.refresh(row)
-    return new_access_token, row
-
-
-async def _zoom_access_token_for_owner(session: Session, owner_id: UUID) -> tuple[str, AppIntegrationConnection]:
-    _require_zoom_credentials()
-    row = _zoom_connection_or_400(session, owner_id)
-    now = _utc_now_naive()
-    access_token = decrypt_if_configured((row.encrypted_access_token or "").strip()).strip()
-    refresh_token = decrypt_if_configured((row.encrypted_refresh_token or "").strip()).strip()
-    expires_at = row.token_expires_at
-    if access_token and expires_at and expires_at > (now + timedelta(seconds=30)):
-        return access_token, row
-    if not refresh_token:
-        raise HTTPException(status_code=400, detail="Zoom refresh token is missing. Reconnect Zoom.")
-    token_data = await _zoom_refresh_access_token(refresh_token)
-    new_access_token = (token_data.get("access_token") or "").strip()
-    expires_in = int(token_data.get("expires_in") or 0)
-    scope_string = (token_data.get("scope") or row.scopes or "").strip()
-    if not new_access_token:
-        raise HTTPException(status_code=400, detail="Zoom did not return a usable access token.")
     row.encrypted_access_token = encrypt_if_configured(new_access_token)
     if (token_data.get("refresh_token") or "").strip():
         row.encrypted_refresh_token = encrypt_if_configured((token_data.get("refresh_token") or "").strip())
@@ -548,16 +415,6 @@ def microsoft_connect(user: User = Depends(require_enterprise_owner)) -> dict[st
     return {"provider": "microsoft", "auth_url": _microsoft_connection_url(state)}
 
 
-@router.get("/zoom/connect")
-def zoom_connect(user: User = Depends(require_enterprise_owner)) -> dict[str, str]:
-    _require_zoom_credentials()
-    owner_id = get_enterprise_owner_id(user)
-    if not owner_id:
-        raise HTTPException(status_code=400, detail="Enterprise owner context not found")
-    state = _encode_zoom_state(enterprise_owner_id=owner_id, actor_user_id=user.id)
-    return {"provider": "zoom", "auth_url": _zoom_connection_url(state)}
-
-
 @router.post("/google/disconnect")
 def google_disconnect(
     session: Session = Depends(get_session),
@@ -612,33 +469,6 @@ def microsoft_disconnect(
     return {"ok": True}
 
 
-@router.post("/zoom/disconnect")
-def zoom_disconnect(
-    session: Session = Depends(get_session),
-    user: User = Depends(require_enterprise_owner),
-) -> dict[str, bool]:
-    owner_id = get_enterprise_owner_id(user)
-    row = session.exec(
-        select(AppIntegrationConnection).where(
-            AppIntegrationConnection.enterprise_owner_id == owner_id,
-            AppIntegrationConnection.provider_key == "zoom",
-        )
-    ).first()
-    if row:
-        now = _utc_now_naive()
-        row.status = "disconnected"
-        row.connected_account_email = ""
-        row.encrypted_access_token = ""
-        row.encrypted_refresh_token = ""
-        row.token_expires_at = None
-        row.scopes = ""
-        row.last_error = ""
-        row.updated_at = now
-        session.add(row)
-        session.commit()
-    return {"ok": True}
-
-
 @router.get("/google/test", response_model=GoogleConnectionTestResponse)
 async def google_test_connection(
     session: Session = Depends(get_session),
@@ -674,31 +504,6 @@ async def microsoft_test_connection(
     access_token, row = await _microsoft_access_token_for_owner(session, owner_id)
     me = await _microsoft_me(access_token)
     email = (me.get("mail") or me.get("userPrincipalName") or row.connected_account_email or "").strip()
-    now = _utc_now_naive()
-    row.last_test_at = now
-    row.last_error = ""
-    row.updated_at = now
-    session.add(row)
-    session.commit()
-    return GoogleConnectionTestResponse(
-        ok=True,
-        connected_account_email=email,
-        expires_at=row.token_expires_at,
-        scopes=[scope for scope in (row.scopes or "").split(" ") if scope.strip()],
-    )
-
-
-@router.get("/zoom/test", response_model=GoogleConnectionTestResponse)
-async def zoom_test_connection(
-    session: Session = Depends(get_session),
-    user: User = Depends(require_enterprise),
-):
-    owner_id = get_enterprise_owner_id(user)
-    if not owner_id:
-        raise HTTPException(status_code=400, detail="Enterprise owner context not found")
-    access_token, row = await _zoom_access_token_for_owner(session, owner_id)
-    me = await _zoom_me(access_token)
-    email = (me.get("email") or row.connected_account_email or "").strip()
     now = _utc_now_naive()
     row.last_test_at = now
     row.last_error = ""
@@ -989,125 +794,3 @@ async def microsoft_callback(
 
     return _status_redirect_for("microsoft", "connected", email or "connected")
 
-
-@router.get("/zoom/callback")
-async def zoom_callback(
-    state: str = Query(...),
-    code: str | None = Query(default=None),
-    error: str | None = Query(default=None),
-    session: Session = Depends(get_session),
-):
-    _require_zoom_credentials()
-    if error:
-        return _status_redirect_for("zoom", "error", error)
-
-    payload = _decode_zoom_state(state)
-    owner_id_raw = payload.get("enterprise_owner_id")
-    if not owner_id_raw:
-        return _status_redirect_for("zoom", "error", "missing_owner")
-    try:
-        owner_id = UUID(str(owner_id_raw))
-    except ValueError:
-        return _status_redirect_for("zoom", "error", "invalid_owner")
-
-    owner = session.get(User, owner_id)
-    owner_plan = (getattr(owner, "plan", "free") or "free") if owner else "free"
-    if not owner or (owner_plan not in {"enterprise", "builder"} and not is_admin_email(getattr(owner, "email", ""))):
-        return _status_redirect_for("zoom", "error", "owner_not_found")
-
-    if not code:
-        return _status_redirect_for("zoom", "error", "missing_code")
-
-    token_data = await _zoom_exchange_code(code)
-    access_token = (token_data.get("access_token") or "").strip()
-    refresh_token = (token_data.get("refresh_token") or "").strip()
-    expires_in = int(token_data.get("expires_in") or 0)
-    scope_string = (token_data.get("scope") or "").strip()
-    if not access_token:
-        return _status_redirect_for("zoom", "error", "missing_access_token")
-
-    me = await _zoom_me(access_token)
-    email = (me.get("email") or "").strip()
-    now = _utc_now_naive()
-
-    row = session.exec(
-        select(AppIntegrationConnection).where(
-            AppIntegrationConnection.enterprise_owner_id == owner.id,
-            AppIntegrationConnection.provider_key == "zoom",
-        )
-    ).first()
-    if not row:
-        row = AppIntegrationConnection(
-            enterprise_owner_id=owner.id,
-            provider_key="zoom",
-            provider_label="Zoom Workspace",
-        )
-
-    row.status = "connected"
-    row.connected_account_email = email
-    row.encrypted_access_token = encrypt_if_configured(access_token)
-    row.encrypted_refresh_token = encrypt_if_configured(refresh_token) if refresh_token else row.encrypted_refresh_token
-    row.token_expires_at = now + timedelta(seconds=expires_in) if expires_in > 0 else None
-    row.scopes = scope_string
-    row.last_test_at = now
-    row.last_error = ""
-    row.updated_at = now
-    session.add(row)
-    session.commit()
-
-    return _status_redirect_for("zoom", "connected", email or "connected")
-
-
-@router.post("/zoom/meetings", response_model=ZoomMeetingResponse)
-async def zoom_create_meeting(
-    payload: ZoomMeetingCreateRequest,
-    session: Session = Depends(get_session),
-    user: User = Depends(require_enterprise),
-):
-    owner_id = get_enterprise_owner_id(user)
-    if not owner_id:
-        raise HTTPException(status_code=400, detail="Enterprise owner context not found")
-    access_token, row = await _zoom_access_token_for_owner(session, owner_id)
-    body = {
-        "topic": payload.title.strip(),
-        "type": 2,
-        "start_time": payload.start_at.isoformat(),
-        "duration": payload.duration_minutes,
-        "timezone": payload.timezone.strip() or "Asia/Kolkata",
-        "agenda": payload.agenda.strip(),
-        "settings": {
-            "join_before_host": False,
-            "approval_type": 2,
-            "waiting_room": True,
-        },
-    }
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        res = await client.post(
-            "https://api.zoom.us/v2/users/me/meetings",
-            headers={"Authorization": f"Bearer {access_token}"},
-            json=body,
-        )
-    if res.status_code >= 400:
-        raise HTTPException(status_code=400, detail=f"Zoom meeting create failed: {res.text}")
-    data = res.json()
-    now = _utc_now_naive()
-    row.last_test_at = now
-    row.last_error = ""
-    row.updated_at = now
-    session.add(row)
-    log_audit_event(
-        session,
-        actor=user,
-        kind="integration.zoom.meeting_created",
-        summary=f"Created Zoom meeting: {payload.title.strip()}",
-        detail=f"duration={payload.duration_minutes}",
-        enterprise_owner_id=owner_id,
-        target_user_id=user.id,
-    )
-    session.commit()
-    return ZoomMeetingResponse(
-        ok=True,
-        meeting_id=str(data.get("id") or ""),
-        join_url=str(data.get("join_url") or ""),
-        start_url=str(data.get("start_url") or ""),
-    )

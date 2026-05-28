@@ -1,3 +1,4 @@
+# MODIFIED: Phase 5 — Admin portal efficiency endpoints — Adds support impersonation audit logging and keeps admin routes server protected.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -5,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select
 
@@ -35,6 +36,8 @@ from .profile import _validate_profile
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+# MODIFIED: Phase 2 — Revenue analytics helpers — Derives subscription revenue, plan mix, and growth from stored subscription fields.
 
 
 def _utc_now_naive() -> datetime:
@@ -69,6 +72,83 @@ def _bucket_label(value: datetime, grain: str) -> str:
     if grain == "year":
         return value.strftime("%Y")
     return value.strftime("%Y-%m")
+
+
+def _bucket_start(value: datetime, grain: str) -> datetime:
+    if grain == "day":
+        return datetime(value.year, value.month, value.day)
+    if grain == "week":
+        start = value - timedelta(days=value.weekday())
+        return datetime(start.year, start.month, start.day)
+    if grain == "year":
+        return datetime(value.year, 1, 1)
+    return datetime(value.year, value.month, 1)
+
+
+def _add_period(value: datetime, grain: str, count: int = 1) -> datetime:
+    if grain == "day":
+        return value + timedelta(days=count)
+    if grain == "week":
+        return value + timedelta(weeks=count)
+    if grain == "year":
+        return datetime(value.year + count, 1, 1)
+    month = value.month - 1 + count
+    year = value.year + month // 12
+    month = month % 12 + 1
+    return datetime(year, month, 1)
+
+
+def _normalize_plan_name(user: User) -> str:
+    raw = ((getattr(user, "subscription_plan", "") or getattr(user, "plan", "") or "starter").strip().lower())
+    if raw in {"solo", "free", "starter", ""}:
+        return "Starter"
+    if raw in {"enterprise", "growth"}:
+        return "Growth"
+    if raw == "builder":
+        return "Builder"
+    return raw.replace("_", " ").title()
+
+
+def _monthly_subscription_amount(user: User) -> float:
+    amount = float(getattr(user, "subscription_amount_inr", 0) or 0)
+    plan = _normalize_plan_name(user)
+    if amount <= 0:
+        amount = 1199 if plan == "Starter" else 6999 if plan == "Growth" else 11999 if plan == "Builder" else 0
+    cycle = (getattr(user, "subscription_cycle", "") or "monthly").strip().lower()
+    if cycle in {"yearly", "annual", "year"}:
+        return amount / 12
+    if cycle in {"six_month", "half_year", "semiannual"}:
+        return amount / 6
+    return amount
+
+
+def _is_subscription_owner(user: User) -> bool:
+    if getattr(user, "enterprise_owner_id", None):
+        return False
+    return (getattr(user, "subscription_plan", "") or getattr(user, "plan", "") or "").strip().lower() not in {"", "free", "demo"}
+
+
+def _subscription_status(user: User, now: datetime) -> str:
+    expires = _normalize_db_datetime(getattr(user, "subscription_expires_at", None))
+    if getattr(user, "is_blacklisted", False):
+        return "Cancelled"
+    if expires and expires < now:
+        return "Expired"
+    if expires and (expires - now).days < 7:
+        return "Expiring Soon"
+    return "Active"
+
+
+def _login_frequency(user: User, now: datetime) -> str:
+    last_login = _normalize_db_datetime(getattr(user, "last_login_at", None))
+    if not last_login:
+        return "Never"
+    days = (now - last_login).days
+    if days <= 1:
+        return "Daily"
+    if days <= 7:
+        return "Weekly"
+    return "Rarely"
 
 
 def _write_env_updates(path: Path, updates: dict[str, str]) -> None:
@@ -958,6 +1038,28 @@ def demo_requests(
     return _demo_request_payload(session)
 
 
+@router.post("/users/{user_id}/impersonate")
+def impersonate_user_for_support(
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> dict:
+    target_user = session.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    log_audit_event(
+        session,
+        actor=admin_user,
+        target_user_id=target_user.id,
+        enterprise_owner_id=getattr(target_user, "enterprise_owner_id", None),
+        kind="admin.support_impersonation_requested",
+        summary=f"Admin opened support impersonation workflow for {target_user.email}",
+        detail="Support impersonation requires audit visibility before account troubleshooting.",
+    )
+    _commit_or_http(session, "Unable to audit impersonation request")
+    return {"ok": True, "user_id": str(target_user.id), "email": target_user.email}
+
+
 @router.get("/audit")
 def audit_feed(
     limit: int = 50,
@@ -1016,6 +1118,380 @@ def subscription_analytics(
         "enterprise": len([user for user in owner_users if (getattr(user, "plan", "free") or "free") == "enterprise"]),
         "builder": len([user for user in owner_users if (getattr(user, "plan", "free") or "free") == "builder"]),
     }
+
+
+@router.get("/revenue-analytics")
+def revenue_analytics(
+    grain: str = Query(default="month", pattern="^(day|week|month|year)$"),
+    plan: str = Query(default="all"),
+    start_date: str = Query(default=""),
+    end_date: str = Query(default=""),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> dict:
+    now = _utc_now_naive()
+
+    def parse_boundary(raw: str, fallback: datetime) -> datetime:
+        if not raw:
+            return fallback
+        try:
+            parsed = datetime.fromisoformat(raw)
+            return parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+        except ValueError:
+            return fallback
+
+    default_start = _add_period(_bucket_start(now, grain), grain, -11)
+    start = _bucket_start(parse_boundary(start_date, default_start), grain)
+    end = _bucket_start(parse_boundary(end_date, now), grain)
+    if end < start:
+        start, end = end, start
+    end_exclusive = _add_period(end, grain, 1)
+
+    users = [user for user in session.exec(select(User)).all() if _is_subscription_owner(user)]
+    plan_filter = (plan or "all").strip().lower()
+    if plan_filter != "all":
+        users = [user for user in users if _normalize_plan_name(user).lower() == plan_filter]
+
+    buckets: list[datetime] = []
+    cursor = start
+    while cursor < end_exclusive:
+        buckets.append(cursor)
+        cursor = _add_period(cursor, grain)
+
+    timeline: list[dict] = []
+    growth: list[dict] = []
+    plan_totals: dict[str, dict[str, float]] = {}
+    active_now = 0
+    total_mrr = 0.0
+    lifetime_revenue = 0.0
+
+    for user in users:
+        plan_name = _normalize_plan_name(user)
+        monthly = _monthly_subscription_amount(user)
+        started = _normalize_db_datetime(getattr(user, "subscription_started_at", None)) or _normalize_db_datetime(getattr(user, "enterprise_enabled_at", None)) or _normalize_db_datetime(getattr(user, "created_at", None)) or now
+        expires = _normalize_db_datetime(getattr(user, "subscription_expires_at", None))
+        active = not expires or expires >= now
+        if active:
+            active_now += 1
+            total_mrr += monthly
+        paid_periods = max(1, int(((min(expires or now, now) - started).days // 30) + 1))
+        lifetime_revenue += monthly * paid_periods
+        row = plan_totals.setdefault(plan_name, {"active_subscribers": 0, "mrr": 0.0, "lifetime": 0.0})
+        row["active_subscribers"] += 1 if active else 0
+        row["mrr"] += monthly if active else 0
+        row["lifetime"] += monthly * paid_periods
+
+    for bucket in buckets:
+        next_bucket = _add_period(bucket, grain)
+        label = _bucket_label(bucket, grain)
+        new_revenue = 0.0
+        renewal_revenue = 0.0
+        churned_revenue = 0.0
+        transactions = 0
+        plan_breakdown: dict[str, dict[str, float]] = {}
+        active_at_period_end = 0
+        new_count = 0
+        cancelled_count = 0
+
+        for user in users:
+            plan_name = _normalize_plan_name(user)
+            monthly = _monthly_subscription_amount(user)
+            started = _normalize_db_datetime(getattr(user, "subscription_started_at", None)) or _normalize_db_datetime(getattr(user, "enterprise_enabled_at", None)) or _normalize_db_datetime(getattr(user, "created_at", None)) or now
+            expires = _normalize_db_datetime(getattr(user, "subscription_expires_at", None))
+            starts_in_bucket = bucket <= started < next_bucket
+            active_during_bucket = started < next_bucket and (not expires or expires >= bucket)
+            churns_in_bucket = bool(expires and bucket <= expires < next_bucket)
+
+            if active_during_bucket:
+                active_at_period_end += 1 if (not expires or expires >= next_bucket - timedelta(seconds=1)) else 0
+                if starts_in_bucket:
+                    new_revenue += monthly
+                    new_count += 1
+                elif started < bucket:
+                    renewal_revenue += monthly
+                transactions += 1
+                breakdown = plan_breakdown.setdefault(plan_name, {"amount": 0.0, "count": 0})
+                breakdown["amount"] += monthly
+                breakdown["count"] += 1
+            if churns_in_bucket:
+                churned_revenue += monthly
+                cancelled_count += 1
+
+        gross = new_revenue + renewal_revenue
+        net = gross - churned_revenue
+        previous_active = growth[-1]["total_active"] if growth else max(1, active_at_period_end - new_count + cancelled_count)
+        growth_rate = ((active_at_period_end - previous_active) / max(1, previous_active)) * 100
+        timeline.append(
+            {
+                "label": label,
+                "gross_revenue": round(gross),
+                "new_revenue": round(new_revenue),
+                "renewal_revenue": round(renewal_revenue),
+                "churned_revenue": round(churned_revenue),
+                "net_revenue": round(net),
+                "transactions": transactions,
+                "plan_breakdown": [
+                    {"plan": name, "amount": round(values["amount"]), "count": int(values["count"])}
+                    for name, values in sorted(plan_breakdown.items())
+                ],
+            }
+        )
+        growth.append(
+            {
+                "label": label,
+                "total_active": active_at_period_end,
+                "new_subscribers": new_count,
+                "cancelled": cancelled_count,
+                "net_growth_rate": round(growth_rate, 2),
+            }
+        )
+
+    current_bucket = _bucket_start(now, "month")
+    previous_bucket = _add_period(current_bucket, "month", -1)
+    new_this_month = len([
+        user for user in users
+        if (_normalize_db_datetime(getattr(user, "subscription_started_at", None)) or _normalize_db_datetime(getattr(user, "created_at", None)) or now) >= current_bucket
+    ])
+    previous_new = len([
+        user for user in users
+        if previous_bucket <= (_normalize_db_datetime(getattr(user, "subscription_started_at", None)) or _normalize_db_datetime(getattr(user, "created_at", None)) or now) < current_bucket
+    ])
+    churned_this_month = len([
+        user for user in users
+        if (expires := _normalize_db_datetime(getattr(user, "subscription_expires_at", None))) and expires < now and expires >= current_bucket
+    ])
+    plan_rows = [
+        {
+            "plan": name,
+            "active_subscribers": int(values["active_subscribers"]),
+            "mrr": round(values["mrr"]),
+            "arr": round(values["mrr"] * 12),
+            "avg_ltv": round(values["lifetime"] / max(1, values["active_subscribers"])),
+        }
+        for name, values in sorted(plan_totals.items())
+    ]
+    total_plan_mrr = sum(row["mrr"] for row in plan_rows) or 1
+    for row in plan_rows:
+        row["percent"] = round((row["mrr"] / total_plan_mrr) * 100, 2)
+
+    return {
+        "grain": grain,
+        "plan_filter": plan_filter,
+        "start_date": start.date().isoformat(),
+        "end_date": end.date().isoformat(),
+        "kpis": {
+            "total_mrr": round(total_mrr),
+            "total_arr": round(total_mrr * 12),
+            "active_subscribers": active_now,
+            "new_this_month": new_this_month,
+            "churned": churned_this_month,
+            "avg_revenue_per_user": round(total_mrr / max(1, active_now)),
+            "changes": {
+                "total_mrr": 0 if not timeline else round(((timeline[-1]["net_revenue"] - (timeline[-2]["net_revenue"] if len(timeline) > 1 else timeline[-1]["net_revenue"])) / max(1, timeline[-2]["net_revenue"] if len(timeline) > 1 else timeline[-1]["net_revenue"])) * 100, 2),
+                "active_subscribers": 0 if len(growth) < 2 else round(((growth[-1]["total_active"] - growth[-2]["total_active"]) / max(1, growth[-2]["total_active"])) * 100, 2),
+                "new_this_month": round(((new_this_month - previous_new) / max(1, previous_new)) * 100, 2),
+                "churned": 0,
+                "avg_revenue_per_user": 0,
+                "total_arr": 0,
+            },
+        },
+        "timeline": timeline,
+        "plan_tiers": plan_rows,
+        "growth": growth,
+        "export_rows": [
+            {
+                "period": row["label"],
+                "gross_revenue": row["gross_revenue"],
+                "new_revenue": row["new_revenue"],
+                "renewal_revenue": row["renewal_revenue"],
+                "churned_revenue": row["churned_revenue"],
+                "net_revenue": row["net_revenue"],
+                "transactions": row["transactions"],
+            }
+            for row in timeline
+        ],
+    }
+
+
+@router.get("/subscribers")
+def subscribers(
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> dict:
+    now = _utc_now_naive()
+    users = [user for user in session.exec(select(User).order_by(User.created_at.desc())).all() if not getattr(user, "enterprise_owner_id", None)]
+    user_ids = [user.id for user in users]
+    profiles = session.exec(select(Profile).where(Profile.owner_id.in_(user_ids))).all() if user_ids else []
+    profile_by_owner = {profile.owner_id: profile for profile in profiles}
+    rows: list[dict] = []
+    active_count = expiring_count = churned_count = 0
+    total_mrr = 0.0
+    collection_paid = collection_total = 0
+
+    for user in users:
+        status = _subscription_status(user, now)
+        plan_name = _normalize_plan_name(user)
+        monthly_amount = _monthly_subscription_amount(user)
+        started = _normalize_db_datetime(getattr(user, "subscription_started_at", None)) or _normalize_db_datetime(getattr(user, "enterprise_enabled_at", None)) or _normalize_db_datetime(getattr(user, "created_at", None))
+        expires = _normalize_db_datetime(getattr(user, "subscription_expires_at", None))
+        profile = profile_by_owner.get(user.id)
+        counts = _user_counts(session, user.id)
+        login_frequency = _login_frequency(user, now)
+        features_used = [
+            label
+            for label, active in [
+                ("Pipeline", counts["deals"] > 0),
+                ("Contacts", counts["contacts"] > 0),
+                ("Tasks", counts["activities"] > 0),
+                ("Enterprise", (getattr(user, "plan", "free") or "free") in {"enterprise", "builder"}),
+                ("AI", bool((getattr(user, "llm_api_key", "") or "").strip())),
+            ]
+            if active
+        ]
+        successful_payments = 0
+        if int(getattr(user, "subscription_amount_inr", 0) or 0) > 0:
+            months = max(1, int(((min(expires or now, now) - (started or now)).days // 30) + 1))
+            successful_payments = 1 if (getattr(user, "subscription_cycle", "") or "monthly") != "monthly" else months
+        failed_payments = 1 if status in {"Expired", "Cancelled"} and monthly_amount > 0 else 0
+        payment_status = "Paid" if status in {"Active", "Expiring Soon"} and monthly_amount > 0 else "Pending" if monthly_amount == 0 else "Failed"
+        health = 4
+        health += {"Daily": 3, "Weekly": 2, "Rarely": 0, "Never": -2}[login_frequency]
+        health += min(2, len(features_used) // 2)
+        health += 1 if failed_payments == 0 and payment_status == "Paid" else -2
+        health = max(1, min(10, health))
+        health_label = "Power User" if health >= 8 else "Stable" if health >= 5 else "At Risk"
+        days_until_renewal = (expires - now).days if expires else 9999
+        if status == "Active":
+            active_count += 1
+            total_mrr += monthly_amount
+        if status == "Expiring Soon":
+            expiring_count += 1
+            total_mrr += monthly_amount
+        if status in {"Expired", "Cancelled"}:
+            churned_count += 1
+        collection_total += 1 if monthly_amount > 0 else 0
+        collection_paid += 1 if payment_status == "Paid" else 0
+        rows.append(
+            {
+                "id": str(user.id),
+                "full_name": profile.full_name if profile else "",
+                "email": user.email,
+                "phone": profile.phone if profile else "",
+                "company_name": profile.company if profile else "",
+                "city_state": profile.city if profile else "",
+                "plan_name": plan_name,
+                "plan_price": round(monthly_amount),
+                "billing_cycle": getattr(user, "subscription_cycle", "") or "monthly",
+                "subscription_start_date": started,
+                "next_renewal_date": expires,
+                "days_until_renewal": days_until_renewal,
+                "subscription_status": status,
+                "total_amount_paid": round(monthly_amount * max(1, successful_payments)),
+                "last_payment_date": started,
+                "last_payment_amount": round(monthly_amount),
+                "payment_method": "Bank Transfer" if monthly_amount > 0 else "Pending",
+                "payment_status": payment_status,
+                "successful_payments": successful_payments,
+                "failed_payments": failed_payments,
+                "last_login_date": getattr(user, "last_login_at", None),
+                "login_frequency": login_frequency,
+                "features_used": features_used,
+                "deals_created": counts["deals"],
+                "contacts_added": counts["contacts"],
+                "tasks_completed": counts["activities"],
+                "storage_used": "-",
+                "api_calls_this_month": int(getattr(user, "request_count", 0) or 0),
+                "health_score": health,
+                "health_label": health_label,
+            }
+        )
+
+    return {
+        "summary": {
+            "total_subscribers": len(rows),
+            "active": active_count,
+            "expiring_in_7_days": expiring_count,
+            "churned_this_month": churned_count,
+            "mrr": round(total_mrr),
+            "collection_rate": round((collection_paid / max(1, collection_total)) * 100, 2),
+        },
+        "rows": rows,
+    }
+
+
+@router.post("/subscribers/{user_id}/extend")
+def extend_subscriber(
+    user_id: UUID,
+    days: int = Body(default=30, embed=True),
+    session: Session = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> dict:
+    target = session.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Subscriber not found")
+    now = _utc_now_naive()
+    current = _normalize_db_datetime(getattr(target, "subscription_expires_at", None))
+    target.subscription_expires_at = (current if current and current > now else now) + timedelta(days=max(1, min(days, 366)))
+    session.add(target)
+    log_audit_event(session, actor=admin_user, target_user_id=target.id, kind="admin.subscription_extend", summary=f"Extended subscription for {target.email}", detail=f"days={days}")
+    _commit_or_http(session, "Unable to extend subscription")
+    return {"ok": True}
+
+
+@router.post("/subscribers/{user_id}/cancel")
+def cancel_subscriber(
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> dict:
+    target = session.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Subscriber not found")
+    target.subscription_expires_at = _utc_now_naive()
+    session.add(target)
+    log_audit_event(session, actor=admin_user, target_user_id=target.id, kind="admin.subscription_cancel", summary=f"Cancelled subscription for {target.email}")
+    _commit_or_http(session, "Unable to cancel subscription")
+    return {"ok": True}
+
+
+@router.post("/subscribers/{user_id}/upgrade")
+def upgrade_subscriber(
+    user_id: UUID,
+    plan: str = Body(default="enterprise", embed=True),
+    session: Session = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> dict:
+    target = session.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Subscriber not found")
+    normalized = (plan or "enterprise").strip().lower()
+    if normalized not in {"free", "enterprise", "builder"}:
+        raise HTTPException(status_code=400, detail="Invalid plan")
+    target.plan = normalized
+    target.subscription_plan = "solo" if normalized == "free" else normalized
+    target.enterprise_enabled_at = target.enterprise_enabled_at or _utc_now_naive()
+    session.add(target)
+    log_audit_event(session, actor=admin_user, target_user_id=target.id, kind="admin.subscription_upgrade", summary=f"Changed subscription plan for {target.email}", detail=f"plan={normalized}")
+    _commit_or_http(session, "Unable to upgrade subscription")
+    return {"ok": True}
+
+
+@router.post("/subscribers/{user_id}/note")
+def note_subscriber(
+    user_id: UUID,
+    note: str = Body(default="", embed=True),
+    session: Session = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> dict:
+    target = session.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Subscriber not found")
+    cleaned = (note or "").strip()[:1000]
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="Note is required")
+    log_audit_event(session, actor=admin_user, target_user_id=target.id, kind="admin.subscription_note", summary=f"Added subscriber note for {target.email}", detail=cleaned)
+    _commit_or_http(session, "Unable to add subscriber note")
+    return {"ok": True}
 
     return {
         "grain": grain,

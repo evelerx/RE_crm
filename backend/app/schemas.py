@@ -1,3 +1,4 @@
+# MODIFIED: Phase 4 — Removed Zoom meeting schemas — Google Meet remains the supported in-app meeting flow.
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -5,6 +6,8 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+# MODIFIED: Phase 1 — Deal Intelligence response models — Enables typed, server-scored priority dashboards with role-safe API output.
 
 
 class LoginRequest(BaseModel):
@@ -370,21 +373,6 @@ class GoogleCalendarEventResponse(BaseModel):
     meet_link: str = ""
 
 
-class ZoomMeetingCreateRequest(BaseModel):
-    title: str = Field(min_length=1, max_length=200)
-    agenda: str = Field(default="", max_length=4000)
-    start_at: datetime
-    duration_minutes: int = Field(default=30, ge=15, le=480)
-    timezone: str = "Asia/Kolkata"
-
-
-class ZoomMeetingResponse(BaseModel):
-    ok: bool
-    meeting_id: str
-    join_url: str = ""
-    start_url: str = ""
-
-
 class BuilderDocumentCreateRequest(BaseModel):
     doc_type: str = Field(default="project_overview", pattern="^(project_overview|company_profile|project_update|sales_offer|compliance_cover_letter|construction_summary|builder_brochure)$")
     project_name: str = ""
@@ -661,6 +649,27 @@ class DealScoreResponse(BaseModel):
     close_probability: int = Field(ge=0, le=100)
     risk_flags: list[str] = []
     rationale: list[str] = []
+
+
+class DealPriorityItem(BaseModel):
+    deal_id: UUID
+    deal_name: str
+    contact_name: str = ""
+    lead_source: str = "unknown"
+    deal_value: float = 0
+    score: int = Field(ge=0, le=100)
+    urgency: str = Field(pattern="^(urgent|important|track)$")
+    days_since_last_activity: int
+    days_in_stage: int
+    overdue_tasks_count: int
+    engagement_score: int
+    recommended_action: str
+
+
+class DealPriorityDashboardRead(BaseModel):
+    last_updated_at: datetime
+    needs_time: list[DealPriorityItem]
+    ad_budget: list[DealPriorityItem]
 
 
 class FollowupRequest(BaseModel):

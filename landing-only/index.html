@@ -13,7 +13,7 @@ Security fixes applied:
 // SECURITY FIX: Added accessible focus states and keyboard-safe disclosure controls for drawer and FAQ interactions.
 
 CRM features added to landing page:
-- Lead pipeline, deal tracking, contacts, today tasks, ROI reporting, AI follow-ups, AI deal summaries, import/export, Google Workspace, Gmail attachments, Calendar/Meet, Zoom, enterprise owners, employee IDs, admin controls, security audit, demo accounts, AI assignment, builder documents, builder website publishing, managed marketing assist, subscription flows, PWA install, and support workflows.
+- Lead pipeline, deal tracking, Deal Intelligence priorities, contacts, today tasks, ROI reporting, AI follow-ups, AI deal summaries, import/export, Google Workspace, Gmail attachments, Calendar/Meet, enterprise owners, employee IDs, admin revenue analytics, subscriber health tracking, Hotstar ads upload, security audit, demo accounts, AI assignment, builder documents, AI builder website publishing, managed marketing assist, subscription flows, PWA install, and support workflows.
 
 Responsive fixes made:
 - Sticky glass navbar with hamburger drawer below 768px, clamp typography, 3/2/1 feature grids, mobile full-width CTAs, carousel-like testimonial scroller on mobile, no horizontal overflow, 44px minimum tap targets, and max-width responsive media.
@@ -447,6 +447,8 @@ New sections added:
       .cta-banner { grid-template-columns: 1fr; padding: 32px 24px; }
       .card { padding: 22px; border-radius: 22px; }
     }
+    .mt-14 { margin-top: 14px; }
+    .mt-16 { margin-top: 16px; }
   </style>
 </head>
 <body>
@@ -572,10 +574,13 @@ New sections added:
           <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 7h18M7 7v14m10-14v14M5 21h14V7L12 3 5 7z"/></svg></span><h3>Enterprise team control</h3><p>Create owner accounts, employee IDs, team limits, support threads, and audit visibility.</p></article>
           <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4"/></svg></span><h3>Admin controls</h3><p>Manage users, demo accounts, AI access, subscriptions, security, and account recovery.</p></article>
           <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 4h16v16H4z"/><path d="M4 8h16M8 4v16"/></svg></span><h3>Google Workspace</h3><p>Send Gmail with attachments, create Calendar events, add Meet links, and test connections.</p></article>
-          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M15 10l4.5-2.5v9L15 14v-4z"/><rect x="3" y="6" width="12" height="12" rx="2"/></svg></span><h3>Zoom meetings</h3><p>Create online meetings from the CRM when your team uses Zoom for sales calls.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="9"/></svg></span><h3>Deal Intelligence</h3><p>Rank active deals by urgency, stalled follow-ups, value, engagement, and ad-budget potential.</p></article>
           <article class="card feature-card" id="builder"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-7h6v7"/></svg></span><h3>Builder websites</h3><p>Builder subscribers can publish a simple public website with projects, photos, and contact forms.</p></article>
           <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><h3>Builder documents</h3><p>Create project overviews, offers, brochures, and compliance-style communication drafts.</p></article>
           <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 12h4l3 8 5-16 3 8h1"/></svg></span><h3>Marketing assist</h3><p>Request managed property marketing help and plan ad budgets with clearer lead goals.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 19V5m0 14h16M8 17V9m4 8V7m4 10v-5"/></svg></span><h3>Admin revenue analytics</h3><p>Track subscription MRR, ARR, renewals, churn, plan split, and subscriber growth from admin.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-3 3-2-2"/></svg></span><h3>Subscriber health table</h3><p>Admin can monitor plan, renewal, payment, usage, health score, and churn risk in one place.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg></span><h3>Hotstar ad upload</h3><p>Prepare video or banner campaigns with targeting, schedule, budget, preview, status, and metrics.</p></article>
         </div>
       </div>
     </section>
@@ -645,8 +650,9 @@ New sections added:
             <div class="price">₹11,999 <small>/month base</small></div>
             <ul>
               <li><span class="good">✓</span><span>Everything in Growth, plus builder workflows</span></li>
-              <li><span class="good">✓</span><span>AI builder documents and public builder website</span></li>
+              <li><span class="good">✓</span><span>AI builder documents and public AI website builder</span></li>
               <li><span class="good">✓</span><span>Property gallery, Formspree-ready inquiries, and site editing</span></li>
+              <li><span class="good">✓</span><span>Automatic /builders/company-url page with custom-domain option</span></li>
             </ul>
             <a class="btn btn-secondary plan-cta" href="#contact" data-plan="Builder">Start Builder</a>
           </article>
@@ -687,13 +693,13 @@ New sections added:
       <div class="container two-col">
         <article class="card">
           <span class="eyebrow">Privacy Policy</span>
-          <h2 style="margin-top: 16px;">Your business data stays controlled.</h2>
-          <p style="margin-top: 14px;">Northstone is designed so sales records, team access, AI assignment, and builder content are handled through authenticated CRM workflows. Public landing forms collect only basic inquiry details required to respond.</p>
+          <h2 class="mt-16">Your business data stays controlled.</h2>
+          <p class="mt-14">Northstone is designed so sales records, team access, AI assignment, and builder content are handled through authenticated CRM workflows. Public landing forms collect only basic inquiry details required to respond.</p>
         </article>
         <article class="card" id="terms">
           <span class="eyebrow">Terms</span>
-          <h2 style="margin-top: 16px;">Use Northstone responsibly.</h2>
-          <p style="margin-top: 14px;">Subscriptions, managed marketing, payment activation, and integrations are confirmed during onboarding. We do not place payment scripts or secret keys inside this public landing page.</p>
+          <h2 class="mt-16">Use Northstone responsibly.</h2>
+          <p class="mt-14">Subscriptions, managed marketing, payment activation, and integrations are confirmed during onboarding. We do not place payment scripts or secret keys inside this public landing page.</p>
         </article>
       </div>
     </section>
@@ -702,8 +708,8 @@ New sections added:
       <div class="container contact-grid">
         <div>
           <span class="eyebrow">Get In Touch</span>
-          <h2 style="margin-top: 16px;">Talk to us.</h2>
-          <p class="lead" style="margin-top: 14px;">Have questions? We respond within 24 hours.</p>
+          <h2 class="mt-16">Talk to us.</h2>
+          <p class="lead mt-14">Have questions? We respond within 24 hours.</p>
           <div class="contact-methods">
             <a class="contact-method" href="tel:+919834241892" aria-label="Call Northstone">
               <span class="icon" aria-hidden="true">☎</span>
@@ -746,7 +752,7 @@ New sections added:
           <img src="./northstone-mark.svg" width="44" height="44" loading="lazy" alt="Northstone logo">
           <span>Northstone <small>Pipeline | Grid | ROI</small></span>
         </a>
-        <p style="margin-top: 14px;">A real-estate sales operating system for solo closers, broker teams, enterprise owners, and builder organizations.</p>
+        <p class="mt-14">A real-estate sales operating system for solo closers, broker teams, enterprise owners, and builder organizations.</p>
         <div class="socials">
           <a href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
           <a href="https://x.com/" target="_blank" rel="noopener noreferrer">Twitter/X</a>
@@ -757,7 +763,7 @@ New sections added:
       <div class="footer-links">
         <div><h3>Product</h3><a href="#features">Features</a><a href="#builder">Builder websites</a><a href="#how-it-works">How it works</a></div>
         <div><h3>Company</h3><a href="#pricing">Pricing</a><a href="#about">About</a><a href="#contact">Contact</a></div>
-        <div><h3>Legal</h3><a href="#privacy">Privacy Policy</a><a href="#terms">Terms</a><a href="https://app.northstonecrm.com/login" target="_blank" rel="noopener noreferrer">CRM Login</a></div>
+        <div><h3>Legal</h3><a href="/privacy">Privacy Policy</a><a href="/terms">Terms</a><a href="https://app.northstonecrm.com/login" target="_blank" rel="noopener noreferrer">CRM Login</a></div>
       </div>
     </div>
   </footer>

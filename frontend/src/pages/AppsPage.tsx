@@ -1,7 +1,9 @@
+// MODIFIED: Phase 4 — Added Hotstar ad upload and removed Zoom UI wiring — Keeps ads managed in-product and eliminates deprecated Zoom paths.
 import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { ApiError, api } from "../api/client";
+import HotstarAdUpload from "../components/HotstarAdUpload";
 
 type ProviderStatus = {
   key: string;
@@ -65,13 +67,6 @@ type GoogleCalendarEventResponse = {
   meet_link: string;
 };
 
-type ZoomMeetingResponse = {
-  ok: boolean;
-  meeting_id: string;
-  join_url: string;
-  start_url: string;
-};
-
 const providerCards = [
   {
     name: "Gmail",
@@ -120,22 +115,6 @@ const providerCards = [
       "Live callback URL"
     ],
     launchLevel: "Meet link generation through the Google stack"
-  },
-  {
-    name: "Zoom",
-    key: "zoom",
-    tab: "meetings",
-    iconUrl: "https://img.icons8.com/color/48/zoom.png",
-    providerGroup: "zoom",
-    category: "Meetings",
-    rollout: "Phase 3",
-    purpose: "Create Zoom sessions for sales calls, investor meetings, and remote walkthroughs.",
-    requiredFromOwner: [
-      "Zoom owner connection",
-      "Zoom OAuth app",
-      "Production callback URL"
-    ],
-    launchLevel: "Owner-managed Zoom meeting creation"
   }
 ];
 
@@ -159,6 +138,15 @@ const adPlatforms = [
     url: "https://www.facebook.com/adsmanager/"
   },
   {
+    name: "Hotstar / Disney+",
+    tab: "ads",
+    iconUrl: "https://img.icons8.com/color/48/disney-plus.png",
+    category: "Video and display",
+    description:
+      "Upload Hotstar creative, define regional audiences, and prepare premium video/display campaigns for property launches.",
+    url: "https://ads.hotstar.com/"
+  },
+  {
     name: "TikTok Ads",
     tab: "ads",
     iconUrl: "https://img.icons8.com/color/48/tiktok--v1.png",
@@ -171,7 +159,7 @@ const adPlatforms = [
 
 const appTabs = [
   { key: "communication", label: "Communication", iconUrl: "https://img.icons8.com/color/48/gmail-new.png" },
-  { key: "meetings", label: "Meetings", iconUrl: "https://img.icons8.com/color/48/zoom.png" },
+  { key: "meetings", label: "Meetings", iconUrl: "https://img.icons8.com/color/48/google-meet.png" },
   { key: "calendar", label: "Calendar", iconUrl: "https://img.icons8.com/color/48/google-calendar--v2.png" },
   { key: "ads", label: "Ads", iconUrl: "https://img.icons8.com/color/48/google-ads.png" },
   { key: "coming_soon", label: "Coming soon", iconUrl: "https://img.icons8.com/color/48/clock--v1.png" }
@@ -233,7 +221,6 @@ function providerRequirementItems(provider: { requiredFromOwner: string[] }, int
   }
   return provider.requiredFromOwner.map((item) => {
     if (item === "Google owner connection") return "Google workspace connection";
-    if (item === "Zoom owner connection") return "Zoom workspace connection";
     if (item === "Owner-managed organization access") return "Organization access managed by admin";
     return item;
   });
@@ -251,11 +238,6 @@ export default function AppsPage() {
   const [microsoftBusy, setMicrosoftBusy] = useState(false);
   const [microsoftTestBusy, setMicrosoftTestBusy] = useState(false);
   const [microsoftTestResult, setMicrosoftTestResult] = useState<GoogleConnectionTestResponse | null>(null);
-  const [zoomBusy, setZoomBusy] = useState(false);
-  const [zoomTestBusy, setZoomTestBusy] = useState(false);
-  const [zoomTestResult, setZoomTestResult] = useState<GoogleConnectionTestResponse | null>(null);
-  const [zoomMeetingBusy, setZoomMeetingBusy] = useState(false);
-  const [zoomMeetingResult, setZoomMeetingResult] = useState<ZoomMeetingResponse | null>(null);
   const [gmailBusy, setGmailBusy] = useState(false);
   const [gmailResult, setGmailResult] = useState<GoogleSendEmailResponse | null>(null);
   const [calendarBusy, setCalendarBusy] = useState(false);
@@ -283,13 +265,6 @@ export default function AppsPage() {
     start_at: "",
     end_at: "",
     attendee_email: "",
-    timezone: "Asia/Kolkata"
-  });
-  const [zoomMeetingForm, setZoomMeetingForm] = useState({
-    title: "",
-    agenda: "",
-    start_at: "",
-    duration_minutes: 30,
     timezone: "Asia/Kolkata"
   });
 
@@ -328,15 +303,10 @@ export default function AppsPage() {
     } else if (callbackState.integration === "microsoft" && callbackState.status === "connected") {
       setActionMsg(callbackState.detail ? `Microsoft Workspace connected: ${callbackState.detail}` : "Microsoft Workspace connected.");
       void load();
-    } else if (callbackState.integration === "zoom" && callbackState.status === "connected") {
-      setActionMsg(callbackState.detail ? `Zoom connected: ${callbackState.detail}` : "Zoom connected.");
-      void load();
     } else if (callbackState.integration === "google" && callbackState.status === "error") {
       setActionMsg(callbackState.detail ? `Google connection failed: ${callbackState.detail}` : "Google connection failed.");
     } else if (callbackState.integration === "microsoft" && callbackState.status === "error") {
       setActionMsg(callbackState.detail ? `Microsoft connection failed: ${callbackState.detail}` : "Microsoft connection failed.");
-    } else if (callbackState.integration === "zoom" && callbackState.status === "error") {
-      setActionMsg(callbackState.detail ? `Zoom connection failed: ${callbackState.detail}` : "Zoom connection failed.");
     }
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -357,7 +327,6 @@ export default function AppsPage() {
 
   const googlePrimary = providerByKey.get("gmail");
   const microsoftPrimary = providerByKey.get("outlook");
-  const zoomPrimary = providerByKey.get("zoom");
   const visibleProviderCards = providerCards.filter((provider) => provider.tab === selectedTab);
   const visibleAdPlatforms = adPlatforms.filter((platform) => platform.tab === selectedTab);
   const visibleComingSoonApps = comingSoonApps.filter(
@@ -449,67 +418,6 @@ export default function AppsPage() {
       setActionMsg(e instanceof ApiError ? e.message : "Unable to test Microsoft connection.");
     } finally {
       setMicrosoftTestBusy(false);
-    }
-  }
-
-  async function connectZoom() {
-    setZoomBusy(true);
-    setActionMsg(null);
-    try {
-      const response = await api<ConnectResponse>("/integrations/zoom/connect");
-      if (!response?.auth_url?.trim()) {
-        throw new Error("Backend did not return a Zoom authorization URL.");
-      }
-      window.location.href = response.auth_url;
-    } catch (e) {
-      setActionMsg(e instanceof ApiError ? e.message : "Unable to start Zoom connection.");
-    } finally {
-      setZoomBusy(false);
-    }
-  }
-
-  async function disconnectZoom() {
-    setZoomBusy(true);
-    setActionMsg(null);
-    try {
-      await api<{ ok: boolean }>("/integrations/zoom/disconnect", { method: "POST" });
-      setActionMsg("Zoom disconnected.");
-      await load();
-    } catch (e) {
-      setActionMsg(e instanceof ApiError ? e.message : "Unable to disconnect Zoom.");
-    } finally {
-      setZoomBusy(false);
-    }
-  }
-
-  async function testZoomConnection() {
-    setZoomTestBusy(true);
-    setActionMsg(null);
-    try {
-      const result = await api<GoogleConnectionTestResponse>("/integrations/zoom/test");
-      setZoomTestResult(result);
-      setActionMsg(`Zoom connection is healthy for ${result.connected_account_email || "the connected account"}.`);
-    } catch (e) {
-      setActionMsg(e instanceof ApiError ? e.message : "Unable to test Zoom connection.");
-    } finally {
-      setZoomTestBusy(false);
-    }
-  }
-
-  async function createZoomMeeting() {
-    setZoomMeetingBusy(true);
-    setActionMsg(null);
-    try {
-      const result = await api<ZoomMeetingResponse>("/integrations/zoom/meetings", {
-        method: "POST",
-        body: JSON.stringify(zoomMeetingForm)
-      });
-      setZoomMeetingResult(result);
-      setActionMsg("Zoom meeting created.");
-    } catch (e) {
-      setActionMsg(e instanceof ApiError ? e.message : "Unable to create Zoom meeting.");
-    } finally {
-      setZoomMeetingBusy(false);
     }
   }
 
@@ -647,7 +555,7 @@ export default function AppsPage() {
         <aside className="card" style={{ position: "sticky", top: 18 }}>
           <div className="sectionTitle" style={{ fontSize: 20 }}>Apps library</div>
           <div className="sectionSub" style={{ marginTop: 8 }}>
-            Browse every tool by business domain, with separate options for Gmail, Calendar, Meet, Zoom, Teams, and ads.
+            Browse every tool by business domain, with separate options for Gmail, Calendar, Meet, and ads.
           </div>
           <div className="stack" style={{ gap: 10, marginTop: 16 }}>
             {appTabs.map((tab) => {
@@ -708,7 +616,6 @@ export default function AppsPage() {
                 const showCalendarTools = showGoogleActions && provider.key === "google_calendar" && !!googlePrimary?.connected;
                 const showMeetTools = showGoogleActions && provider.key === "google_meet" && !!googlePrimary?.connected;
                 const showMicrosoftActions = provider.key === "outlook" && !!microsoftPrimary;
-                const showZoomActions = provider.key === "zoom" && !!zoomPrimary;
                 const connectedLabel = live?.connected_account_email ? `Connected as ${live.connected_account_email}` : "";
                 return (
                   <article key={provider.name} className="card">
@@ -1102,128 +1009,6 @@ export default function AppsPage() {
                       </div>
                     ) : null}
 
-                    {showZoomActions ? (
-                      <div className="stack" style={{ gap: 14, marginTop: 18 }}>
-                        <div className="row" style={{ gap: 14, flexWrap: "wrap", justifyContent: "flex-start" }}>
-                          {zoomPrimary?.can_connect && !zoomPrimary.connected ? (
-                            <button className="btn" onClick={() => void connectZoom()} disabled={zoomBusy} type="button">
-                              {zoomBusy ? "Connecting..." : "Connect Zoom Workspace"}
-                            </button>
-                          ) : null}
-                          {zoomPrimary?.connected ? (
-                            <>
-                              <button className="btn" onClick={() => void testZoomConnection()} disabled={zoomTestBusy} type="button">
-                                {zoomTestBusy ? "Testing..." : "Test Zoom connection"}
-                              </button>
-                              <button className="btn secondary" onClick={() => void disconnectZoom()} disabled={zoomBusy} type="button">
-                                {zoomBusy ? "Working..." : "Disconnect Zoom"}
-                              </button>
-                            </>
-                          ) : null}
-                        </div>
-
-                        {zoomTestResult ? (
-                          <div className="bannerInfo">
-                            Connected account: {zoomTestResult.connected_account_email || "-"}
-                            <br />
-                            Expires at: {zoomTestResult.expires_at || "Not provided"}
-                            <br />
-                            Scopes: {zoomTestResult.scopes.join(", ") || "None reported"}
-                          </div>
-                        ) : null}
-
-                        {zoomPrimary?.connected ? (
-                          <div className="card">
-                            <div className="sectionTitle" style={{ fontSize: 18 }}>Create Zoom meeting</div>
-                            <div className="stack" style={{ gap: 10, marginTop: 12 }}>
-                              <label>
-                                Meeting title
-                                <input
-                                  value={zoomMeetingForm.title}
-                                  onChange={(e) => setZoomMeetingForm((prev) => ({ ...prev, title: e.target.value }))}
-                                  placeholder="Project investor call"
-                                />
-                              </label>
-                              <label>
-                                Agenda
-                                <textarea
-                                  value={zoomMeetingForm.agenda}
-                                  onChange={(e) => setZoomMeetingForm((prev) => ({ ...prev, agenda: e.target.value }))}
-                                  placeholder="Agenda, talking points, and meeting context"
-                                  rows={4}
-                                />
-                              </label>
-                              <div className="grid cols2">
-                                <label>
-                                  Start date and time
-                                  <input
-                                    type="datetime-local"
-                                    value={zoomMeetingForm.start_at}
-                                    onChange={(e) => setZoomMeetingForm((prev) => ({ ...prev, start_at: e.target.value }))}
-                                  />
-                                </label>
-                                <label>
-                                  Duration in minutes
-                                  <input
-                                    type="number"
-                                    min={15}
-                                    max={480}
-                                    step={15}
-                                    value={zoomMeetingForm.duration_minutes}
-                                    onChange={(e) =>
-                                      setZoomMeetingForm((prev) => ({
-                                        ...prev,
-                                        duration_minutes: Number(e.target.value) || 30
-                                      }))
-                                    }
-                                  />
-                                </label>
-                              </div>
-                              <label>
-                                Timezone
-                                <input
-                                  value={zoomMeetingForm.timezone}
-                                  onChange={(e) => setZoomMeetingForm((prev) => ({ ...prev, timezone: e.target.value }))}
-                                  placeholder="Asia/Kolkata"
-                                />
-                              </label>
-                              <button
-                                className="btn"
-                                onClick={() => void createZoomMeeting()}
-                                disabled={zoomMeetingBusy || !zoomMeetingForm.title.trim() || !zoomMeetingForm.start_at}
-                              >
-                                {zoomMeetingBusy ? "Creating..." : "Create Zoom meeting"}
-                              </button>
-                              {zoomMeetingResult ? (
-                                <div className="bannerInfo">
-                                  Meeting created: {zoomMeetingResult.meeting_id}
-                                  <br />
-                                  {zoomMeetingResult.join_url ? (
-                                    <>
-                                      Join link:{" "}
-                                      <a href={zoomMeetingResult.join_url} target="_blank" rel="noreferrer">
-                                        Open Zoom meeting
-                                      </a>
-                                      <br />
-                                    </>
-                                  ) : null}
-                                  {zoomMeetingResult.start_url ? (
-                                    <>
-                                      Host link:{" "}
-                                      <a href={zoomMeetingResult.start_url} target="_blank" rel="noreferrer">
-                                        Start as host
-                                      </a>
-                                    </>
-                                  ) : (
-                                    "Host link not returned by Zoom."
-                                  )}
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
                   </article>
                 );
               })}
@@ -1231,38 +1016,41 @@ export default function AppsPage() {
           ) : null}
 
           {visibleAdPlatforms.length > 0 ? (
-            <div className="grid cols3">
-              {visibleAdPlatforms.map((platform) => (
-                <article key={platform.name} className="card">
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                    <div className="row" style={{ gap: 12, alignItems: "center" }}>
-                      <img
-                        src={platform.iconUrl}
-                        alt={`${platform.name} icon`}
-                        width={28}
-                        height={28}
-                        style={{ borderRadius: 8, background: "#fff", padding: 4 }}
-                      />
-                      <div>
-                        <div className="sectionTitle" style={{ fontSize: 22 }}>{platform.name}</div>
-                        <div className="muted" style={{ marginTop: 6 }}>{platform.category}</div>
+            <>
+              <div className="grid cols3">
+                {visibleAdPlatforms.map((platform) => (
+                  <article key={platform.name} className="card">
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                      <div className="row" style={{ gap: 12, alignItems: "center" }}>
+                        <img
+                          src={platform.iconUrl}
+                          alt={`${platform.name} icon`}
+                          width={28}
+                          height={28}
+                          style={{ borderRadius: 8, background: "#fff", padding: 4 }}
+                        />
+                        <div>
+                          <div className="sectionTitle" style={{ fontSize: 22 }}>{platform.name}</div>
+                          <div className="muted" style={{ marginTop: 6 }}>{platform.category}</div>
+                        </div>
                       </div>
+                      <div className="pill adminPill">{platform.name.includes("Hotstar") ? "Upload" : "Publish"}</div>
                     </div>
-                    <div className="pill adminPill">Publish</div>
-                  </div>
-                  <p className="muted" style={{ lineHeight: 1.7, marginTop: 14 }}>{platform.description}</p>
-                  <a
-                    className="btn"
-                    href={platform.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ marginTop: 8, textDecoration: "none" }}
-                  >
-                    Open {platform.name}
-                  </a>
-                </article>
-              ))}
-            </div>
+                    <p className="muted" style={{ lineHeight: 1.7, marginTop: 14 }}>{platform.description}</p>
+                    <a
+                      className="btn"
+                      href={platform.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ marginTop: 8, textDecoration: "none" }}
+                    >
+                      Open {platform.name}
+                    </a>
+                  </article>
+                ))}
+              </div>
+              <HotstarAdUpload />
+            </>
           ) : null}
 
           {visibleComingSoonApps.length > 0 ? (
@@ -1293,8 +1081,7 @@ export default function AppsPage() {
 
           {selectedTab === "ads" ? (
             <div className="bannerInfo">
-              Current ad cards open the official platforms directly. The next phase can add AI ad generation, campaign draft
-              storage, and tracked publishing workflows inside Northstone.
+              Hotstar campaigns can now be prepared inside Northstone with validation, preview, progress, status, and launch metrics.
             </div>
           ) : null}
         </div>

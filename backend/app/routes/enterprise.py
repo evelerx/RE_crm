@@ -1,3 +1,4 @@
+# MODIFIED: Phase 4 — Removed Zoom from integration catalog — Keeps meetings on Google Meet and avoids dead OAuth setup.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -314,10 +315,6 @@ def _provider_configured(provider_group: str) -> tuple[bool, list[str]]:
             ("MICROSOFT_CLIENT_SECRET", (settings.microsoft_client_secret or "").strip()),
             ("MICROSOFT_TENANT_ID", (settings.microsoft_tenant_id or "").strip()),
         ],
-        "zoom": [
-            ("ZOOM_CLIENT_ID", (settings.zoom_client_id or "").strip()),
-            ("ZOOM_CLIENT_SECRET", (settings.zoom_client_secret or "").strip()),
-        ],
     }
     pairs = requirements.get(provider_group, [])
     missing = [name for name, value in pairs if not value]
@@ -331,7 +328,6 @@ def _integration_catalog() -> list[dict[str, str]]:
         {"key": "google_meet", "name": "Google Meet", "provider_group": "google", "category": "meetings"},
         {"key": "outlook", "name": "Outlook", "provider_group": "microsoft", "category": "email"},
         {"key": "microsoft_teams", "name": "Microsoft Teams", "provider_group": "microsoft", "category": "meetings"},
-        {"key": "zoom", "name": "Zoom", "provider_group": "zoom", "category": "meetings"},
     ]
 
 
