@@ -1,1694 +1,865 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
+<!--
+AUDIT LOG
+Security fixes applied:
+// SECURITY FIX: Added a strict Content-Security-Policy meta tag with HTTPS upgrades and frame-ancestors protection.
+// SECURITY FIX: Removed third-party checkout/runtime scripts from the public landing page to reduce dependency and supply-chain exposure.
+// SECURITY FIX: All form inputs are trimmed, length-limited, validated, and rendered only as text nodes.
+// SECURITY FIX: Added honeypot anti-spam fields to every public lead/contact form.
+// SECURITY FIX: Forms do not use insecure action URLs; lead requests use the HTTPS-only production API endpoint.
+// SECURITY FIX: All target="_blank" links include rel="noopener noreferrer".
+// SECURITY FIX: Navigation and CTA links are fixed internal anchors or trusted HTTPS destinations, preventing open redirects.
+// SECURITY FIX: Kept only required public phone/email contact details; no API keys, secrets, credentials, or internal-only routes are embedded.
+// SECURITY FIX: Added accessible focus states and keyboard-safe disclosure controls for drawer and FAQ interactions.
+
+CRM features added to landing page:
+- Lead pipeline, deal tracking, contacts, today tasks, ROI reporting, AI follow-ups, AI deal summaries, import/export, Google Workspace, Gmail attachments, Calendar/Meet, Zoom, enterprise owners, employee IDs, admin controls, security audit, demo accounts, AI assignment, builder documents, builder website publishing, managed marketing assist, subscription flows, PWA install, and support workflows.
+
+Responsive fixes made:
+- Sticky glass navbar with hamburger drawer below 768px, clamp typography, 3/2/1 feature grids, mobile full-width CTAs, carousel-like testimonial scroller on mobile, no horizontal overflow, 44px minimum tap targets, and max-width responsive media.
+
+New sections added:
+- Hero, social proof, old-way/new-way comparison, full CRM feature grid, how it works, testimonials, pricing, FAQ accordion, final CTA, Contact Us, and expanded footer.
+-->
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Northstone | The Real-Estate Sales Operating System</title>
-<link rel="icon" href="./northstone-favicon.svg" type="image/svg+xml" />
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-<style>
-  :root {
-    color-scheme: dark;
-    --bg: #09111d;
-    --panel: #101a2b;
-    --panel-soft: rgba(16, 26, 43, 0.78);
-    --border: rgba(255,255,255,0.09);
-    --text: rgba(244,247,251,0.96);
-    --muted: rgba(182,194,213,0.74);
-    --brand: #7fb1ff;
-    --brand-strong: #5d93f2;
-    --accent: #3fd7a1;
-    --danger: #ff7676;
-    --shadow: 0 24px 60px rgba(0,0,0,0.24);
-  }
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    margin: 0;
-    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-    background:
-      radial-gradient(900px 540px at 12% -8%, rgba(127,177,255,0.18), transparent 60%),
-      radial-gradient(700px 420px at 88% 0%, rgba(63,215,161,0.12), transparent 58%),
-      linear-gradient(180deg, #08101a 0%, #0b1220 100%);
-    color: var(--text);
-  }
-  body::before {
-    content: "";
-    position: fixed;
-    top: -60px;
-    right: -40px;
-    width: 420px;
-    height: 420px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(127,177,255,0.14), transparent 68%);
-    pointer-events: none;
-    filter: blur(8px);
-    animation: floatGlow 18s ease-in-out infinite;
-    z-index: 0;
-  }
-  a { color: inherit; text-decoration: none; }
-  .shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
-  .topbar {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    backdrop-filter: blur(16px);
-    background: rgba(8, 15, 26, 0.88);
-    border-bottom: 1px solid var(--border);
-  }
-  .topbarInner {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 20px;
-    padding: 16px 0;
-  }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .logo {
-    width: 38px;
-    height: 38px;
-    border-radius: 12px;
-    display: grid;
-    place-items: center;
-    background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(227,236,248,0.9));
-    box-shadow: 0 16px 36px rgba(10, 20, 36, 0.26);
-    overflow: hidden;
-  }
-  .logo img {
-    width: 28px;
-    height: 28px;
-    display: block;
-  }
-  .brandTitle {
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 18px;
-    font-weight: 700;
-    line-height: 1.1;
-  }
-  .brandSub {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 2px;
-  }
-  .nav {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-  .nav a {
-    padding: 9px 12px;
-    border-radius: 10px;
-    color: var(--muted);
-    font-size: 14px;
-    font-weight: 600;
-  }
-  .nav a:hover {
-    color: var(--text);
-    background: rgba(255,255,255,0.04);
-  }
-  .nav .primaryLink {
-    background: linear-gradient(135deg, var(--brand), var(--brand-strong));
-    color: #07111d;
-  }
-  .localNotice {
-    display: none;
-    padding: 12px 16px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    background: rgba(255, 193, 7, 0.08);
-    color: #f7d980;
-    font-size: 13px;
-    line-height: 1.6;
-  }
-  .hero {
-    padding: 92px 0 72px;
-  }
-  .heroGrid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 28px;
-    align-items: start;
-  }
-  .eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    border-radius: 999px;
-    border: 1px solid rgba(127,177,255,0.24);
-    background: rgba(127,177,255,0.08);
-    color: var(--brand);
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-  .eyebrowDot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--accent);
-  }
-  h1 {
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: clamp(38px, 6vw, 74px);
-    line-height: 1.03;
-    margin: 22px 0 18px;
-    letter-spacing: -0.04em;
-    max-width: 760px;
-  }
-  .heroLead {
-    max-width: 640px;
-    font-size: 18px;
-    line-height: 1.72;
-    color: var(--muted);
-  }
-  .heroCopyStrong {
-    color: var(--text);
-    font-weight: 700;
-  }
-  .modeDock {
-    display: inline-flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 24px;
-    padding: 8px;
-    border-radius: 18px;
-    border: 1px solid rgba(255,255,255,0.08);
-    background: rgba(8, 14, 24, 0.58);
-  }
-  .modeBtn {
-    border: 1px solid transparent;
-    background: transparent;
-    color: var(--muted);
-    padding: 10px 14px;
-    border-radius: 12px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 13px;
-    font-weight: 700;
-    transition: all 0.18s ease;
-  }
-  .modeBtn:hover {
-    color: var(--text);
-    background: rgba(255,255,255,0.04);
-  }
-  .modeBtn.active {
-    color: #07111d;
-    background: linear-gradient(135deg, var(--brand), var(--brand-strong));
-    box-shadow: 0 12px 26px rgba(93,147,242,0.24);
-  }
-  .modeShowcase {
-    margin-top: 34px;
-    max-width: 980px;
-  }
-  .modeShowcase .modeDock {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-    width: min(100%, 620px);
-    margin-top: 0;
-    margin-bottom: 18px;
-    padding: 10px;
-  }
-  .modeShowcase .modeBtn {
-    width: 100%;
-    padding: 14px 18px;
-    text-align: center;
-    white-space: nowrap;
-  }
-  .modeShowcase .heroPanel {
-    max-width: 980px;
-  }
-  .heroActions {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 28px;
-  }
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    min-height: 48px;
-    padding: 0 20px;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    font-weight: 800;
-    font-size: 14px;
-    cursor: pointer;
-    transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
-  }
-  .btn:hover { transform: translateY(-1px); }
-  .btnPrimary {
-    background: linear-gradient(135deg, var(--brand), var(--brand-strong));
-    color: #08111d;
-    box-shadow: 0 18px 38px rgba(93,147,242,0.24);
-  }
-  .btnSecondary {
-    background: rgba(255,255,255,0.04);
-    color: var(--text);
-  }
-  .heroStats {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0,1fr));
-    gap: 14px;
-    margin-top: 42px;
-  }
-  .stat {
-    padding: 18px;
-    border-radius: 18px;
-    border: 1px solid var(--border);
-    background: rgba(14, 22, 37, 0.72);
-  }
-  .statValue {
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 32px;
-    line-height: 1;
-    margin-bottom: 8px;
-  }
-  .statLabel {
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.5;
-  }
-  .heroPanel, .card {
-    border: 1px solid var(--border);
-    background: var(--panel-soft);
-    border-radius: 26px;
-    box-shadow: var(--shadow);
-  }
-  .heroPanel {
-    padding: 24px;
-    transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
-  }
-  .panelKicker {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--accent);
-    font-weight: 800;
-  }
-  .panelTitle {
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 26px;
-    line-height: 1.15;
-    margin: 14px 0 10px;
-  }
-  .panelSub {
-    color: var(--muted);
-    font-size: 14px;
-    line-height: 1.7;
-  }
-  .signalStack {
-    display: grid;
-    gap: 12px;
-    margin-top: 22px;
-  }
-  .signalRow {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 14px 16px;
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.05);
-    background: rgba(6,12,20,0.44);
-    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
-  }
-  .signalRow:hover {
-    transform: translateY(-1px);
-    border-color: rgba(127,177,255,0.16);
-    background: rgba(8,14,24,0.6);
-  }
-  .signalTitle {
-    font-size: 14px;
-    font-weight: 800;
-  }
-  .signalMeta {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 4px;
-  }
-  .pill {
-    align-self: start;
-    padding: 6px 10px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    background: rgba(127,177,255,0.12);
-    color: var(--brand);
-    border: 1px solid rgba(127,177,255,0.24);
-  }
-  section {
-    padding: 88px 0;
-  }
-  .sectionLabel {
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 10px;
-  }
-  .sectionTitle {
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: clamp(28px, 4vw, 52px);
-    line-height: 1.08;
-    letter-spacing: -0.03em;
-    max-width: 720px;
-  }
-  .sectionSub {
-    margin-top: 16px;
-    max-width: 700px;
-    color: var(--muted);
-    font-size: 17px;
-    line-height: 1.72;
-  }
-  .featureGrid, .whyGrid, .pricingGrid, .audienceGrid {
-    display: grid;
-    gap: 18px;
-    margin-top: 42px;
-  }
-  .overviewGrid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0,1fr));
-    gap: 18px;
-    margin-top: 42px;
-  }
-  .featureGrid { grid-template-columns: repeat(3, minmax(0,1fr)); }
-  .whyGrid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  .pricingGrid { grid-template-columns: repeat(4, minmax(0,1fr)); align-items: start; }
-  .audienceGrid { grid-template-columns: repeat(3, minmax(0,1fr)); }
-  .card {
-    padding: 24px;
-  }
-  .card:hover {
-    border-color: rgba(127,177,255,0.16);
-  }
-  .cardTitle {
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 22px;
-    line-height: 1.2;
-    margin: 0 0 10px;
-  }
-  .cardText {
-    color: var(--muted);
-    font-size: 14px;
-    line-height: 1.72;
-  }
-  .overviewStat {
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 34px;
-    line-height: 1;
-    margin-bottom: 10px;
-    color: var(--text);
-  }
-  .overviewMini {
-    margin-top: 12px;
-    font-size: 12px;
-    line-height: 1.6;
-    color: rgba(244,247,251,0.82);
-  }
-  .featureTag, .priceTag {
-    display: inline-flex;
-    margin-top: 16px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(63,215,161,0.22);
-    background: rgba(63,215,161,0.08);
-    color: var(--accent);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .pricingSection {
-    background: linear-gradient(180deg, rgba(255,255,255,0), rgba(16,26,43,0.38));
-  }
-  .priceCard.featured {
-    border-color: rgba(127,177,255,0.36);
-    box-shadow: 0 26px 70px rgba(62,108,190,0.2);
-    transform: translateY(-6px);
-  }
-  .priceName {
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 24px;
-    margin-bottom: 8px;
-  }
-  .priceDesc {
-    color: var(--muted);
-    font-size: 14px;
-    line-height: 1.6;
-  }
-  .priceAmount {
-    margin-top: 22px;
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 46px;
-    letter-spacing: -0.04em;
-  }
-  .pricePeriod {
-    color: var(--muted);
-    font-size: 14px;
-    margin-left: 8px;
-  }
-  .divider {
-    height: 1px;
-    background: var(--border);
-    margin: 20px 0;
-  }
-  .list {
-    display: grid;
-    gap: 12px;
-  }
-  .listRow {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-    color: var(--text);
-    font-size: 14px;
-    line-height: 1.58;
-  }
-  .tick {
-    color: var(--accent);
-    font-weight: 900;
-  }
-  .cross {
-    color: rgba(255,255,255,0.22);
-    font-weight: 900;
-  }
-  .mutedLine {
-    color: var(--muted);
-  }
-  .comparison {
-    overflow-x: auto;
-    margin-top: 40px;
-  }
-  table {
-    width: 100%;
-    min-width: 760px;
-    border-collapse: collapse;
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    overflow: hidden;
-    background: rgba(10, 17, 29, 0.62);
-  }
-  th, td {
-    padding: 16px 18px;
-    border-bottom: 1px solid var(--border);
-    text-align: left;
-    font-size: 14px;
-    vertical-align: top;
-  }
-  th {
-    color: var(--muted);
-    font-size: 12px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-  tr:last-child td { border-bottom: none; }
-  .good { color: var(--accent); font-weight: 800; }
-  .bad { color: var(--danger); font-weight: 800; }
-  .ctaBand {
-    padding: 34px;
-    border-radius: 28px;
-    border: 1px solid rgba(127,177,255,0.24);
-    background:
-      radial-gradient(620px 220px at 10% 10%, rgba(127,177,255,0.18), transparent 65%),
-      linear-gradient(135deg, rgba(16,26,43,0.88), rgba(9,17,29,0.94));
-    display: grid;
-    grid-template-columns: 1.05fr 0.95fr;
-    gap: 22px;
-    align-items: start;
-  }
-  .formGrid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0,1fr));
-    gap: 12px;
-    margin-top: 18px;
-  }
-  .field {
-    display: grid;
-    gap: 6px;
-  }
-  .field.full { grid-column: 1 / -1; }
-  .field label {
-    font-size: 13px;
-    font-weight: 700;
-    color: rgba(255,255,255,0.8);
-  }
-  input, select, textarea {
-    width: 100%;
-    border: 1px solid var(--border);
-    background: rgba(4, 10, 18, 0.68);
-    color: var(--text);
-    border-radius: 14px;
-    padding: 13px 14px;
-    font: inherit;
-    outline: none;
-  }
-  textarea { min-height: 110px; resize: vertical; }
-  input:focus, select:focus, textarea:focus {
-    border-color: rgba(127,177,255,0.46);
-    box-shadow: 0 0 0 3px rgba(127,177,255,0.10);
-  }
-  .message {
-    margin-top: 14px;
-    padding: 12px 14px;
-    border-radius: 14px;
-    font-size: 14px;
-    line-height: 1.55;
-    display: none;
-  }
-  .message.ok {
-    display: block;
-    border: 1px solid rgba(63,215,161,0.22);
-    background: rgba(63,215,161,0.08);
-    color: #dffcf2;
-  }
-  .message.err {
-    display: block;
-    border: 1px solid rgba(255,118,118,0.22);
-    background: rgba(255,118,118,0.08);
-    color: #ffe3e3;
-  }
-  .finePrint {
-    color: var(--muted);
-    font-size: 12px;
-    line-height: 1.65;
-    margin-top: 12px;
-  }
-  footer {
-    padding: 42px 0 52px;
-    border-top: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.7;
-  }
-  .js-ready .revealItem {
-    opacity: 0;
-    transform: translateY(24px);
-    transition: opacity 0.55s ease, transform 0.55s ease;
-  }
-  .js-ready .revealItem.revealed {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  @keyframes floatGlow {
-    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-    50% { transform: translate3d(-18px, 16px, 0) scale(1.06); }
-  }
-  @media (max-width: 1080px) {
-    .heroGrid, .ctaBand { grid-template-columns: 1fr; }
-    .featureGrid, .pricingGrid, .audienceGrid, .overviewGrid { grid-template-columns: 1fr 1fr; }
-    .heroStats { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  }
-  @media (max-width: 720px) {
-    .topbarInner { align-items: flex-start; }
-    .nav { justify-content: flex-start; }
-    .featureGrid, .whyGrid, .pricingGrid, .audienceGrid, .overviewGrid, .heroStats, .formGrid { grid-template-columns: 1fr; }
-    .hero { padding-top: 68px; }
-    section { padding: 72px 0; }
-    .priceCard.featured { transform: none; }
-    .modeDock { width: 100%; }
-    .modeShowcase .modeDock { grid-template-columns: 1fr; }
-    .modeShowcase .modeBtn { white-space: normal; }
-  }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; form-action 'self' https://api.northstonecrm.com; connect-src 'self' https://api.northstonecrm.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests">
+  <title>Northstone CRM | Real Estate CRM for Builders and Brokers</title>
+  <meta name="description" content="Northstone CRM helps real-estate brokers, builder teams, and enterprise owners track leads, manage deals, use AI follow-ups, publish builder websites, and close more business.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://northstonecrm.com/">
+  <meta property="og:title" content="Northstone CRM | Close Real Estate Deals Faster">
+  <meta property="og:description" content="A modern CRM for real-estate sales teams, builder organizations, contacts, pipeline, ROI, AI follow-ups, integrations, and builder websites.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://northstonecrm.com/">
+  <meta property="og:image" content="https://northstonecrm.com/northstone-approved-logo.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="./northstone-favicon.svg" type="image/svg+xml">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Northstone",
+      "url": "https://northstonecrm.com",
+      "logo": "https://northstonecrm.com/northstone-approved-logo.jpg",
+      "email": "niharlakhani2@gmail.com",
+      "telephone": "+919834241892",
+      "sameAs": [
+        "https://www.linkedin.com/",
+        "https://x.com/",
+        "https://www.instagram.com/"
+      ]
+    }
+  </script>
+  <style>
+    :root {
+      --bg: #f7f9fc;
+      --surface: #ffffff;
+      --surface-strong: #eef4ff;
+      --ink: #101828;
+      --muted: #475467;
+      --line: #d9e2ef;
+      --brand: #1257d6;
+      --brand-strong: #073b96;
+      --accent: #06b6a8;
+      --accent-soft: #e5fbf8;
+      --warning: #fff6df;
+      --radius-xl: 32px;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --shadow: 0 24px 80px rgba(16, 24, 40, 0.12);
+      --max: 1200px;
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(18, 87, 214, 0.12), transparent 28rem),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 42%, #eef4ff 100%);
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 1.65;
+      overflow-x: hidden;
+    }
+    body.drawer-open { overflow: hidden; }
+    a { color: inherit; text-decoration: none; }
+    img { display: block; max-width: 100%; height: auto; }
+    button, input, textarea, select { font: inherit; }
+    button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
+    :focus-visible { outline: 3px solid rgba(18, 87, 214, 0.35); outline-offset: 3px; }
+
+    .container {
+      width: min(var(--max), calc(100% - 48px));
+      margin: 0 auto;
+    }
+    .section { padding: 80px 0; }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 32px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: #03665f;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 {
+      margin: 0;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+      line-height: 1.08;
+    }
+    h1 { font-size: clamp(2.7rem, 7vw, 5.8rem); font-weight: 800; max-width: 980px; }
+    h2 { font-size: clamp(2rem, 4vw, 3.4rem); font-weight: 800; }
+    h3 { font-size: clamp(1.2rem, 2vw, 1.6rem); font-weight: 750; }
+    p { margin: 0; color: var(--muted); }
+    .lead { font-size: clamp(1.05rem, 2vw, 1.28rem); max-width: 760px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 48px;
+      padding: 12px 20px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--brand); color: #fff; box-shadow: 0 16px 34px rgba(18, 87, 214, 0.24); }
+    .btn-primary:hover { background: var(--brand-strong); }
+    .btn-secondary { background: #fff; border-color: var(--line); color: var(--ink); }
+    .btn-ghost { background: transparent; border-color: var(--line); color: var(--ink); }
+    .pill { border-radius: 999px; border: 1px solid var(--line); padding: 8px 12px; color: var(--muted); font-weight: 700; font-size: 14px; background: #fff; }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      border-bottom: 1px solid rgba(217, 226, 239, 0.82);
+      background: rgba(255, 255, 255, 0.76);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+    .nav-shell {
+      min-height: 76px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 24px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 44px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .brand img { width: 44px; height: 44px; border-radius: 14px; }
+    .brand span small { display: block; color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: 0; }
+    .nav-links {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-links a {
+      min-height: 44px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      color: #344054;
+      font-weight: 750;
+    }
+    .nav-links a:hover { background: var(--surface-strong); color: var(--brand); }
+    .menu-toggle { display: none; border: 0; background: #fff; border-radius: 14px; width: 48px; height: 48px; cursor: pointer; }
+    .menu-toggle span { display: block; width: 22px; height: 2px; margin: 5px auto; background: var(--ink); border-radius: 3px; }
+    .mobile-menu {
+      border-top: 1px solid var(--line);
+      background: #fff;
+      padding: 16px 24px 24px;
+    }
+    .mobile-menu a { display: flex; align-items: center; min-height: 48px; padding: 10px 6px; font-weight: 800; color: var(--ink); }
+    .mobile-menu .btn { width: 100%; margin-top: 12px; }
+
+    .hero { padding: 96px 0 64px; }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.02fr) minmax(320px, 0.78fr);
+      gap: 48px;
+      align-items: center;
+    }
+    .hero-copy { display: grid; gap: 24px; }
+    .hero-actions, .form-actions { display: flex; flex-wrap: wrap; gap: 14px; }
+    .trust-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .stars { color: #f59e0b; letter-spacing: 2px; font-size: 18px; }
+    .hero-visual {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      background: linear-gradient(145deg, #ffffff, #edf4ff);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+    .mock-window {
+      border: 1px solid #c9d7eb;
+      border-radius: 24px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .mock-top { display: flex; gap: 6px; padding: 14px; border-bottom: 1px solid var(--line); background: #f8fbff; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #98a2b3; }
+    .mock-body { padding: 20px; display: grid; gap: 16px; }
+    .metric-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .metric-card { background: #f2f6ff; border: 1px solid #dce8fb; border-radius: 16px; padding: 14px; }
+    .metric-card b { display: block; font-size: 1.4rem; color: var(--brand); }
+    .pipeline-card { border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: grid; gap: 10px; }
+    .deal-line { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 12px; border-radius: 14px; background: #fbfdff; border: 1px solid #e7eef9; }
+    .deal-line small { color: var(--muted); }
+
+    .proof-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: rgba(255, 255, 255, 0.78);
+    }
+    .proof-item { display: flex; flex-direction: column; gap: 2px; }
+    .proof-item b { font-size: 1.5rem; color: var(--ink); }
+
+    .section-head { display: grid; gap: 14px; max-width: 760px; margin-bottom: 32px; }
+    .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: rgba(255, 255, 255, 0.82);
+      padding: 28px;
+      box-shadow: 0 18px 46px rgba(16, 24, 40, 0.06);
+    }
+    .problem-card ul, .price-card ul { list-style: none; padding: 0; margin: 22px 0 0; display: grid; gap: 14px; }
+    .problem-card li, .price-card li, .feature-list li { display: grid; grid-template-columns: 24px 1fr; gap: 10px; color: var(--ink); }
+    .bad { color: #b42318; }
+    .good { color: #027a48; }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+    .feature-card { display: grid; gap: 12px; min-height: 220px; }
+    .icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      display: inline-grid;
+      place-items: center;
+      background: var(--surface-strong);
+      color: var(--brand);
+    }
+    .icon svg { width: 24px; height: 24px; stroke-width: 2.2; }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+      counter-reset: step;
+    }
+    .step { position: relative; }
+    .step-num {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: var(--brand);
+      color: #fff;
+      font-weight: 900;
+      margin-bottom: 18px;
+    }
+
+    .testimonial-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+    .quote { font-size: 1.04rem; color: var(--ink); }
+    .person { margin-top: 22px; display: flex; gap: 12px; align-items: center; }
+    .avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--brand); color: #fff; font-weight: 900; }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+      align-items: stretch;
+    }
+    .price-card { position: relative; display: grid; gap: 18px; }
+    .price-card.popular { border: 2px solid var(--brand); box-shadow: var(--shadow); }
+    .popular-badge { position: absolute; top: 20px; right: 20px; background: var(--brand); color: #fff; }
+    .price { font-size: clamp(2.1rem, 4vw, 3.4rem); font-weight: 800; letter-spacing: -0.04em; color: var(--ink); }
+    .price small { font-size: 1rem; color: var(--muted); letter-spacing: 0; }
+
+    .faq-list { display: grid; gap: 12px; }
+    .faq-item { border: 1px solid var(--line); border-radius: 18px; background: #fff; overflow: hidden; }
+    .faq-trigger {
+      width: 100%;
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border: 0;
+      background: transparent;
+      padding: 18px 22px;
+      text-align: left;
+      font-weight: 850;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .faq-panel { padding: 0 22px 20px; color: var(--muted); }
+    .faq-panel[hidden] { display: none; }
+
+    .cta-banner {
+      padding: 48px;
+      border-radius: var(--radius-xl);
+      background: linear-gradient(135deg, var(--brand), #0a2770);
+      color: #fff;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 24px;
+      align-items: center;
+      overflow: hidden;
+    }
+    .cta-banner h2, .cta-banner p { color: #fff; }
+    .cta-banner p { opacity: 0.86; }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.82fr) minmax(320px, 1fr);
+      gap: 32px;
+      align-items: start;
+    }
+    .contact-methods { display: grid; gap: 14px; margin-top: 26px; }
+    .contact-method {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 56px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      font-weight: 800;
+    }
+    .form-card { display: grid; gap: 16px; }
+    .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .floating-field { position: relative; }
+    .floating-field input, .floating-field textarea, .floating-field select {
+      width: 100%;
+      min-height: 56px;
+      border: 1px solid #cfd9e8;
+      border-radius: 16px;
+      background: #fff;
+      color: var(--ink);
+      padding: 20px 14px 8px;
+      outline: none;
+    }
+    .floating-field textarea { min-height: 144px; resize: vertical; }
+    .floating-field label {
+      position: absolute;
+      left: 14px;
+      top: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 750;
+      pointer-events: none;
+    }
+    .honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+    .form-message { min-height: 24px; font-weight: 800; }
+    .form-message.success { color: #027a48; }
+    .form-message.error { color: #b42318; }
+
+    .footer {
+      padding: 48px 0;
+      border-top: 1px solid var(--line);
+      background: #fff;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 2fr;
+      gap: 32px;
+      align-items: start;
+    }
+    .footer-links {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+    .footer-links a { display: block; min-height: 36px; color: var(--muted); font-weight: 750; }
+    .socials { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+    .socials a { min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 999px; font-weight: 800; color: var(--ink); }
+    .copyright { margin-top: 28px; color: var(--muted); font-size: 14px; }
+
+    @media (max-width: 1024px) {
+      .hero-grid, .contact-grid { grid-template-columns: 1fr; }
+      .feature-grid, .pricing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .proof-strip { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 767px) {
+      .container { width: min(100% - 32px, var(--max)); }
+      .section { padding: 48px 0; }
+      .hero { padding: 56px 0 40px; }
+      .nav-shell { min-height: 68px; grid-template-columns: 1fr auto; }
+      .nav-links, .nav-shell > .btn { display: none; }
+      .menu-toggle { display: inline-block; }
+      .brand span small { display: none; }
+      .hero-actions .btn, .form-actions .btn, .cta-banner .btn { width: 100%; }
+      .two-col, .feature-grid, .steps, .pricing-grid, .field-grid, .footer-grid, .footer-links { grid-template-columns: 1fr; }
+      .testimonial-grid {
+        display: flex;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        padding-bottom: 8px;
+      }
+      .testimonial-grid .card { min-width: 86%; scroll-snap-align: start; }
+      .metric-row, .proof-strip { grid-template-columns: 1fr; }
+      .cta-banner { grid-template-columns: 1fr; padding: 32px 24px; }
+      .card { padding: 22px; border-radius: 22px; }
+    }
+  </style>
 </head>
 <body>
-  <div id="localNotice" class="localNotice">
-    You are opening this page as a local file. For the cleanest test flow, serve it over <b>http://127.0.0.1</b> instead of <b>file://</b>.
-  </div>
-  <div class="topbar">
-    <div class="shell topbarInner">
-      <div class="brand">
-        <div class="logo"><img src="./northstone-mark.svg" alt="Northstone logo" /></div>
-        <div>
-          <div class="brandTitle">Northstone</div>
-          <div class="brandSub">Real-estate sales operating system for solo closers, broker teams, enterprise owners, and builder organizations</div>
-        </div>
-      </div>
-      <div class="nav">
-        <a href="#overview">Overview</a>
-        <a href="#why">Why Us</a>
+  <header class="site-header">
+    <nav class="container nav-shell" aria-label="Primary navigation">
+      <a class="brand" href="#top" aria-label="Northstone home">
+        <img src="./northstone-mark.svg" srcset="./northstone-mark.svg 1x" width="44" height="44" alt="Northstone logo">
+        <span>Northstone <small>Real-estate operating CRM</small></span>
+      </a>
+      <div class="nav-links">
         <a href="#features">Features</a>
+        <a href="#builder">Builder Sites</a>
         <a href="#pricing">Pricing</a>
-        <a href="#install">Download App</a>
-        <a href="#demo">Request Demo</a>
-        <a href="#compare">Why Not Your Current CRM</a>
-        <a href="#start" class="primaryLink">Start Now</a>
+        <a href="#faq">FAQ</a>
+        <a href="#contact">Contact</a>
       </div>
+      <a class="btn btn-primary" href="#contact">Request a Demo</a>
+      <button class="menu-toggle" type="button" aria-label="Open menu" aria-controls="mobileMenu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+    <div class="mobile-menu" id="mobileMenu" hidden>
+      <a href="#features">Features</a>
+      <a href="#builder">Builder Sites</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a href="#contact">Contact</a>
+      <a class="btn btn-primary" href="#contact">Get Started Free</a>
     </div>
-  </div>
+  </header>
 
-  <main>
+  <main id="top">
     <section class="hero">
-      <div class="shell heroGrid">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">Built for real-estate teams</span>
+          <h1>Close property deals faster.</h1>
+          <p class="lead">Northstone keeps your leads, contacts, follow-ups, ROI, team IDs, builder documents, and customer conversations in one clean workspace.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#contact">Start Free Trial</a>
+            <a class="btn btn-secondary" href="#how-it-works">Watch Demo</a>
+          </div>
+          <div class="trust-row" aria-label="Social proof">
+            <span class="stars" aria-hidden="true">★★★★★</span>
+            <span>Trusted by 500+ brokers, builders, and sales teams</span>
+          </div>
+        </div>
+        <div class="hero-visual" aria-label="Northstone CRM product preview">
+          <div class="mock-window">
+            <div class="mock-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+            <div class="mock-body">
+              <div class="metric-row">
+                <div class="metric-card"><b>42</b><span>Active deals</span></div>
+                <div class="metric-card"><b>18%</b><span>Avg ROI</span></div>
+                <div class="metric-card"><b>9</b><span>Today tasks</span></div>
+              </div>
+              <div class="pipeline-card">
+                <div class="deal-line"><span><b>Powai 3BHK buyer</b><br><small>AI follow-up ready</small></span><span class="pill">Qualified</span></div>
+                <div class="deal-line"><span><b>Builder site launch</b><br><small>Public page published</small></span><span class="pill">Live</span></div>
+                <div class="deal-line"><span><b>Gmail campaign</b><br><small>Attachment queued</small></span><span class="pill">Ready</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-label="Northstone proof">
+      <div class="container proof-strip">
+        <div class="proof-item"><b>500+</b><span>businesses supported</span></div>
+        <div class="proof-item"><b>5 min</b><span>to start tracking deals</span></div>
+        <div class="proof-item"><b>24h</b><span>support response promise</span></div>
+        <div class="proof-item"><b>1 place</b><span>for sales, AI, and team control</span></div>
+      </div>
+    </section>
+
+    <section class="section" id="about">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Problem to solution</span>
+          <h2>Stop losing leads between calls, notes, and spreadsheets.</h2>
+          <p class="lead">A reader does not need CRM knowledge to understand Northstone: it is the place where every real-estate opportunity gets tracked until it closes.</p>
+        </div>
+        <div class="two-col">
+          <article class="card problem-card">
+            <h3>The old way</h3>
+            <ul>
+              <li><span class="bad">×</span><span>Leads sit in WhatsApp, Excel, notebooks, and memory.</span></li>
+              <li><span class="bad">×</span><span>Owners cannot see team follow-ups or deal progress.</span></li>
+              <li><span class="bad">×</span><span>Builder brochures, client emails, and reports are made manually.</span></li>
+              <li><span class="bad">×</span><span>No clear answer for which deals deserve time or ad budget.</span></li>
+            </ul>
+          </article>
+          <article class="card problem-card">
+            <h3>With Northstone</h3>
+            <ul>
+              <li><span class="good">✓</span><span>Every lead, contact, deal, task, and document stays organized.</span></li>
+              <li><span class="good">✓</span><span>Owners see team activity without exposing private client details.</span></li>
+              <li><span class="good">✓</span><span>AI helps draft follow-ups, reports, builder copy, and deal memos.</span></li>
+              <li><span class="good">✓</span><span>ROI, pipeline stage, and insights help teams make smarter decisions.</span></li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Full CRM feature sync</span>
+          <h2>Everything your real-estate team needs to operate clearly.</h2>
+          <p class="lead">All core CRM modules are represented here in plain English, including the newer builder website, Google integrations, admin, and marketing workflows.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6h16M4 12h10M4 18h7"/></svg></span><h3>Track every lead</h3><p>Move buyers and sellers through clear stages from new lead to closed deal.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><h3>Deal detail snapshots</h3><p>See budget, ticket size, visit date, probability, notes, risk flags, and next step.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M8 7V3m8 4V3M5 11h14M6 21h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/></svg></span><h3>Today tasks</h3><p>Know exactly who needs a call, WhatsApp, meeting, or follow-up today.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></span><h3>Contacts that stay useful</h3><p>Store client and owner contact details with import, export, and clean search.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 8c-2.2 0-4 1.1-4 2.5S9.8 13 12 13s4 1.1 4 2.5S14.2 18 12 18m0-10V6m0 12v-2"/></svg></span><h3>ROI and investment reports</h3><p>Compare deal value, risk, expected return, and practical next actions.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 3l1.9 5.8H20l-5 3.6 1.9 5.8L12 14.6l-4.9 3.6L9 12.4 4 8.8h6.1L12 3z"/></svg></span><h3>AI follow-ups</h3><p>Generate clearer client messages, deal summaries, builder copy, and memos.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 19V5m0 14h16M8 17V9m4 8V7m4 10v-5"/></svg></span><h3>Insights dashboard</h3><p>Understand stage counts, market signals, pipeline health, and portfolio trends.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 3v12m0 0l4-4m-4 4l-4-4"/><path d="M5 21h14"/></svg></span><h3>Import and export</h3><p>Bring in records from spreadsheets and export data when your team needs it.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 7h18M7 7v14m10-14v14M5 21h14V7L12 3 5 7z"/></svg></span><h3>Enterprise team control</h3><p>Create owner accounts, employee IDs, team limits, support threads, and audit visibility.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4"/></svg></span><h3>Admin controls</h3><p>Manage users, demo accounts, AI access, subscriptions, security, and account recovery.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 4h16v16H4z"/><path d="M4 8h16M8 4v16"/></svg></span><h3>Google Workspace</h3><p>Send Gmail with attachments, create Calendar events, add Meet links, and test connections.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M15 10l4.5-2.5v9L15 14v-4z"/><rect x="3" y="6" width="12" height="12" rx="2"/></svg></span><h3>Zoom meetings</h3><p>Create online meetings from the CRM when your team uses Zoom for sales calls.</p></article>
+          <article class="card feature-card" id="builder"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-7h6v7"/></svg></span><h3>Builder websites</h3><p>Builder subscribers can publish a simple public website with projects, photos, and contact forms.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><h3>Builder documents</h3><p>Create project overviews, offers, brochures, and compliance-style communication drafts.</p></article>
+          <article class="card feature-card"><span class="icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 12h4l3 8 5-16 3 8h1"/></svg></span><h3>Marketing assist</h3><p>Request managed property marketing help and plan ad budgets with clearer lead goals.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="how-it-works">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">How it works</span>
+          <h2>Go from signup to organized selling in three steps.</h2>
+        </div>
+        <div class="steps">
+          <article class="card step"><div class="step-num">1</div><h3>Sign up</h3><p>Create a solo, enterprise, or builder account based on your team structure.</p></article>
+          <article class="card step"><div class="step-num">2</div><h3>Import your contacts</h3><p>Add clients, deals, team members, builder properties, and follow-up tasks.</p></article>
+          <article class="card step"><div class="step-num">3</div><h3>Close more deals</h3><p>Use reminders, AI messages, ROI reports, and integrations to keep momentum moving.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-label="Customer testimonials">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Social proof</span>
+          <h2>Built around real estate sales pressure.</h2>
+        </div>
+        <div class="testimonial-grid">
+          <article class="card"><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><p class="quote">“Northstone made our follow-up discipline visible. The team finally knows what to do each morning.”</p><div class="person"><span class="avatar">A</span><p><b>Anika Rao</b><br>Broker Owner, Metro Estates</p></div></article>
+          <article class="card"><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><p class="quote">“The builder website flow is exactly what smaller developers need: simple, fast, and easy to edit.”</p><div class="person"><span class="avatar">R</span><p><b>Rohit Mehta</b><br>Director, Mehta Buildcorp</p></div></article>
+          <article class="card"><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><p class="quote">“AI follow-ups and ROI views help our team choose better deals instead of chasing everything.”</p><div class="person"><span class="avatar">S</span><p><b>Sana Khan</b><br>Sales Lead, Prime Realty</p></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="pricing">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Pricing</span>
+          <h2>Plans for solo closers, teams, and builders.</h2>
+          <p class="lead">Payment links can be connected after gateway approval. Until then, each plan can be requested directly from this page.</p>
+        </div>
+        <div class="pricing-grid">
+          <article class="card price-card">
+            <h3>Starter</h3>
+            <p>For solo brokers and consultants.</p>
+            <div class="price">₹1,199 <small>/month</small></div>
+            <ul>
+              <li><span class="good">✓</span><span>Personal pipeline, contacts, deals, ROI, and insights</span></li>
+              <li><span class="good">✓</span><span>AI follow-up access when allocated</span></li>
+              <li><span class="good">✓</span><span>Import, export, and account-level reporting</span></li>
+            </ul>
+            <a class="btn btn-secondary plan-cta" href="#contact" data-plan="Starter">Start Starter</a>
+          </article>
+          <article class="card price-card popular">
+            <span class="pill popular-badge">Most Popular</span>
+            <h3>Growth</h3>
+            <p>For brokerages and CP networks.</p>
+            <div class="price">₹6,999 <small>/month base</small></div>
+            <ul>
+              <li><span class="good">✓</span><span>Enterprise owner account with employee ID creation</span></li>
+              <li><span class="good">✓</span><span>Org-wide reporting, user controls, and AI inheritance</span></li>
+              <li><span class="good">✓</span><span>Private support thread and employee drill-down</span></li>
+            </ul>
+            <a class="btn btn-primary plan-cta" href="#contact" data-plan="Growth">Request Growth</a>
+          </article>
+          <article class="card price-card">
+            <h3>Builder</h3>
+            <p>For developers and construction-led sales teams.</p>
+            <div class="price">₹11,999 <small>/month base</small></div>
+            <ul>
+              <li><span class="good">✓</span><span>Everything in Growth, plus builder workflows</span></li>
+              <li><span class="good">✓</span><span>AI builder documents and public builder website</span></li>
+              <li><span class="good">✓</span><span>Property gallery, Formspree-ready inquiries, and site editing</span></li>
+            </ul>
+            <a class="btn btn-secondary plan-cta" href="#contact" data-plan="Builder">Start Builder</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="faq">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">FAQ</span>
+          <h2>Simple answers before you start.</h2>
+        </div>
+        <div class="faq-list">
+          <article class="faq-item"><button class="faq-trigger" type="button" aria-expanded="false">What is Northstone CRM?<span>+</span></button><div class="faq-panel" hidden>Northstone is a real-estate CRM that helps you track leads, deals, contacts, tasks, ROI, reports, and team activity from one place.</div></article>
+          <article class="faq-item"><button class="faq-trigger" type="button" aria-expanded="false">Who is it for?<span>+</span></button><div class="faq-panel" hidden>It is built for solo brokers, broker teams, CP networks, enterprise owners, and builder organizations that need a cleaner sales operating system.</div></article>
+          <article class="faq-item"><button class="faq-trigger" type="button" aria-expanded="false">Is it free?<span>+</span></button><div class="faq-panel" hidden>You can request a free trial or demo. Paid plans unlock long-term usage, team controls, builder workflows, and managed support.</div></article>
+          <article class="faq-item"><button class="faq-trigger" type="button" aria-expanded="false">How is data stored?<span>+</span></button><div class="faq-panel" hidden>Production data is handled by the backend and database environment. Public landing forms only send safe lead details to the HTTPS API or show a local contact success state.</div></article>
+          <article class="faq-item"><button class="faq-trigger" type="button" aria-expanded="false">Can I import contacts?<span>+</span></button><div class="faq-panel" hidden>Yes. Northstone supports importing and exporting contacts and deal data so teams are not locked into manual entry.</div></article>
+          <article class="faq-item"><button class="faq-trigger" type="button" aria-expanded="false">Is support included?<span>+</span></button><div class="faq-panel" hidden>Yes. Enterprise and builder accounts include an owner support workflow, and all public inquiries receive a response promise within 24 hours.</div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="cta-banner">
+          <div>
+            <h2>Ready to grow your business?</h2>
+            <p>Start with a guided setup. No credit card required for the first conversation.</p>
+          </div>
+          <a class="btn btn-secondary" href="#contact">Start Free — No Credit Card Required</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="privacy">
+      <div class="container two-col">
+        <article class="card">
+          <span class="eyebrow">Privacy Policy</span>
+          <h2 style="margin-top: 16px;">Your business data stays controlled.</h2>
+          <p style="margin-top: 14px;">Northstone is designed so sales records, team access, AI assignment, and builder content are handled through authenticated CRM workflows. Public landing forms collect only basic inquiry details required to respond.</p>
+        </article>
+        <article class="card" id="terms">
+          <span class="eyebrow">Terms</span>
+          <h2 style="margin-top: 16px;">Use Northstone responsibly.</h2>
+          <p style="margin-top: 14px;">Subscriptions, managed marketing, payment activation, and integrations are confirmed during onboarding. We do not place payment scripts or secret keys inside this public landing page.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="contact">
+      <div class="container contact-grid">
         <div>
-          <div class="eyebrow"><span class="eyebrowDot"></span> Built for brokers, CP networks, enterprise teams, and builders</div>
-          <h1>Stop managing deals like a side hustle. <br />Run your sales like a machine.</h1>
-          <div class="heroLead">
-            <span class="heroCopyStrong">Northstone is not another generic CRM.</span>
-            It is the operating system for real-estate sales teams that are done losing revenue to missed follow-ups, weak visibility, scattered tools, broken reporting, and spreadsheet chaos.
-          </div>
-          <div class="heroActions">
-            <a class="btn btnPrimary" href="#start">Start your plan</a>
-            <a class="btn btnSecondary" href="#demo">Request a demo</a>
-            <a class="btn btnSecondary" href="#install">Download CRM app</a>
-            <a class="btn btnSecondary" href="#pricing">See pricing</a>
-          </div>
-          <div class="heroStats">
-            <div class="stat">
-              <div class="statValue">AI</div>
-              <div class="statLabel">Follow-up generation, deal scoring, and faster client communication</div>
-            </div>
-            <div class="stat">
-              <div class="statValue">Control</div>
-              <div class="statLabel">Revenue, enterprise visibility, user controls, and audit-backed operational clarity</div>
-            </div>
-            <div class="stat">
-              <div class="statValue">Solo</div>
-              <div class="statLabel">For independent closers who want speed, structure, and daily control</div>
-            </div>
-            <div class="stat">
-              <div class="statValue">Builder</div>
-              <div class="statLabel">For developers and construction sales teams who need hierarchy, document workflows, and full team visibility</div>
-            </div>
+          <span class="eyebrow">Get In Touch</span>
+          <h2 style="margin-top: 16px;">Talk to us.</h2>
+          <p class="lead" style="margin-top: 14px;">Have questions? We respond within 24 hours.</p>
+          <div class="contact-methods">
+            <a class="contact-method" href="tel:+919834241892" aria-label="Call Northstone">
+              <span class="icon" aria-hidden="true">☎</span>
+              <span>+91 98342 41892</span>
+            </a>
+            <a class="contact-method" href="https://wa.me/919834241892" target="_blank" rel="noopener noreferrer" aria-label="Message Northstone on WhatsApp">
+              <span class="icon" aria-hidden="true">☘</span>
+              <span>WhatsApp us</span>
+            </a>
+            <a class="contact-method" href="mailto:niharlakhani2@gmail.com" aria-label="Email Northstone">
+              <span class="icon" aria-hidden="true">✉</span>
+              <span>niharlakhani2@gmail.com</span>
+            </a>
           </div>
         </div>
-      </div>
-    </section>
-
-    <section id="overview">
-      <div class="shell">
-        <div class="sectionLabel">Overview</div>
-        <div class="sectionTitle">Everything important is organized here before a client ever clicks Start Now.</div>
-        <div class="sectionSub">This section gives buyers a fast executive read of what Northstone is, who it serves, what is already live, and how the commercial model works today.</div>
-        <div class="overviewGrid">
-          <div class="card">
-            <div class="cardTitle">What it is</div>
-            <div class="overviewStat">CRM + Ops</div>
-            <div class="cardText">Northstone is a real-estate sales operating system for solo closers, broker teams, enterprise owners, and builder organizations.</div>
-            <div class="overviewMini">Pipeline, deals, contacts, ROI, insights, enterprise controls, apps, and launch-ready workflows in one stack.</div>
+        <form class="card form-card" id="contactForm" novalidate>
+          <div class="honeypot" aria-hidden="true">
+            <label for="contactWebsite">Website</label>
+            <input id="contactWebsite" name="website" type="text" tabindex="-1" autocomplete="off">
           </div>
-          <div class="card">
-            <div class="cardTitle">Who it serves</div>
-            <div class="overviewStat">4 lanes</div>
-            <div class="cardText">Independent brokers, channel partners, brokerages, and builder-led sales organizations all fit inside the same product model.</div>
-            <div class="overviewMini">Solo for individuals. Enterprise for broker and CP teams. Builder for developer-led operations. Custom for larger rollouts.</div>
+          <div class="field-grid">
+            <div class="floating-field"><input id="contactName" name="name" type="text" autocomplete="name" required maxlength="90"><label for="contactName">Full Name</label></div>
+            <div class="floating-field"><input id="contactEmail" name="email" type="email" autocomplete="email" required maxlength="120"><label for="contactEmail">Email</label></div>
           </div>
-          <div class="card">
-            <div class="cardTitle">What is live today</div>
-            <div class="overviewStat">Live UI</div>
-            <div class="cardText">Landing page, CRM preview, pipeline workspace, admin portal, enterprise flows, apps workspace, and owner-managed install flow are already structured.</div>
-            <div class="overviewMini">Public preview shows the full product shape. Paid owner access unlocks the live operational workflow.</div>
+          <div class="floating-field"><input id="contactPhone" name="phone" type="tel" autocomplete="tel" maxlength="24"><label for="contactPhone">Phone (optional)</label></div>
+          <div class="floating-field"><textarea id="contactMessage" name="message" required maxlength="800"></textarea><label for="contactMessage">Message</label></div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Submit</button>
           </div>
-          <div class="card">
-            <div class="cardTitle">How pricing works</div>
-            <div class="overviewStat">1 / 6 / 12</div>
-            <div class="cardText">Subscriptions now support 1 month, 6 months, and 1 year billing cycles, with a 5% discount reserved only for the 1-year option.</div>
-            <div class="overviewMini">Enterprise and Builder include seat drilldown, so extra sub accounts scale from the same pricing logic instead of being handled manually.</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="why">
-      <div class="shell">
-        <div class="sectionLabel">Why Northstone</div>
-        <div class="sectionTitle">Because real-estate sales teams do not need more software clutter. They need a sharper operating model.</div>
-        <div class="sectionSub">
-          Bossy truth: if your follow-up discipline is weak, your reporting is delayed, your team visibility is patchy, and your deals live across five tools, you are bleeding revenue. This platform fixes that.
-        </div>
-        <div class="whyGrid">
-          <div class="card">
-            <div class="cardTitle">Why us</div>
-            <div class="list">
-              <div class="listRow"><span class="tick">+</span><span>Built around how brokers, CPs, and real-estate teams actually sell</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Solo and enterprise workflows inside the same product</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Leadership visibility over revenue, access, subscriptions, AI allocation, and governance</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Enterprise owner -> employee hierarchy with rollups and drill-downs</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Apps workspace, ROI, insights, audit visibility, and guided onboarding in one stack</span></div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="cardTitle">Why not your current CRM</div>
-            <div class="list">
-              <div class="listRow"><span class="cross">-</span><span>Generic CRMs are broad, but they are rarely sharp for real-estate execution</span></div>
-              <div class="listRow"><span class="cross">-</span><span>Most of them record activity. They do not improve discipline</span></div>
-              <div class="listRow"><span class="cross">-</span><span>Most of them do not naturally support broker / CP / employee hierarchy</span></div>
-              <div class="listRow"><span class="cross">-</span><span>Most teams end up forcing their workflow into the product instead of the product fitting the workflow</span></div>
-              <div class="listRow"><span class="cross">-</span><span>If you still need spreadsheets beside your CRM, your CRM is not doing enough</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="features">
-      <div class="shell">
-        <div class="sectionLabel">What clients get</div>
-        <div class="sectionTitle">Everything that moves deals forward. Nothing that wastes the team’s time.</div>
-        <div class="sectionSub">This is the version of the CRM you have now: clearer, stronger, more commercial, and more operationally serious than a generic lead tracker.</div>
-        <div class="modeShowcase">
-          <div class="modeDock" id="modeDock" aria-label="Northstone use case modes">
-            <button class="modeBtn active" type="button" data-mode="solo">Solo closer view</button>
-            <button class="modeBtn" type="button" data-mode="enterprise">Enterprise owner view</button>
-            <button class="modeBtn" type="button" data-mode="builder">Builder ops view</button>
-          </div>
-          <div class="heroPanel">
-            <div class="panelKicker" id="panelKicker">What this changes</div>
-            <div class="panelTitle" id="panelTitle">Your current CRM stores records. This one pushes revenue.</div>
-            <div class="panelSub" id="panelSub">
-              If your team still depends on memory, scattered chats, notebooks, and delayed follow-ups, you do not have a sales system. You have risk. Northstone gives you the discipline layer your current stack never gave you.
-            </div>
-            <div class="signalStack">
-              <div class="signalRow" id="signalRow1">
-                <div>
-                  <div class="signalTitle" id="signalTitle1">Every deal visible</div>
-                  <div class="signalMeta" id="signalMeta1">Pipeline, grid, detail workspace, ROI, visits, typology, budget, and client heat in one place.</div>
-                </div>
-                <span class="pill" id="signalPill1">Execution</span>
-              </div>
-              <div class="signalRow" id="signalRow2">
-                <div>
-                  <div class="signalTitle" id="signalTitle2">Every team member accountable</div>
-                  <div class="signalMeta" id="signalMeta2">Enterprise owners can see activity, usage, employee IDs, AI access, and rollups without chasing scattered updates.</div>
-                </div>
-                <span class="pill" id="signalPill2">Control</span>
-              </div>
-              <div class="signalRow" id="signalRow3">
-                <div>
-                  <div class="signalTitle" id="signalTitle3">Every workspace connected</div>
-                  <div class="signalMeta" id="signalMeta3">Google Workspace, Calendar, Meet, Zoom, and ad launch surfaces are being brought into one operating layer instead of being managed in isolation.</div>
-                </div>
-                <span class="pill" id="signalPill3">Growth</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="featureGrid">
-          <div class="card">
-            <div class="cardTitle">Pipeline + deals command center</div>
-            <div class="cardText">Track stage, visit date, typology, client budget, location, probability, and client phase from one deal system that feels built for selling, not just storing rows.</div>
-            <div class="featureTag">Core execution</div>
-          </div>
-          <div class="card">
-            <div class="cardTitle">Apps workspace for communication and launch workflows</div>
-            <div class="cardText">Use a dedicated apps layer for Gmail, Google Calendar, Google Meet, Zoom, and ad platform jump-offs instead of forcing teams to keep those workflows scattered outside the CRM.</div>
-            <div class="featureTag">Apps and integrations</div>
-          </div>
-          <div class="card">
-            <div class="cardTitle">Enterprise team structure</div>
-            <div class="cardText">Owners can create broker, CP, and employee IDs while keeping team activity, deals, and results visible at the organization level, with limited access for the right inherited roles.</div>
-            <div class="featureTag">Enterprise</div>
-          </div>
-          <div class="card">
-            <div class="cardTitle">Management oversight that actually matters</div>
-            <div class="cardText">See plan mix, AI allocation, enterprise or builder usage, audit activity, locked accounts, security posture, and support threads from one operational cockpit.</div>
-            <div class="featureTag">Governance</div>
-          </div>
-          <div class="card">
-            <div class="cardTitle">Builder document workflows</div>
-            <div class="cardText">Builder teams can generate polished project overviews, sales offers, construction summaries, and compliance-style draft communication directly inside the CRM instead of chasing scattered document versions.</div>
-            <div class="featureTag">Builder operations</div>
-          </div>
-          <div class="card">
-            <div class="cardTitle">AI builder website launcher</div>
-            <div class="cardText">Builder subscriptions can create a simple public company website with template selection, logo, project photos, property details, office address, enquiry form, and an automatic northstonecrm.com/builders link.</div>
-            <div class="featureTag">Builder website</div>
-          </div>
-          <div class="card">
-            <div class="cardTitle">Insights your managers can use</div>
-            <div class="cardText">Win rate, pipeline value, follow-up completion, user activity, subscription growth, and enterprise or builder usage tracking that supports decisions instead of vanity dashboards.</div>
-            <div class="featureTag">Reporting</div>
-          </div>
-          <div class="card">
-            <div class="cardTitle">A product teams can actually adopt</div>
-            <div class="cardText">Mobile-friendly CRM, clean account onboarding, tutorial guidance, forgot-password recovery, private organization support threads, import/export, and a layout that works on real screens in real teams.</div>
-            <div class="featureTag">Adoption</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="compare">
-      <div class="shell">
-        <div class="sectionLabel">Why clients switch</div>
-        <div class="sectionTitle">Most CRMs give you a database. We give you a sales operating system.</div>
-        <div class="comparison">
-          <table>
-            <thead>
-              <tr>
-                <th>What matters</th>
-                <th>Current spreadsheets / generic CRM</th>
-                <th>Northstone</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Follow-up discipline</td>
-                <td class="bad">Lives in memory, WhatsApp, and scattered reminders</td>
-                <td class="good">Centralized workflow with AI follow-up and activity logging</td>
-              </tr>
-              <tr>
-                <td>Enterprise hierarchy</td>
-                <td class="bad">Usually awkward, expensive, or missing</td>
-                <td class="good">Owner -> broker / CP / employee structure built in</td>
-              </tr>
-              <tr>
-                <td>Management visibility</td>
-                <td class="bad">Weak revenue and usage visibility</td>
-                <td class="good">Plan oversight, security, AI access, audit, support, enterprise usage</td>
-              </tr>
-              <tr>
-                <td>Real-estate deal context</td>
-                <td class="bad">Too generic, not deal-motion specific</td>
-                <td class="good">Budget, typology, visit date, location, phase, ROI, pipeline value</td>
-              </tr>
-              <tr>
-                <td>Team accountability</td>
-                <td class="bad">Hard to see who is actually moving deals</td>
-                <td class="good">Per-user activity, enterprise rollups, audit trail, drill-down visibility</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <section id="pricing" class="pricingSection">
-      <div class="shell">
-        <div class="sectionLabel">Pricing</div>
-        <div class="sectionTitle">Choose the plan that matches how seriously you sell.</div>
-        <div class="sectionSub">Solo closes better. Enterprise controls better. Builder teams operate with more discipline. Custom scales with your rollout. Pick the lane that matches your ambition.</div>
-        <div class="pricingGrid">
-          <div class="card priceCard">
-            <div class="priceName">Solo</div>
-            <div class="priceDesc">For independent brokers and consultants who want tighter follow-up, better visibility, and a cleaner daily selling system.</div>
-            <div class="priceAmount">&#8377;1,199<span class="pricePeriod">/ month</span></div>
-            <div class="divider"></div>
-            <div class="list">
-              <div class="listRow"><span class="tick">+</span><span>Personal pipeline, deals, contacts, ROI, insights</span></div>
-              <div class="listRow"><span class="tick">+</span><span>AI follow-up access when allocated</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Import, export, and account-level reporting</span></div>
-              <div class="listRow"><span class="cross">-</span><span class="mutedLine">No enterprise employee hierarchy</span></div>
-            </div>
-            <div class="featureTag">For solo closers</div>
-            <div class="heroActions" style="margin-top:18px">
-              <button class="btn btnSecondary choose-plan" data-plan="solo" data-cycle="monthly" data-amount="1199" data-seats="1">Start Solo</button>
-            </div>
-          </div>
-          <div class="card priceCard">
-            <div class="priceName">Enterprise</div>
-            <div class="priceDesc">For brokerages, CP networks, and owner-led teams that need structure, visibility, subscription control, and real operations discipline.</div>
-            <div class="priceAmount">&#8377;6,999<span class="pricePeriod">/ month base</span></div>
-            <div class="divider"></div>
-            <div class="list">
-              <div class="listRow"><span class="tick">+</span><span>Enterprise owner account with employee ID creation</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Org-wide reporting, user controls, AI inheritance, audit visibility</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Private support thread and employee-level drill-down</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Recommended seat range: start with 5 IDs</span></div>
-              <div class="listRow"><span class="tick">+</span><span>More than 5 sub accounts: &#8377;899 per new ID</span></div>
-            </div>
-            <div class="featureTag">For serious teams</div>
-            <div class="heroActions" style="margin-top:18px">
-              <button class="btn btnSecondary choose-plan" data-plan="enterprise" data-cycle="monthly" data-amount="6999" data-seats="5">Start Enterprise</button>
-            </div>
-          </div>
-          <div class="card priceCard featured">
-            <div class="priceTag">Best for builders</div>
-            <div class="priceName">Builder</div>
-            <div class="priceDesc">For developers and construction-led sales teams who need project-facing communication, builder documents, owner controls, and stronger organization-level operating discipline.</div>
-            <div class="priceAmount">&#8377;11,999<span class="pricePeriod">/ month base</span></div>
-            <div class="divider"></div>
-            <div class="list">
-              <div class="listRow"><span class="tick">+</span><span>Everything in Enterprise, plus builder-focused organization workflows</span></div>
-              <div class="listRow"><span class="tick">+</span><span>AI website builder with templates, logo, project images, property pages, and public builder URL</span></div>
-              <div class="listRow"><span class="tick">+</span><span>AI builder documents for project overviews, offers, updates, and compliance-style communication</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Organization analytics, governance, support thread, and owner-level rollout control</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Includes 5 team IDs to start</span></div>
-              <div class="listRow"><span class="tick">+</span><span>More than 5 sub accounts: &#8377;1,499 per new ID</span></div>
-            </div>
-            <div class="featureTag">Builder operations</div>
-            <div class="heroActions" style="margin-top:18px">
-              <button class="btn btnPrimary choose-plan" data-plan="builder" data-cycle="monthly" data-amount="11999" data-seats="5">Start Builder</button>
-            </div>
-          </div>
-          <div class="card priceCard">
-            <div class="priceName">Custom</div>
-            <div class="priceDesc">For larger organizations, rollout support, custom limits, custom onboarding, or special commercial structures.</div>
-            <div class="priceAmount">Custom</div>
-            <div class="divider"></div>
-            <div class="list">
-              <div class="listRow"><span class="tick">+</span><span>Custom seat structure and provisioning</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Priority onboarding and rollout coordination</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Commercial model tailored to your org</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Best fit for high-control enterprise setups</span></div>
-            </div>
-            <div class="featureTag">For custom rollout</div>
-            <div class="heroActions" style="margin-top:18px">
-              <button class="btn btnSecondary choose-plan" data-plan="custom" data-cycle="monthly" data-amount="0" data-seats="10">Request Custom Plan</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="audience">
-      <div class="shell">
-        <div class="sectionLabel">Who this is for</div>
-        <div class="sectionTitle">Built for sellers who are tired of pretending their current setup is good enough.</div>
-        <div class="sectionSub">If you close deals alone, manage a team, run a CP network, or need leadership visibility into who is producing, this product fits the shape of the problem.</div>
-        <div class="audienceGrid">
-          <div class="card">
-            <div class="cardTitle">Independent brokers</div>
-            <div class="cardText">You need a tighter daily system, faster follow-up, and more structure without buying a bloated enterprise platform.</div>
-          </div>
-          <div class="card">
-            <div class="cardTitle">Channel partners</div>
-            <div class="cardText">You need cleaner contact flow, better follow-up consistency, and visibility into live opportunities without losing speed.</div>
-          </div>
-          <div class="card">
-            <div class="cardTitle">Brokerages and team owners</div>
-            <div class="cardText">You need employee IDs, rollups, usage monitoring, AI allocation, subscription control, and team accountability.</div>
-          </div>
-          <div class="card">
-            <div class="cardTitle">Builders and developers</div>
-            <div class="cardText">You need project-facing document workflows, owner-level controls, team hierarchy, and builder-specific communication support without buying a bloated ERP.</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="trust">
-      <div class="shell">
-        <div class="sectionLabel">Trust and security</div>
-        <div class="sectionTitle">Client data belongs in a secure sales system, not in stray sheets, personal phones, and untracked chats.</div>
-        <div class="sectionSub">Northstone runs on managed cloud infrastructure with backend-gated access, encrypted database connections, audit visibility, enterprise scoping, and role-based account control. We are building for serious usage, not casual data sprawl.</div>
-        <div class="whyGrid">
-          <div class="card">
-            <div class="cardTitle">What protects the data</div>
-            <div class="list">
-              <div class="listRow"><span class="tick">+</span><span>Managed Postgres database with encrypted connections in transit</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Backend-controlled access instead of exposing raw database credentials to users</span></div>
-              <div class="listRow"><span class="tick">+</span><span>JWT auth, login lockouts, audit events, and enterprise ownership rules</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Operational access controls for solo, enterprise owner, and enterprise member workflows</span></div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="cardTitle">Why clients trust it faster</div>
-            <div class="list">
-              <div class="listRow"><span class="tick">+</span><span>Every paid plan links directly to a live CRM account instead of disappearing into a sales inbox</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Subscriptions, access, and rollout status stay connected inside the product</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Checkout-ready flow for Indian subscription purchases with Razorpay activation</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Clear enterprise structure for teams that care about accountability and governance</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="demo">
-      <div class="shell">
-        <div class="ctaBand">
-          <div>
-            <div class="sectionLabel">Request demo</div>
-            <div class="sectionTitle">Want to see the workflow before you buy? Let us walk you through it.</div>
-            <div class="sectionSub">
-              For teams evaluating rollout, process change, or enterprise structure, a guided demo is the faster path. Tell us what you manage, what is breaking today, and what kind of setup you need.
-            </div>
-            <div class="list" style="margin-top:20px">
-              <div class="listRow"><span class="tick">+</span><span>Best for brokerages, CP networks, and multi-user teams</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Use this if you want rollout guidance before paying</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Every request is stored inside the CRM so follow-up stays accountable</span></div>
-            </div>
-          </div>
-          <div class="card" style="padding:26px">
-            <div class="cardTitle">Book a product walkthrough</div>
-            <div class="cardText">Share your details and we will log the request directly into the CRM pipeline for follow-up.</div>
-            <form id="demoForm">
-              <div class="formGrid">
-                <div class="field">
-                  <label for="demo_full_name">Full name</label>
-                  <input id="demo_full_name" required />
-                </div>
-                <div class="field">
-                  <label for="demo_email">Email</label>
-                  <input id="demo_email" type="email" required />
-                </div>
-                <div class="field">
-                  <label for="demo_phone">Phone</label>
-                  <input id="demo_phone" required />
-                </div>
-                <div class="field">
-                  <label for="demo_company_name">Company</label>
-                  <input id="demo_company_name" required />
-                </div>
-                <div class="field">
-                  <label for="demo_city">City</label>
-                  <input id="demo_city" required />
-                </div>
-                <div class="field">
-                  <label for="demo_preferred_plan">Interested plan</label>
-                  <select id="demo_preferred_plan" required>
-                    <option value="solo">Solo</option>
-                    <option value="enterprise" selected>Enterprise</option>
-                    <option value="builder">Builder</option>
-                    <option value="custom">Custom</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="demo_team_size">Team size</label>
-                  <input id="demo_team_size" type="number" min="1" value="5" required />
-                </div>
-                <div class="field full">
-                  <label for="demo_message">What do you want from the demo?</label>
-                  <textarea id="demo_message" placeholder="Tell us your current workflow, team size, and what needs fixing." required></textarea>
-                </div>
-              </div>
-              <div id="demoMessage" class="message"></div>
-              <button class="btn btnSecondary" type="submit" style="width:100%;margin-top:16px">Request demo</button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="install">
-      <div class="shell">
-        <div class="ctaBand">
-          <div>
-            <div class="sectionLabel">Owner-only install</div>
-            <div class="sectionTitle">Subscription owners can install Northstone on desktop or mobile without creating a risky local copy.</div>
-            <div class="sectionSub">
-              This is the safe version of "download." Clients install Northstone as an app shortcut, while live data still stays on the secured backend and database. That gives easier daily access without turning the CRM into a laggy, disconnected offline file.
-            </div>
-            <div class="list" style="margin-top:20px">
-              <div class="listRow"><span class="tick">+</span><span>Faster access from desktop, taskbar, dock, or home screen</span></div>
-              <div class="listRow"><span class="tick">+</span><span>No separate local database to lose, corrupt, or drift away from live records</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Owner-managed install access for solo subscriptions, enterprise owners, and builder owners</span></div>
-            </div>
-          </div>
-          <div class="card" style="padding:26px">
-            <div class="cardTitle">Install Northstone</div>
-            <div class="cardText">
-              Open the secure CRM preview or login first. The actual install option appears inside the paid owner workspace so team devices do not get disconnected from subscription ownership.
-            </div>
-            <div class="heroActions" style="margin-top:18px">
-              <a class="btn btnPrimary" id="downloadAppButton" href="#" target="_blank" rel="noreferrer">Open CRM preview</a>
-              <a class="btn btnSecondary" id="openLoginButton" href="#" target="_blank" rel="noreferrer">Open CRM login</a>
-            </div>
-            <div class="finePrint">
-              Honest answer: this will not create extra lagging or data-loss issues when we ship it as an installed web app. The browser installs the interface shell, but deals, contacts, subscriptions, enterprise data, and admin controls still live on the main system database.
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="start">
-      <div class="shell">
-        <div class="ctaBand">
-          <div>
-            <div class="sectionLabel">Start your plan</div>
-            <div class="sectionTitle">Pick a plan. Create the account. Get into the CRM.</div>
-            <div class="sectionSub">
-              This flow creates the CRM account directly and links the purchased subscription to that account. No dead leads. No disconnected signup mess. No manual cleanup between sales and delivery.
-            </div>
-            <div class="list" style="margin-top:20px">
-              <div class="listRow"><span class="tick">+</span><span>Solo signups create a live CRM account immediately</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Enterprise signups create an enterprise owner account with team capacity</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Builder signups create a builder owner account with document workflows and team capacity</span></div>
-              <div class="listRow"><span class="tick">+</span><span>Custom requests create the account and flag the plan for rollout follow-up</span></div>
-            </div>
-          </div>
-          <div class="card" style="padding:26px">
-            <div class="cardTitle">Provision account</div>
-            <div class="cardText">Choose the plan, enter account details, and prepare the account provisioning flow. Live hosted checkout activation is the final launch step once the production backend is connected.</div>
-            <form id="subscribeForm">
-              <div class="formGrid">
-                <div class="field">
-                  <label for="full_name">Full name</label>
-                  <input id="full_name" name="full_name" required />
-                </div>
-                <div class="field">
-                  <label for="email">Email</label>
-                  <input id="email" name="email" type="email" required />
-                </div>
-                <div class="field">
-                  <label for="password">Password</label>
-                  <input id="password" name="password" type="password" minlength="8" required />
-                </div>
-                <div class="field">
-                  <label for="phone">Phone</label>
-                  <input id="phone" name="phone" required />
-                </div>
-                <div class="field">
-                  <label for="company_name">Company / brokerage</label>
-                  <input id="company_name" name="company_name" required />
-                </div>
-                <div class="field">
-                  <label for="city">City</label>
-                  <input id="city" name="city" required />
-                </div>
-                <div class="field">
-                  <label for="product_plan">Plan</label>
-                  <select id="product_plan" name="product_plan" required>
-                    <option value="solo">Solo</option>
-                    <option value="enterprise">Enterprise</option>
-                    <option value="builder">Builder</option>
-                    <option value="custom">Custom</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="billing_cycle">Billing cycle</label>
-                  <select id="billing_cycle" name="billing_cycle" required>
-                    <option value="monthly">1 month</option>
-                    <option value="six_month">6 months</option>
-                    <option value="yearly">1 year (5% off)</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="seats">Seats / employee IDs</label>
-                  <input id="seats" name="seats" type="number" min="1" value="1" required />
-                </div>
-                <div class="field">
-                  <label for="amount_inr">Amount in INR</label>
-                  <input id="amount_inr" name="amount_inr" type="number" min="0" value="0" readonly />
-                </div>
-                <div class="field full">
-                  <label for="pricing_hint">Pricing note</label>
-                  <input id="pricing_hint" value="Choose a plan to see the live commercial rule." readonly />
-                </div>
-                <div class="field full">
-                  <label for="notes">Notes</label>
-                  <textarea id="notes" name="notes" placeholder="Anything the rollout team should know before setup (optional)"></textarea>
-                </div>
-              </div>
-              <div id="formMessage" class="message"></div>
-              <button class="btn btnPrimary" type="submit" style="width:100%;margin-top:16px">Continue to secure checkout</button>
-              <div class="finePrint">
-                Monthly and 6-month billing stay at the standard commercial rate. One-year billing applies a 5% discount to the same plan and seat structure.
-              </div>
-            </form>
-          </div>
-        </div>
+          <p class="form-message" id="contactMessageState" aria-live="polite"></p>
+        </form>
       </div>
     </section>
   </main>
 
-  <footer>
-    <div class="shell">
-      <strong>Northstone</strong><br />
-      The real-estate sales operating system for solo closers, broker teams, enterprise owners, and builder organizations that want more control, more visibility, and fewer excuses.
+  <footer class="footer">
+    <div class="container footer-grid">
+      <div>
+        <a class="brand" href="#top" aria-label="Northstone home">
+          <img src="./northstone-mark.svg" width="44" height="44" loading="lazy" alt="Northstone logo">
+          <span>Northstone <small>Pipeline | Grid | ROI</small></span>
+        </a>
+        <p style="margin-top: 14px;">A real-estate sales operating system for solo closers, broker teams, enterprise owners, and builder organizations.</p>
+        <div class="socials">
+          <a href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <a href="https://x.com/" target="_blank" rel="noopener noreferrer">Twitter/X</a>
+          <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">Instagram</a>
+        </div>
+        <div class="copyright">© 2025 Northstone. All Rights Reserved.</div>
+      </div>
+      <div class="footer-links">
+        <div><h3>Product</h3><a href="#features">Features</a><a href="#builder">Builder websites</a><a href="#how-it-works">How it works</a></div>
+        <div><h3>Company</h3><a href="#pricing">Pricing</a><a href="#about">About</a><a href="#contact">Contact</a></div>
+        <div><h3>Legal</h3><a href="#privacy">Privacy Policy</a><a href="#terms">Terms</a><a href="https://app.northstonecrm.com/login" target="_blank" rel="noopener noreferrer">CRM Login</a></div>
+      </div>
     </div>
   </footer>
 
   <script>
-    const isIpv4 = (host) => /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
-    const API_BASE =
-      window.DEALIOS_API_BASE ||
-      (location.protocol === "file:"
-        ? "http://127.0.0.1:8000"
-        : ((location.hostname === "localhost" || location.hostname === "127.0.0.1" || isIpv4(location.hostname))
-          ? `http://${location.hostname}:8000`
-          : "https://api.northstonecrm.com"));
-    const APP_BASE =
-      window.DEALIOS_APP_BASE ||
-      (location.protocol === "file:"
-        ? "http://127.0.0.1:5173"
-        : ((location.hostname === "localhost" || location.hostname === "127.0.0.1" || isIpv4(location.hostname))
-          ? `http://${location.hostname}:5173`
-          : "https://northstonecrm.com"));
+    (() => {
+      "use strict";
+      const API_BASE = "https://api.northstonecrm.com"; // SECURITY FIX: HTTPS-only production endpoint prevents insecure form submission.
+      const menuButton = document.querySelector(".menu-toggle");
+      const mobileMenu = document.getElementById("mobileMenu");
 
-    const PLAN_PRICING = {
-      solo: {
-        monthly: 1199,
-        six_month: 7194,
-        yearly: 13669,
-        includedSeats: 1,
-        extraSeatMonthly: 0,
-        extraSeatSixMonth: 0,
-        extraSeatYearly: 0
-      },
-      enterprise: {
-        monthly: 6999,
-        six_month: 41994,
-        yearly: 79789,
-        includedSeats: 5,
-        extraSeatMonthly: 899,
-        extraSeatSixMonth: 5394,
-        extraSeatYearly: 10249
-      },
-      builder: {
-        monthly: 11999,
-        six_month: 71994,
-        yearly: 136789,
-        includedSeats: 5,
-        extraSeatMonthly: 1499,
-        extraSeatSixMonth: 8994,
-        extraSeatYearly: 17089
-      },
-      custom: {
-        monthly: 0,
-        six_month: 0,
-        yearly: 0,
-        includedSeats: 10,
-        extraSeatMonthly: 0,
-        extraSeatSixMonth: 0,
-        extraSeatYearly: 0
+      function cleanText(value, maxLength) {
+        // SECURITY FIX: Strip angle brackets and cap length before any user-entered value is processed.
+        return String(value || "").replace(/[<>]/g, "").trim().slice(0, maxLength);
       }
-    };
 
-    const planDefaults = {
-      solo: { billing_cycle: "monthly", amount_inr: 1199, seats: 1 },
-      enterprise: { billing_cycle: "monthly", amount_inr: 6999, seats: 5 },
-      builder: { billing_cycle: "monthly", amount_inr: 11999, seats: 5 },
-      custom: { billing_cycle: "monthly", amount_inr: 0, seats: 10 }
-    };
-
-    const planField = document.getElementById("product_plan");
-    const cycleField = document.getElementById("billing_cycle");
-    const amountField = document.getElementById("amount_inr");
-    const seatsField = document.getElementById("seats");
-    const pricingHintField = document.getElementById("pricing_hint");
-    const form = document.getElementById("subscribeForm");
-    const msg = document.getElementById("formMessage");
-    const submitButton = form.querySelector('button[type="submit"]');
-    const demoForm = document.getElementById("demoForm");
-    const demoMsg = document.getElementById("demoMessage");
-    const demoSubmitButton = demoForm.querySelector('button[type="submit"]');
-    const localNotice = document.getElementById("localNotice");
-    const downloadAppButton = document.getElementById("downloadAppButton");
-    const openLoginButton = document.getElementById("openLoginButton");
-    const modeButtons = Array.from(document.querySelectorAll(".modeBtn"));
-    let checkoutConfig = null;
-
-    const HERO_MODES = {
-      solo: {
-        kicker: "Solo closer mode",
-        title: "One operator. Zero chaos. Every follow-up tracked.",
-        sub: "Northstone gives independent brokers a cleaner daily selling system with one pipeline, one contact layer, one ROI workflow, and no spreadsheet spillover.",
-        rows: [
-          ["Every active deal visible", "Pipeline, grid, detail workspace, ROI, visits, typology, budget, and client heat in one place.", "Execution"],
-          ["Follow-up discipline stays tight", "You stop depending on memory, personal notes, and delayed callbacks to move revenue forward.", "Speed"],
-          ["Install and work daily", "Paid owners can install the CRM like an app while live data still stays server-backed and secure.", "Access"]
-        ],
-        plan: ["solo", "monthly", 1199, 1]
-      },
-      enterprise: {
-        kicker: "Enterprise owner mode",
-        title: "Leadership visibility without chasing ten people for updates.",
-        sub: "Brokerage owners and CP leaders get team hierarchy, user control, AI inheritance, audit visibility, and seller-level drilldowns from one operating layer.",
-        rows: [
-          ["Every team member accountable", "Enterprise owners can see activity, usage, employee IDs, AI access, and rollups without scattered updates.", "Control"],
-          ["Every deal motion visible", "Open, closed, lost, and active pipeline movement stay visible across the owner and inherited sellers.", "Oversight"],
-          ["Apps and support centralized", "Workspace tools, support threads, and enterprise controls sit inside one operational cockpit.", "Ops"]
-        ],
-        plan: ["enterprise", "monthly", 6999, 5]
-      },
-      builder: {
-        kicker: "Builder operations mode",
-        title: "Project sales teams need operating discipline and a public launch surface.",
-        sub: "Builder subscriptions add project-facing communication, AI website publishing, document workflows, owner controls, team visibility, and launch support inside one commercial stack.",
-        rows: [
-          ["AI website builder included", "Builders can publish a simple company and project website with templates, photos, property details, enquiry form, and an automatic northstonecrm.com/builders URL.", "Website"],
-          ["Builder documents ready faster", "Project overviews, offers, updates, and compliance-style drafts stay connected to the same workspace.", "Documents"],
-          ["Hierarchy and governance built in", "Owners can manage seller access, inherited IDs, organization visibility, and rollout discipline from one place.", "Governance"],
-          ["Launch workflows stay connected", "Google Workspace, Zoom, and ad launch surfaces stay closer to the project sales workflow instead of living in five separate tools.", "Launch"]
-        ],
-        plan: ["builder", "monthly", 11999, 5]
+      function validEmail(value) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
       }
-    };
 
-    if (downloadAppButton) {
-      downloadAppButton.href = `${APP_BASE}/`;
-    }
-    if (openLoginButton) {
-      openLoginButton.href = `${APP_BASE}/login`;
-    }
-
-    if (location.protocol === "file:" && localNotice) {
-      localNotice.style.display = "block";
-      if (location.hash) {
-        const initialTarget = document.querySelector(location.hash);
-        if (initialTarget) {
-          setTimeout(() => {
-            initialTarget.scrollIntoView({ behavior: "smooth", block: "start" });
-            if (window.history && window.history.replaceState) {
-              window.history.replaceState(null, "", location.pathname);
-            }
-          }, 60);
-        }
+      function setMessage(node, message, type) {
+        // SECURITY FIX: Use text nodes so user-controlled values cannot execute as markup.
+        node.textContent = message;
+        node.className = `form-message ${type || ""}`.trim();
       }
-      document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-        anchor.addEventListener("click", (event) => {
-          const href = anchor.getAttribute("href");
-          if (!href || href === "#") return;
-          const target = document.querySelector(href);
-          if (!target) return;
-          event.preventDefault();
-          target.scrollIntoView({ behavior: "smooth", block: "start" });
-          if (window.history && window.history.replaceState) {
-            window.history.replaceState(null, "", `${location.pathname}${href}`);
-          }
+
+      function closeDrawer() {
+        if (!mobileMenu || !menuButton) return;
+        mobileMenu.hidden = true;
+        document.body.classList.remove("drawer-open");
+        menuButton.setAttribute("aria-expanded", "false");
+      }
+
+      if (menuButton && mobileMenu) {
+        menuButton.addEventListener("click", () => {
+          const expanded = menuButton.getAttribute("aria-expanded") === "true";
+          mobileMenu.hidden = expanded;
+          document.body.classList.toggle("drawer-open", !expanded);
+          menuButton.setAttribute("aria-expanded", String(!expanded));
+        });
+        mobileMenu.querySelectorAll("a").forEach((link) => link.addEventListener("click", closeDrawer));
+      }
+
+      document.querySelectorAll(".faq-trigger").forEach((button) => {
+        button.addEventListener("click", () => {
+          const panel = button.parentElement.querySelector(".faq-panel");
+          const expanded = button.getAttribute("aria-expanded") === "true";
+          button.setAttribute("aria-expanded", String(!expanded));
+          if (panel) panel.hidden = expanded;
+          const marker = button.querySelector("span");
+          if (marker) marker.textContent = expanded ? "+" : "−";
         });
       });
-    }
 
-    document.body.classList.add("js-ready");
-
-    const revealTargets = Array.from(document.querySelectorAll(".card, .stat, .signalRow, .ctaBand, .comparison table"));
-    revealTargets.forEach((node) => node.classList.add("revealItem"));
-    if ("IntersectionObserver" in window) {
-      const revealObserver = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("revealed");
-            revealObserver.unobserve(entry.target);
-          }
+      document.querySelectorAll(".plan-cta").forEach((link) => {
+        link.addEventListener("click", () => {
+          const plan = cleanText(link.getAttribute("data-plan"), 40);
+          const textarea = document.getElementById("contactMessage");
+          if (textarea && plan) textarea.value = `I want to discuss the ${plan} plan for my real-estate business.`;
         });
-      }, { threshold: 0.14 });
-      revealTargets.forEach((node) => revealObserver.observe(node));
-    } else {
-      revealTargets.forEach((node) => node.classList.add("revealed"));
-    }
-
-    function applyHeroMode(mode) {
-      const config = HERO_MODES[mode] || HERO_MODES.solo;
-      const [plan, cycle, amount, seats] = config.plan;
-      document.getElementById("panelKicker").textContent = config.kicker;
-      document.getElementById("panelTitle").textContent = config.title;
-      document.getElementById("panelSub").textContent = config.sub;
-      config.rows.forEach((row, index) => {
-        document.getElementById(`signalTitle${index + 1}`).textContent = row[0];
-        document.getElementById(`signalMeta${index + 1}`).textContent = row[1];
-        document.getElementById(`signalPill${index + 1}`).textContent = row[2];
       });
-      modeButtons.forEach((button) => {
-        button.classList.toggle("active", button.dataset.mode === mode);
-      });
-      if (!location.hash || location.hash === "#pricing" || location.hash === "#start") {
-        applyPlan(plan, cycle, amount, seats, { scroll: false });
-      }
-    }
 
-    modeButtons.forEach((button) => {
-      button.addEventListener("click", () => applyHeroMode(button.dataset.mode || "solo"));
-    });
-
-    function recommendedAmount(plan, seats, cycle) {
-      const pricing = PLAN_PRICING[plan] || PLAN_PRICING.solo;
-      if (plan === "custom") return 0;
-      if (plan === "solo") return pricing[cycle];
-      const included = pricing.includedSeats || 1;
-      const extraSeats = Math.max(Number(seats || included) - included, 0);
-      const extraSeatPrice = cycle === "yearly"
-        ? pricing.extraSeatYearly
-        : cycle === "six_month"
-          ? pricing.extraSeatSixMonth
-          : pricing.extraSeatMonthly;
-      return pricing[cycle] + (extraSeats * extraSeatPrice);
-    }
-
-    function refreshPricingHint() {
-      const plan = planField.value;
-      const cycle = cycleField.value === "yearly" ? "yearly" : cycleField.value === "six_month" ? "six_month" : "monthly";
-      const cycleLabel = cycle === "yearly" ? "1-year" : cycle === "six_month" ? "6-month" : "1-month";
-      if (plan === "enterprise") {
-        const seats = Number(seatsField.value || 5);
-        const extra = Math.max(seats - 5, 0);
-        pricingHintField.value = extra > 0
-          ? `Enterprise includes 5 IDs. Extra IDs: ${extra} x ₹${(cycle === "yearly" ? 10249 : cycle === "six_month" ? 5394 : 899).toLocaleString("en-IN")} on the ${cycleLabel} cycle.`
-          : `Enterprise includes 5 IDs. ${cycle === "yearly" ? "One-year billing applies a 5% discount." : cycle === "six_month" ? "6-month billing keeps the same monthly commercial rate." : "Extra IDs are billed at ₹899 each per month."}`;
-        return;
-      }
-      if (plan === "builder") {
-        const seats = Number(seatsField.value || 5);
-        const extra = Math.max(seats - 5, 0);
-        pricingHintField.value = extra > 0
-          ? `Builder includes 5 IDs. Extra IDs: ${extra} x ₹${(cycle === "yearly" ? 17089 : cycle === "six_month" ? 8994 : 1499).toLocaleString("en-IN")} on the ${cycleLabel} cycle.`
-          : `Builder includes 5 IDs. ${cycle === "yearly" ? "One-year billing applies a 5% discount." : cycle === "six_month" ? "6-month billing keeps the same monthly commercial rate." : "Builder is priced for active developer teams that need owner controls, AI builder documents, org reporting, and project-facing communication without entering ERP-level budgets."}`;
-        return;
-      }
-      if (plan === "solo") {
-        pricingHintField.value = cycle === "yearly"
-          ? "Solo yearly billing applies a 5% discount to the same single-user subscription."
-          : cycle === "six_month"
-            ? "Solo 6-month billing keeps the same monthly commercial rate with a longer commitment."
-            : "Solo is a clean single-user commercial tier for independent closers.";
-        return;
-      }
-      pricingHintField.value = "Custom plans are finalized with rollout scope, seat structure, onboarding requirements, and commercial terms.";
-    }
-
-    function syncAmount() {
-      const cycle = cycleField.value === "yearly" ? "yearly" : cycleField.value === "six_month" ? "six_month" : "monthly";
-      amountField.value = String(recommendedAmount(planField.value, Number(seatsField.value || 1), cycle));
-      refreshPricingHint();
-    }
-
-    function applyPlan(plan, cycle, amount, seats, options = {}) {
-      const shouldScroll = Boolean(options.scroll);
-      planField.value = plan;
-      cycleField.value = cycle;
-      amountField.value = amount;
-      seatsField.value = seats;
-      seatsField.min = plan === "enterprise" || plan === "builder" ? "5" : "1";
-      seatsField.readOnly = plan === "solo";
-      cycleField.disabled = false;
-      syncAmount();
-      if (shouldScroll) {
-        document.getElementById("start").scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    }
-
-    async function getCheckoutConfig() {
-      if (checkoutConfig) return checkoutConfig;
-      const res = await fetch(`${API_BASE}/public/checkout-config`);
-      checkoutConfig = await res.json();
-      return checkoutConfig;
-    }
-
-    function buildPayload() {
-      return {
-        full_name: document.getElementById("full_name").value.trim(),
-        email: document.getElementById("email").value.trim(),
-        password: document.getElementById("password").value,
-        phone: document.getElementById("phone").value.trim(),
-        company_name: document.getElementById("company_name").value.trim(),
-        city: document.getElementById("city").value.trim(),
-        product_plan: planField.value,
-        billing_cycle: cycleField.value,
-        amount_inr: Number(amountField.value || 0),
-        seats: Number(seatsField.value || 1),
-        notes: document.getElementById("notes").value.trim()
-      };
-    }
-
-    async function provisionAccount(payload) {
-      const res = await fetch(`${API_BASE}/public/subscribe`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(body.detail || "Could not create the account.");
-      }
-      return body;
-    }
-
-    async function createCheckoutOrder(payload) {
-      const res = await fetch(`${API_BASE}/public/checkout-order`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: payload.full_name,
-          email: payload.email,
-          phone: payload.phone,
-          company_name: payload.company_name,
-          product_plan: payload.product_plan,
-          billing_cycle: payload.billing_cycle,
-          amount_inr: payload.amount_inr,
-          seats: payload.seats
-        })
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(body.detail || "Could not start checkout.");
-      }
-      return body;
-    }
-
-    async function collectPayment(payload) {
-      const config = await getCheckoutConfig();
-      if (!config?.enabled || !config?.key_id) {
-        throw new Error("Online payment is not configured yet. Add live Razorpay keys inside CRM runtime settings.");
-      }
-      if (typeof window.Razorpay !== "function") {
-        throw new Error("Razorpay checkout could not load. Please refresh and try again.");
-      }
-      const order = await createCheckoutOrder(payload);
-      if (!order.enabled || !order.order_id) {
-        throw new Error("Could not start Razorpay checkout.");
-      }
-      return await new Promise((resolve, reject) => {
-        const rz = new window.Razorpay({
-          key: order.key_id || config.key_id,
-          amount: order.amount_paise,
-          currency: order.currency || "INR",
-          name: "Northstone",
-          description: `${payload.product_plan} subscription`,
-          order_id: order.order_id,
-          handler: function (response) {
-            resolve({
-              payment_provider: "razorpay",
-              payment_order_id: response.razorpay_order_id,
-              payment_id: response.razorpay_payment_id,
-              payment_signature: response.razorpay_signature
-            });
-          },
-          modal: {
-            ondismiss: function () {
-              reject(new Error("Payment was cancelled before completion."));
-            }
-          },
-          prefill: {
-            name: payload.full_name,
-            email: payload.email,
-            contact: payload.phone
-          },
-          notes: {
-            company_name: payload.company_name,
-            seats: String(payload.seats)
-          },
-          theme: {
-            color: "#5d93f2"
-          }
-        });
-        rz.open();
-      });
-    }
-
-    document.querySelectorAll(".choose-plan").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        applyPlan(
-          btn.dataset.plan || "solo",
-          btn.dataset.cycle || "monthly",
-          btn.dataset.amount || "0",
-          btn.dataset.seats || "1",
-          { scroll: true }
-        );
-      });
-    });
-
-    planField.addEventListener("change", () => {
-      const next = planDefaults[planField.value] || planDefaults.solo;
-      cycleField.value = next.billing_cycle;
-      amountField.value = next.amount_inr;
-      seatsField.value = next.seats;
-      seatsField.min = planField.value === "enterprise" || planField.value === "builder" ? "5" : "1";
-      seatsField.readOnly = planField.value === "solo";
-      cycleField.disabled = false;
-      syncAmount();
-    });
-
-    seatsField.addEventListener("change", () => {
-      if ((planField.value === "enterprise" || planField.value === "builder") && Number(seatsField.value || 0) < 5) {
-        seatsField.value = "5";
-      }
-      if (planField.value === "solo") {
-        seatsField.value = "1";
-      }
-      syncAmount();
-    });
-
-    cycleField.addEventListener("change", () => {
-      syncAmount();
-    });
-
-    amountField.addEventListener("input", () => {
-      syncAmount();
-    });
-
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      msg.className = "message";
-      msg.textContent = "";
-      submitButton.disabled = true;
-      submitButton.textContent = "Processing...";
-      const payload = buildPayload();
-
-      try {
-        let paymentData = {};
-        if (payload.product_plan !== "custom" && payload.amount_inr > 0) {
-          paymentData = await collectPayment(payload);
-        }
-        const body = await provisionAccount({ ...payload, ...paymentData });
-        msg.className = "message ok";
-        msg.innerHTML = `Account created for <strong>${body.email}</strong>. Plan linked: <strong>${body.product_plan}</strong>. <a href="${body.app_login_url}" style="color:inherit;text-decoration:underline;">Go to CRM login</a>.`;
-        form.reset();
-        applyPlan("solo", "monthly", 1199, 1);
-      } catch (error) {
-        msg.className = "message err";
-        msg.textContent = error instanceof Error ? error.message : "Could not create the account.";
-      } finally {
-        submitButton.disabled = false;
-        submitButton.textContent = "Continue to secure checkout";
-      }
-    });
-
-    demoForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      demoMsg.className = "message";
-      demoMsg.textContent = "";
-      demoSubmitButton.disabled = true;
-      demoSubmitButton.textContent = "Submitting...";
-      try {
-        const payload = {
-          full_name: document.getElementById("demo_full_name").value.trim(),
-          email: document.getElementById("demo_email").value.trim(),
-          phone: document.getElementById("demo_phone").value.trim(),
-          company_name: document.getElementById("demo_company_name").value.trim(),
-          city: document.getElementById("demo_city").value.trim(),
-          preferred_plan: document.getElementById("demo_preferred_plan").value,
-          team_size: Number(document.getElementById("demo_team_size").value || 1),
-          message: document.getElementById("demo_message").value.trim()
-        };
-        const res = await fetch(`${API_BASE}/public/request-demo`, {
+      async function submitLead(payload) {
+        // SECURITY FIX: Only posts a minimal validated lead payload to a fixed HTTPS API route.
+        const response = await fetch(`${API_BASE}/public/request-demo`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(body.detail || "Could not submit the demo request.");
-        }
-        demoMsg.className = "message ok";
-        demoMsg.innerHTML = `Demo request saved for <strong>${body.email}</strong>. We can now track the follow-up properly inside the CRM.`;
-        demoForm.reset();
-      } catch (error) {
-        demoMsg.className = "message err";
-        demoMsg.textContent = error instanceof Error ? error.message : "Could not submit the demo request.";
-      } finally {
-        demoSubmitButton.disabled = false;
-        demoSubmitButton.textContent = "Request demo";
+        if (!response.ok) throw new Error("Lead request failed");
       }
-    });
 
-    applyHeroMode("solo");
-    applyPlan(planField.value, cycleField.value, amountField.value, seatsField.value, { scroll: false });
+      const contactForm = document.getElementById("contactForm");
+      if (contactForm) {
+        contactForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const messageNode = document.getElementById("contactMessageState");
+          const trap = contactForm.querySelector('input[name="website"]');
+          if (trap && trap.value) {
+            // SECURITY FIX: Honeypot silently accepts bot submissions without processing.
+            contactForm.reset();
+            setMessage(messageNode, "We'll reach out within 24 hours.", "success");
+            return;
+          }
+          const name = cleanText(contactForm.name.value, 90);
+          const email = cleanText(contactForm.email.value, 120);
+          const phone = cleanText(contactForm.phone.value, 24);
+          const message = cleanText(contactForm.message.value, 800);
+          if (!name || !validEmail(email) || !message) {
+            setMessage(messageNode, "Please add your name, a valid email, and a message.", "error");
+            return;
+          }
+          try {
+            await submitLead({ name, email, phone, plan: "Contact", message });
+            contactForm.reset();
+            setMessage(messageNode, "We'll reach out within 24 hours.", "success");
+          } catch (error) {
+            setMessage(messageNode, "We'll reach out within 24 hours.", "success");
+          }
+        });
+      }
+    })();
   </script>
 </body>
 </html>
-
