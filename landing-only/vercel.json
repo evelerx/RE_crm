@@ -32,14 +32,6 @@
     {
       "source": "/builders/:path*",
       "destination": "/builder-site"
-    },
-    {
-      "source": "/privacy",
-      "destination": "/privacy"
-    },
-    {
-      "source": "/terms",
-      "destination": "/terms"
     }
   ]
 }
