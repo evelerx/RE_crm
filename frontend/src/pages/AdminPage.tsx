@@ -788,7 +788,7 @@ export default function AdminPage() {
           ["Users", "admin-users", "U"],
           ["Subscriptions", "admin-subscriptions", "S"],
           ["Revenue", "admin-revenue", "R"],
-          ["Ads Manager", "admin-ads", "A"],
+          ["Security", "admin-security", "A"],
           ["CRM Settings", "admin-settings", "C"],
           ["Org & Demo", "admin-organization", "O"],
           ["AI Assign", "admin-ai-assignment", "I"],
@@ -1020,11 +1020,6 @@ export default function AdminPage() {
       <section id="admin-subscriptions">
         <SubscriberDataTable />
       </section>
-      <div id="admin-ads" className="adminAnchorTarget" />
-      <div id="admin-settings" className="adminAnchorTarget" />
-      <div id="admin-support" className="adminAnchorTarget" />
-      <div id="admin-logs" className="adminAnchorTarget" />
-
       {displaySecurity ? (
         <section id="admin-security" className="card premiumPanel adminAnchorTarget">
           <div className="cardTitle">Security posture</div>
@@ -1086,7 +1081,7 @@ export default function AdminPage() {
       ) : null}
 
       {runtimeConfig ? (
-        <section className="card premiumPanel">
+        <section id="admin-settings" className="card premiumPanel adminAnchorTarget">
           <div className="cardTitle">Admin runtime configuration</div>
           <div className="muted small">
             This writes directly to <b>{runtimeConfig.env_file_path}</b> so you can manage encryption, admin auth, and session controls from the panel.
@@ -2191,7 +2186,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section className="card">
+      <section id="admin-support" className="card adminAnchorTarget">
         <div className="cardTitle">Admin conversation with selected enterprise</div>
         <div className="grid2">
           <label>
@@ -2295,7 +2290,7 @@ export default function AdminPage() {
         )}
       </section>
 
-      <section className="card">
+      <section id="admin-logs" className="card adminAnchorTarget">
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
           <div className="cardTitle">Recent audit feed</div>
           <div className="row">
