@@ -585,6 +585,10 @@ async def generate_builder_website_copy(
     user: User = Depends(require_builder_owner),
 ):
     website = ensure_builder_website(session, user)
+    website.website_llm_last_error = ""
+    session.add(website)
+    session.commit()
+    session.refresh(website)
     if not builder_website_key_active(website):
         ok, message = await provision_builder_website_key(website, seed_name=payload.site_name)
         if not ok:
@@ -667,6 +671,8 @@ async def generate_builder_website_copy(
         elif current == "about" and line:
             about_text = f"{about_text}\n{line}".strip()
 
+    if not tagline.strip() and not about_text.strip():
+        tagline, about_text = _website_copy_fallback(payload)
     website.website_llm_last_error = ""
     session.add(website)
     session.commit()
