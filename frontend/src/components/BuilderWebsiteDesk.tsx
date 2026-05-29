@@ -105,6 +105,16 @@ function mapWebsiteToForm(website: BuilderWebsite): BuilderWebsiteForm {
   };
 }
 
+function serializeWebsiteForm(form: BuilderWebsiteForm) {
+  return JSON.stringify({
+    ...form,
+    properties: form.properties.map((property) => ({
+      ...property,
+      image_urls: [...property.image_urls]
+    }))
+  });
+}
+
 function apiProperties(properties: BuilderWebsiteProperty[]) {
   return properties
     .filter((item) => item.title.trim())
@@ -136,6 +146,7 @@ export default function BuilderWebsiteDesk() {
   const [aiBusy, setAiBusy] = useState(false);
   const [website, setWebsite] = useState<BuilderWebsite | null>(null);
   const [form, setForm] = useState<BuilderWebsiteForm | null>(null);
+  const [savedSnapshot, setSavedSnapshot] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -145,7 +156,9 @@ export default function BuilderWebsiteDesk() {
     try {
       const row = await api<BuilderWebsite>("/enterprise/builder-website");
       setWebsite(row);
-      setForm(mapWebsiteToForm(row));
+      const nextForm = mapWebsiteToForm(row);
+      setForm(nextForm);
+      setSavedSnapshot(serializeWebsiteForm(nextForm));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load builder website desk");
     } finally {
@@ -158,6 +171,10 @@ export default function BuilderWebsiteDesk() {
   }, []);
 
   const livePropertyCount = useMemo(() => form?.properties.filter((item) => item.title.trim()).length ?? 0, [form]);
+  const hasUnsavedChanges = useMemo(
+    () => (form ? serializeWebsiteForm(form) !== savedSnapshot : false),
+    [form, savedSnapshot]
+  );
 
   function scrollToPreview() {
     const element = document.getElementById("builder-website-preview");
@@ -165,6 +182,16 @@ export default function BuilderWebsiteDesk() {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   async function saveWebsite() {
     if (!form) return;
@@ -180,7 +207,9 @@ export default function BuilderWebsiteDesk() {
         })
       });
       setWebsite(row);
-      setForm(mapWebsiteToForm(row));
+      const nextForm = mapWebsiteToForm(row);
+      setForm(nextForm);
+      setSavedSnapshot(serializeWebsiteForm(nextForm));
       setMessage("Builder website draft saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save builder website");
@@ -204,7 +233,9 @@ export default function BuilderWebsiteDesk() {
       });
       const row = await api<BuilderWebsite>("/enterprise/builder-website/publish", { method: "POST" });
       setWebsite(row);
-      setForm(mapWebsiteToForm(row));
+      const nextForm = mapWebsiteToForm(row);
+      setForm(nextForm);
+      setSavedSnapshot(serializeWebsiteForm(nextForm));
       setMessage("Builder website published. Open the live page to review it.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not publish builder website");
@@ -220,7 +251,9 @@ export default function BuilderWebsiteDesk() {
     try {
       const row = await api<BuilderWebsite>("/enterprise/builder-website/unpublish", { method: "POST" });
       setWebsite(row);
-      setForm(mapWebsiteToForm(row));
+      const nextForm = mapWebsiteToForm(row);
+      setForm(nextForm);
+      setSavedSnapshot(serializeWebsiteForm(nextForm));
       setMessage("Builder website moved back to draft.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not unpublish builder website");
@@ -265,7 +298,15 @@ export default function BuilderWebsiteDesk() {
       } else {
         setMessage(result.ai_last_error || "AI copy is not ready yet.");
       }
-      await load();
+      setWebsite((prev) =>
+        prev
+          ? {
+              ...prev,
+              ai_ready: result.ai_ready,
+              ai_last_error: result.ai_last_error || ""
+            }
+          : prev
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not generate starter copy");
     } finally {
@@ -330,6 +371,11 @@ export default function BuilderWebsiteDesk() {
       </div>
 
       {website.ai_last_error ? <div className="alert">{website.ai_last_error}</div> : null}
+      {hasUnsavedChanges ? (
+        <div className="alert ok" style={{ marginBottom: 18 }}>
+          You have unsaved website edits. Save draft or publish website before leaving this page.
+        </div>
+      ) : null}
       {!isPublished ? (
         <div className="alert ok" style={{ marginBottom: 18 }}>
           This website is still in draft. The public URL will stay unavailable until you click <b>Publish website</b>. Use the preview section below to review the design before going live.
@@ -387,14 +433,19 @@ export default function BuilderWebsiteDesk() {
             type="file"
             accept="image/*"
             onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              if (file.size > 2_000_000) {
-                setError("Logo must stay under 2 MB for the first builder website release.");
-                return;
+              try {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 2_000_000) {
+                  setError("Logo must stay under 2 MB for the first builder website release.");
+                  return;
+                }
+                const dataUrl = await fileToDataUrl(file);
+                setError(null);
+                setForm((prev) => (prev ? { ...prev, logo_url: dataUrl } : prev));
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Could not read the selected logo.");
               }
-              const dataUrl = await fileToDataUrl(file);
-              setForm((prev) => (prev ? { ...prev, logo_url: dataUrl } : prev));
             }}
           />
           {form.logo_url ? <img src={form.logo_url} alt="Builder logo preview" style={{ marginTop: 12, maxWidth: 120, borderRadius: 12 }} /> : null}
@@ -405,14 +456,19 @@ export default function BuilderWebsiteDesk() {
             type="file"
             accept="image/*"
             onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              if (file.size > 2_500_000) {
-                setError("Hero image must stay under 2.5 MB for the first builder website release.");
-                return;
+              try {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 2_500_000) {
+                  setError("Hero image must stay under 2.5 MB for the first builder website release.");
+                  return;
+                }
+                const dataUrl = await fileToDataUrl(file);
+                setError(null);
+                setForm((prev) => (prev ? { ...prev, hero_image_url: dataUrl } : prev));
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Could not read the selected hero image.");
               }
-              const dataUrl = await fileToDataUrl(file);
-              setForm((prev) => (prev ? { ...prev, hero_image_url: dataUrl } : prev));
             }}
           />
           {form.hero_image_url ? <img src={form.hero_image_url} alt="Hero preview" style={{ marginTop: 12, width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 16 }} /> : null}
@@ -639,24 +695,29 @@ export default function BuilderWebsiteDesk() {
                   accept="image/*"
                   multiple
                   onChange={async (e) => {
-                    const files = Array.from(e.target.files || []);
-                    if (!files.length) return;
-                    const oversize = files.find((file) => file.size > 2_500_000);
-                    if (oversize) {
-                      setError(`${oversize.name} is too large. Keep each property image under 2.5 MB.`);
-                      return;
+                    try {
+                      const files = Array.from(e.target.files || []);
+                      if (!files.length) return;
+                      const oversize = files.find((file) => file.size > 2_500_000);
+                      if (oversize) {
+                        setError(`${oversize.name} is too large. Keep each property image under 2.5 MB.`);
+                        return;
+                      }
+                      const urls = await Promise.all(files.map((file) => fileToDataUrl(file)));
+                      setError(null);
+                      setForm((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              properties: prev.properties.map((item, itemIndex) =>
+                                itemIndex === index ? { ...item, image_urls: [...item.image_urls, ...urls] } : item
+                              )
+                            }
+                          : prev
+                      );
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Could not read one of the selected property images.");
                     }
-                    const urls = await Promise.all(files.map((file) => fileToDataUrl(file)));
-                    setForm((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            properties: prev.properties.map((item, itemIndex) =>
-                              itemIndex === index ? { ...item, image_urls: [...item.image_urls, ...urls] } : item
-                            )
-                          }
-                        : prev
-                    );
                   }}
                 />
               </label>
@@ -696,16 +757,16 @@ export default function BuilderWebsiteDesk() {
       </div>
 
       <div className="row" style={{ marginTop: 18, flexWrap: "wrap" }}>
-        <button className="btn" type="button" onClick={() => void saveWebsite()} disabled={busy}>
+        <button className="btn" type="button" onClick={() => void saveWebsite()} disabled={busy} title={busy ? "A website action is already running." : hasUnsavedChanges ? "Save your draft changes." : "No unsaved changes yet, but you can save the current draft again."}>
           {busy ? "Saving..." : "Save draft"}
         </button>
-        <button className="btn ghost" type="button" onClick={() => void generateStarterCopy()} disabled={aiBusy}>
+        <button className="btn ghost" type="button" onClick={() => void generateStarterCopy()} disabled={aiBusy} title={aiBusy ? "Starter copy is being generated right now." : "Generate draft copy for the headline and about section."}>
           {aiBusy ? "Generating..." : "Generate starter copy"}
         </button>
-        <button className="btn ghost" type="button" onClick={() => void publishWebsite()} disabled={busy}>
+        <button className="btn ghost" type="button" onClick={() => void publishWebsite()} disabled={busy} title={busy ? "A website action is already running." : "Publish the current draft to the public builder page."}>
           Publish website
         </button>
-        <button className="btn ghost" type="button" onClick={() => void unpublishWebsite()} disabled={busy || website.status !== "published"}>
+        <button className="btn ghost" type="button" onClick={() => void unpublishWebsite()} disabled={busy || website.status !== "published"} title={website.status !== "published" ? "This website is still a draft, so there is nothing live to unpublish." : busy ? "A website action is already running." : "Move the live builder website back to draft."}>
           Unpublish
         </button>
         {isPublished ? (
