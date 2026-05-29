@@ -636,7 +636,7 @@ async def generate_builder_website_copy(
     try:
         generated = await chat_completion(
             api_key=api_key,
-            model="openai/gpt-5-mini",
+            model="openai/gpt-4o-mini",
             messages=[
                 {
                     "role": "system",
@@ -647,10 +647,17 @@ async def generate_builder_website_copy(
             max_tokens=350,
         )
     except OpenRouterError as exc:
-        website.website_llm_last_error = str(exc)
+        fallback_tagline, fallback_about = _website_copy_fallback(payload)
+        website.website_llm_last_error = ""
         session.add(website)
         session.commit()
-        return BuilderWebsiteGenerateCopyResponse(ok=False, ai_ready=True, ai_last_error=str(exc))
+        return BuilderWebsiteGenerateCopyResponse(
+            ok=True,
+            tagline=fallback_tagline,
+            about_text=fallback_about,
+            ai_ready=True,
+            ai_last_error=f"AI copy came back incomplete, so Northstone generated starter copy from your builder details instead. ({str(exc)[:180]})",
+        )
 
     tagline = ""
     about_text = ""
