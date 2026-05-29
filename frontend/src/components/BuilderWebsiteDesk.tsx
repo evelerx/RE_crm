@@ -248,7 +248,13 @@ export default function BuilderWebsiteDesk() {
               }
             : prev
         );
-        setMessage(result.ok ? "Starter copy generated." : result.ai_last_error || "AI copy is not ready yet.");
+        setMessage(
+          result.ok
+            ? result.ai_last_error
+              ? `Starter copy generated. ${result.ai_last_error}`
+              : "Starter copy generated."
+            : result.ai_last_error || "AI copy is not ready yet."
+        );
       } else {
         setMessage(result.ai_last_error || "AI copy is not ready yet.");
       }

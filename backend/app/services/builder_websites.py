@@ -143,13 +143,19 @@ def builder_website_key_active(website: BuilderWebsite) -> bool:
     return bool(raw) and not raw.startswith("enc:")
 
 
+def builder_website_key_management_configured() -> bool:
+    return bool((settings.openrouter_management_api_key or "").strip())
+
+
 async def provision_builder_website_key(website: BuilderWebsite, *, seed_name: str | None = None) -> tuple[bool, str]:
     if builder_website_key_active(website):
         return True, "Builder website AI key is already active."
     mgmt_key = (settings.openrouter_management_api_key or "").strip()
     if not mgmt_key:
-        website.website_llm_last_error = "OpenRouter management key is missing."
-        return False, website.website_llm_last_error
+        # Keep this non-blocking for builders. They can still publish/edit the site
+        # even before the admin configures OpenRouter child-key provisioning.
+        website.website_llm_last_error = ""
+        return False, "OpenRouter management key is missing."
 
     base_url = (settings.openrouter_base_url or "https://openrouter.ai/api/v1").rstrip("/")
     create_url = f"{base_url}/keys"

@@ -58,6 +58,7 @@ from ..schemas import (
 from ..settings import settings
 from ..services.builder_websites import (
     builder_website_image_list,
+    builder_website_key_management_configured,
     builder_website_key_active,
     ensure_builder_website,
     provision_builder_website_key,
@@ -286,6 +287,36 @@ def _builder_website_row(session: Session, row: BuilderWebsite) -> BuilderWebsit
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
+
+
+def _website_copy_fallback(payload: BuilderWebsiteGenerateCopyRequest) -> tuple[str, str]:
+    site_name = payload.site_name.strip() or "Your builder brand"
+    property_types = [item.strip() for item in payload.property_types.split(",") if item.strip()]
+    areas = [item.strip() for item in payload.service_areas.split(",") if item.strip()]
+    office_city = payload.office_city.strip()
+    featured = [item.title.strip() for item in payload.properties if item.title.strip()]
+
+    lead_type = property_types[0].lower() if property_types else "residential"
+    area_text = ", ".join(areas[:3]) if areas else (office_city or "your market")
+    tagline = f"{site_name} for modern {lead_type} spaces in {area_text}."
+    if len(tagline) > 72:
+        tagline = f"{site_name} building trusted spaces in {area_text}."
+
+    about_parts = [
+        f"{site_name} presents {lead_type} opportunities with a clear focus on {area_text}.",
+    ]
+    if featured:
+        about_parts.append(f"Current highlights include {', '.join(featured[:3])}.")
+    if office_city:
+        about_parts.append(
+            f"Our team supports buyers from our {office_city} office with project guidance, site details, and timely follow-up."
+        )
+    else:
+        about_parts.append(
+            "Our team supports buyers with project guidance, site details, and timely follow-up."
+        )
+    about_parts.append("You can edit this starter copy any time and refine it with your project details, amenities, and delivery notes.")
+    return tagline[:120], " ".join(about_parts)[:900]
 
 
 def _resolve_enterprise_llm_config(session: Session, user: User) -> tuple[str, str]:
@@ -557,9 +588,21 @@ async def generate_builder_website_copy(
     if not builder_website_key_active(website):
         ok, message = await provision_builder_website_key(website, seed_name=payload.site_name)
         if not ok:
+            fallback_tagline, fallback_about = _website_copy_fallback(payload)
+            website.website_llm_last_error = ""
             session.add(website)
             session.commit()
-            return BuilderWebsiteGenerateCopyResponse(ok=False, ai_ready=False, ai_last_error=message)
+            return BuilderWebsiteGenerateCopyResponse(
+                ok=True,
+                tagline=fallback_tagline,
+                about_text=fallback_about,
+                ai_ready=False,
+                ai_last_error=(
+                    "Starter copy was generated from your builder details. Add the OpenRouter management key in Admin or Settings to enable AI-generated copy."
+                    if not builder_website_key_management_configured()
+                    else message
+                ),
+            )
         session.add(website)
         session.commit()
         session.refresh(website)
