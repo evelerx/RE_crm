@@ -113,7 +113,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = buildHeaders(init, "application/json");
   const timeoutMs =
     path.startsWith("/enterprise/builder-documents/generate")
-      || path.startsWith("/enterprise/builder-website/generate-copy")
+      || path.startsWith("/enterprise/builder-website")
       ? 60000
       : path.startsWith("/auth/") || path.startsWith("/admin/") || path.startsWith("/enterprise/audit")
         ? 20000
