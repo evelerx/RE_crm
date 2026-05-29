@@ -1119,6 +1119,19 @@ def subscription_analytics(
         "builder": len([user for user in owner_users if (getattr(user, "plan", "free") or "free") == "builder"]),
     }
 
+    return {
+        "grain": grain,
+        "timeline": timeline,
+        "current_mix": current_mix,
+        "tracked_subscriptions": len(subscription_users),
+        "revenue_supported": False,
+        "profit_supported": False,
+        "note": (
+            "Activation trend shows builder and enterprise owner subscriptions recorded in the CRM. "
+            "Detailed billing and profit analytics live in Revenue Analytics once payment event data is available."
+        ),
+    }
+
 
 @router.get("/revenue-analytics")
 def revenue_analytics(
