@@ -140,6 +140,13 @@ async function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+function validatePublishReady(form: BuilderWebsiteForm) {
+  if (!form.site_name.trim()) return "Website name is required before publishing.";
+  if (!form.contact_email.trim()) return "Contact email is required before publishing.";
+  if (!form.about_text.trim()) return "Add a short builder description before publishing.";
+  return "";
+}
+
 export default function BuilderWebsiteDesk() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -220,23 +227,35 @@ export default function BuilderWebsiteDesk() {
 
   async function publishWebsite() {
     if (!form) return;
+    const publishError = validatePublishReady(form);
+    if (publishError) {
+      setMessage(null);
+      setError(publishError);
+      return;
+    }
     setBusy(true);
     setMessage(null);
     setError(null);
     try {
-      await api<BuilderWebsite>("/enterprise/builder-website", {
+      const savedRow = await api<BuilderWebsite>("/enterprise/builder-website", {
         method: "PUT",
         body: JSON.stringify({
           ...form,
           properties: apiProperties(form.properties)
         })
       });
+      if (!savedRow.id) {
+        throw new Error("Draft save did not return a valid website record.");
+      }
       const row = await api<BuilderWebsite>("/enterprise/builder-website/publish", { method: "POST" });
+      if (row.status !== "published") {
+        throw new Error("Publish request completed, but the website is still marked as draft.");
+      }
       setWebsite(row);
       const nextForm = mapWebsiteToForm(row);
       setForm(nextForm);
       setSavedSnapshot(serializeWebsiteForm(nextForm));
-      setMessage("Builder website published. Open the live page to review it.");
+      setMessage(`Builder website published. Open the live page to review it: ${row.public_url}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not publish builder website");
     } finally {
