@@ -159,6 +159,13 @@ export default function BuilderWebsiteDesk() {
 
   const livePropertyCount = useMemo(() => form?.properties.filter((item) => item.title.trim()).length ?? 0, [form]);
 
+  function scrollToPreview() {
+    const element = document.getElementById("builder-website-preview");
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
   async function saveWebsite() {
     if (!form) return;
     setBusy(true);
@@ -284,6 +291,8 @@ export default function BuilderWebsiteDesk() {
     );
   }
 
+  const isPublished = website.status === "published";
+
   return (
     <section className="card">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
@@ -321,6 +330,11 @@ export default function BuilderWebsiteDesk() {
       </div>
 
       {website.ai_last_error ? <div className="alert">{website.ai_last_error}</div> : null}
+      {!isPublished ? (
+        <div className="alert ok" style={{ marginBottom: 18 }}>
+          This website is still in draft. The public URL will stay unavailable until you click <b>Publish website</b>. Use the preview section below to review the design before going live.
+        </div>
+      ) : null}
 
       <div className="grid2">
         <label>
@@ -694,12 +708,18 @@ export default function BuilderWebsiteDesk() {
         <button className="btn ghost" type="button" onClick={() => void unpublishWebsite()} disabled={busy || website.status !== "published"}>
           Unpublish
         </button>
-        <a className="btn ghost" href={website.public_url} target="_blank" rel="noreferrer">
-          View live page
-        </a>
+        {isPublished ? (
+          <a className="btn ghost" href={website.public_url} target="_blank" rel="noreferrer">
+            View live page
+          </a>
+        ) : (
+          <button className="btn ghost" type="button" onClick={scrollToPreview}>
+            Preview draft
+          </button>
+        )}
       </div>
 
-      <div className="card" style={{ marginTop: 18 }}>
+      <div className="card" id="builder-website-preview" style={{ marginTop: 18 }}>
         <div className="cardTitle">Preview</div>
         <div className={`enterprisePreviewCard ${form.template_key}`}>
           {form.hero_image_url ? (
