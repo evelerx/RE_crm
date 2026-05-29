@@ -249,6 +249,19 @@ def _builder_website_property_row(row: BuilderWebsiteProperty) -> BuilderWebsite
     )
 
 
+def _sanitize_builder_ai_error(value: str) -> str:
+    message = (value or "").strip()
+    if not message:
+        return ""
+    lowered = message.lower()
+    # Do not leak raw provider payloads or stale model-specific parser failures into the builder UI.
+    if "unexpected openrouter response" in lowered or "chat.completion" in lowered or "gpt-5-mini" in lowered:
+        return ""
+    if len(message) > 220:
+        return message[:220].rstrip() + "..."
+    return message
+
+
 def _builder_website_row(session: Session, row: BuilderWebsite) -> BuilderWebsiteRead:
     properties = session.exec(
         select(BuilderWebsiteProperty)
@@ -281,7 +294,7 @@ def _builder_website_row(session: Session, row: BuilderWebsite) -> BuilderWebsit
         ai_key_name=row.website_llm_key_name,
         ai_limit_usd=float(row.website_llm_limit_usd or 0.08),
         ai_ready=builder_website_key_active(row),
-        ai_last_error=row.website_llm_last_error,
+        ai_last_error=_sanitize_builder_ai_error(row.website_llm_last_error),
         properties=[_builder_website_property_row(item) for item in properties],
         published_at=row.published_at,
         created_at=row.created_at,
@@ -469,6 +482,12 @@ def get_builder_website(
     user: User = Depends(require_builder_owner),
 ):
     website = ensure_builder_website(session, user)
+    sanitized = _sanitize_builder_ai_error(website.website_llm_last_error)
+    if sanitized != (website.website_llm_last_error or ""):
+        website.website_llm_last_error = sanitized
+        session.add(website)
+        session.commit()
+        session.refresh(website)
     return _builder_website_row(session, website)
 
 
