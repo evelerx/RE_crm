@@ -734,7 +734,21 @@ New sections added:
             <div class="floating-field"><input id="contactName" name="name" type="text" autocomplete="name" required maxlength="90"><label for="contactName">Full Name</label></div>
             <div class="floating-field"><input id="contactEmail" name="email" type="email" autocomplete="email" required maxlength="120"><label for="contactEmail">Email</label></div>
           </div>
-          <div class="floating-field"><input id="contactPhone" name="phone" type="tel" autocomplete="tel" maxlength="24"><label for="contactPhone">Phone (optional)</label></div>
+          <div class="field-grid">
+            <div class="floating-field"><input id="contactPhone" name="phone" type="tel" autocomplete="tel" required maxlength="24"><label for="contactPhone">Phone</label></div>
+            <div class="floating-field">
+              <select id="contactPlan" name="plan" required>
+                <option value="">Select subscription</option>
+                <option value="Solo">Solo</option>
+                <option value="Enterprise">Enterprise</option>
+                <option value="Builder">Builder</option>
+                <option value="Custom">Custom</option>
+                <option value="CRM + Marketing Assist">CRM + Marketing Assist</option>
+                <option value="CRM + Managed Marketing">CRM + Managed Marketing</option>
+              </select>
+              <label for="contactPlan">Subscription for demo</label>
+            </div>
+          </div>
           <div class="floating-field"><textarea id="contactMessage" name="message" required maxlength="800"></textarea><label for="contactMessage">Message</label></div>
           <div class="form-actions">
             <button class="btn btn-primary" type="submit">Submit</button>
@@ -822,6 +836,8 @@ New sections added:
         link.addEventListener("click", () => {
           const plan = cleanText(link.getAttribute("data-plan"), 40);
           const textarea = document.getElementById("contactMessage");
+          const planSelect = document.getElementById("contactPlan");
+          if (planSelect && plan) planSelect.value = plan;
           if (textarea && plan) textarea.value = `I want to discuss the ${plan} plan for my real-estate business.`;
         });
       });
@@ -851,13 +867,14 @@ New sections added:
           const name = cleanText(contactForm.name.value, 90);
           const email = cleanText(contactForm.email.value, 120);
           const phone = cleanText(contactForm.phone.value, 24);
+          const plan = cleanText(contactForm.plan.value, 60);
           const message = cleanText(contactForm.message.value, 800);
-          if (!name || !validEmail(email) || !message) {
-            setMessage(messageNode, "Please add your name, a valid email, and a message.", "error");
+          if (!name || !validEmail(email) || !phone || !plan || !message) {
+            setMessage(messageNode, "Please add your name, valid email, phone number, subscription choice, and message.", "error");
             return;
           }
           try {
-            await submitLead({ name, email, phone, plan: "Contact", message });
+            await submitLead({ name, email, phone, plan, message });
             contactForm.reset();
             setMessage(messageNode, "We'll reach out within 24 hours.", "success");
           } catch (error) {
