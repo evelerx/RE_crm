@@ -20,11 +20,18 @@ from .models import (
     DealClosureEvent,
     DealImage,
     DealStageEvent,
+    GoogleCalendarToken,
+    InventoryProject,
+    InventoryUnit,
+    IntegrationMapping,
     PasswordResetToken,
     Profile,
+    CallRecord,
     SupportChatMessage,
     User,
     WhatsAppMessage,
+    WebhookEndpoint,
+    WebhookLog,
 )
 from .settings import app_base_dir, settings
 
@@ -302,6 +309,8 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "deal", "closed_at DATETIME")
             if "closure_note" not in cols:
                 _sqlite_add_column(conn, "deal", "closure_note VARCHAR DEFAULT ''")
+            if "lead_source" not in cols:
+                _sqlite_add_column(conn, "deal", "lead_source VARCHAR DEFAULT 'manual'")
             conn.execute(text("UPDATE deal SET status='closed' WHERE stage='closed' AND (status IS NULL OR status='open' OR status='')"))
             conn.execute(text("UPDATE deal SET status='lost' WHERE stage='lost' AND (status IS NULL OR status='open' OR status='')"))
         if _sqlite_table_exists(conn, "contact"):
@@ -314,6 +323,8 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "contact", "created_by_user_id VARCHAR")
             if "occupation" not in cols:
                 _sqlite_add_column(conn, "contact", "occupation VARCHAR DEFAULT ''")
+            if "lead_source" not in cols:
+                _sqlite_add_column(conn, "contact", "lead_source VARCHAR DEFAULT 'manual'")
         if _sqlite_table_exists(conn, "activity"):
             cols = _sqlite_table_columns(conn, "activity")
             if "owner_id" not in cols:
@@ -322,6 +333,8 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "activity", "enterprise_owner_id VARCHAR")
             if "created_by_user_id" not in cols:
                 _sqlite_add_column(conn, "activity", "created_by_user_id VARCHAR")
+            if "google_event_id" not in cols:
+                _sqlite_add_column(conn, "activity", "google_event_id VARCHAR DEFAULT ''")
         if _sqlite_table_exists(conn, "dealstageevent"):
             cols = _sqlite_table_columns(conn, "dealstageevent")
             if "enterprise_owner_id" not in cols:
@@ -356,6 +369,30 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "supportchatmessage", "message VARCHAR DEFAULT ''")
             if "created_at" not in cols:
                 _sqlite_add_column(conn, "supportchatmessage", "created_at DATETIME")
+        if _sqlite_table_exists(conn, "whatsappmessage"):
+            cols = _sqlite_table_columns(conn, "whatsappmessage")
+            if "deal_id" not in cols:
+                _sqlite_add_column(conn, "whatsappmessage", "deal_id VARCHAR")
+            if "read_at" not in cols:
+                _sqlite_add_column(conn, "whatsappmessage", "read_at DATETIME")
+        if _sqlite_table_exists(conn, "webhookendpoint"):
+            cols = _sqlite_table_columns(conn, "webhookendpoint")
+            if "field_mapping" not in cols:
+                _sqlite_add_column(conn, "webhookendpoint", "field_mapping VARCHAR DEFAULT '{}'")
+            if "is_active" not in cols:
+                _sqlite_add_column(conn, "webhookendpoint", "is_active BOOLEAN DEFAULT 1")
+        if _sqlite_table_exists(conn, "webhooklog"):
+            cols = _sqlite_table_columns(conn, "webhooklog")
+            if "error_message" not in cols:
+                _sqlite_add_column(conn, "webhooklog", "error_message VARCHAR DEFAULT ''")
+        if _sqlite_table_exists(conn, "googlecalendartoken"):
+            cols = _sqlite_table_columns(conn, "googlecalendartoken")
+            if "connected_email" not in cols:
+                _sqlite_add_column(conn, "googlecalendartoken", "connected_email VARCHAR DEFAULT ''")
+            if "last_sync_at" not in cols:
+                _sqlite_add_column(conn, "googlecalendartoken", "last_sync_at DATETIME")
+            if "synced_events_count" not in cols:
+                _sqlite_add_column(conn, "googlecalendartoken", "synced_events_count INTEGER DEFAULT 0")
 
         if _sqlite_table_exists(conn, "user"):
             cols = _sqlite_table_columns(conn, "user")
@@ -464,6 +501,17 @@ def _postgres_best_effort_migrate() -> None:
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS closed_by_user_name VARCHAR DEFAULT '';
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP;
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS closure_note VARCHAR DEFAULT '';
+                  ALTER TABLE deal ADD COLUMN IF NOT EXISTS lead_source VARCHAR DEFAULT 'manual';
+                  ALTER TABLE contact ADD COLUMN IF NOT EXISTS lead_source VARCHAR DEFAULT 'manual';
+                  ALTER TABLE whatsappmessage ADD COLUMN IF NOT EXISTS deal_id UUID;
+                  ALTER TABLE whatsappmessage ADD COLUMN IF NOT EXISTS read_at TIMESTAMP;
+                  ALTER TABLE activity ADD COLUMN IF NOT EXISTS google_event_id VARCHAR DEFAULT '';
+                  ALTER TABLE webhookendpoint ADD COLUMN IF NOT EXISTS field_mapping VARCHAR DEFAULT '{}';
+                  ALTER TABLE webhookendpoint ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+                  ALTER TABLE webhooklog ADD COLUMN IF NOT EXISTS error_message VARCHAR DEFAULT '';
+                  ALTER TABLE googlecalendartoken ADD COLUMN IF NOT EXISTS connected_email VARCHAR DEFAULT '';
+                  ALTER TABLE googlecalendartoken ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMP;
+                  ALTER TABLE googlecalendartoken ADD COLUMN IF NOT EXISTS synced_events_count INTEGER DEFAULT 0;
                   UPDATE deal SET status='closed' WHERE stage='closed' AND COALESCE(status, 'open') = 'open';
                   UPDATE deal SET status='lost' WHERE stage='lost' AND COALESCE(status, 'open') = 'open';
                 EXCEPTION

@@ -6,9 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, select
 
 from ..auth import get_current_user
+from ..enterprise_scope import get_enterprise_owner_id
 from ..db import get_session
 from ..enterprise_scope import assign_enterprise_fields, user_can_access_record, user_read_filter
 from ..models import Activity, Contact, Deal, User
+from .calendar_sync import auto_sync_activity_if_enabled
 from ..schemas import ActivityCreate, ActivityRead, ActivityUpdate
 
 
@@ -32,7 +34,7 @@ def list_activities(
 
 
 @router.post("", response_model=ActivityRead)
-def create_activity(
+async def create_activity(
     payload: ActivityCreate,
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
@@ -58,11 +60,12 @@ def create_activity(
 
     session.commit()
     session.refresh(activity)
+    await auto_sync_activity_if_enabled(session, activity, get_enterprise_owner_id(user))
     return activity
 
 
 @router.patch("/{activity_id}", response_model=ActivityRead)
-def update_activity(
+async def update_activity(
     activity_id: UUID,
     payload: ActivityUpdate,
     session: Session = Depends(get_session),
@@ -87,6 +90,7 @@ def update_activity(
 
     session.commit()
     session.refresh(activity)
+    await auto_sync_activity_if_enabled(session, activity, get_enterprise_owner_id(user))
     return activity
 
 

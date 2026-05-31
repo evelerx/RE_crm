@@ -10,24 +10,32 @@ import AccountPage from "./pages/AccountPage";
 import AppsPage from "./pages/AppsPage";
 import BuilderPublicPage from "./pages/BuilderPublicPage";
 import CalculatorPage from "./pages/CalculatorPage";
+import CallLogPage from "./pages/CallLogPage";
 import ContactsPage from "./pages/ContactsPage";
 import DealDetailPage from "./pages/DealDetailPage";
 import DealsGridPage from "./pages/DealsGridPage";
 import EnterprisePage from "./pages/EnterprisePage";
+import IntegrationsSetupPage from "./pages/IntegrationsSetupPage";
+import InventoryPage from "./pages/InventoryPage";
 import InsightsPage from "./pages/InsightsPage";
 import LoginPage from "./pages/LoginPage";
 import PipelinePage from "./pages/PipelinePage";
 import SettingsPage from "./pages/SettingsPage";
 import TodayPage from "./pages/TodayPage";
+import WebhooksPage from "./pages/WebhooksPage";
 
 function TopBar({
   isAdmin,
+  canManageIntegrations,
   enterpriseBadge,
+  canUseInventory,
   onLogout,
   loginHref
 }: {
   isAdmin: boolean;
+  canManageIntegrations: boolean;
   enterpriseBadge: string | null;
+  canUseInventory: boolean;
   onLogout?: () => void;
   loginHref?: string;
 }) {
@@ -63,12 +71,20 @@ function TopBar({
           <NavLink to="/deals" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
             Deals
           </NavLink>
-          <NavLink to="/contacts" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-            Contacts
+        <NavLink to="/contacts" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+          Contacts
+        </NavLink>
+        <NavLink to="/calls" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+          Calls
+        </NavLink>
+        {canUseInventory ? (
+          <NavLink to="/inventory" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+            Inventory
           </NavLink>
-          <NavLink to="/calc" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-            ROI
-          </NavLink>
+        ) : null}
+        <NavLink to="/calc" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+          ROI
+        </NavLink>
           <NavLink to="/insights" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
             Insights
           </NavLink>
@@ -85,6 +101,16 @@ function TopBar({
         <NavLink to="/apps" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
           Apps
         </NavLink>
+        {canManageIntegrations ? (
+          <NavLink to="/integrations/setup" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+            Integrations
+          </NavLink>
+        ) : null}
+        {canManageIntegrations ? (
+          <NavLink to="/webhooks" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+            Webhooks
+          </NavLink>
+        ) : null}
         {isAdmin ? (
           <NavLink to="/admin" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
             Admin
@@ -114,6 +140,14 @@ function TopBar({
           <NavLink to="/contacts" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
             Contacts
           </NavLink>
+          <NavLink to="/calls" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+            Calls
+          </NavLink>
+          {canUseInventory ? (
+            <NavLink to="/inventory" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+              Inventory
+            </NavLink>
+          ) : null}
           <NavLink to="/calc" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
             ROI
           </NavLink>
@@ -133,6 +167,16 @@ function TopBar({
         <NavLink to="/apps" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
           Apps
         </NavLink>
+        {canManageIntegrations ? (
+          <NavLink to="/integrations/setup" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+            Integrations
+          </NavLink>
+        ) : null}
+        {canManageIntegrations ? (
+          <NavLink to="/webhooks" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+            Webhooks
+          </NavLink>
+        ) : null}
         {isAdmin ? (
           <NavLink to="/admin" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
             Admin
@@ -177,8 +221,10 @@ function BottomNav() {
 export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getToken()));
   const [isAdmin, setIsAdmin] = useState(false);
+  const [canManageIntegrations, setCanManageIntegrations] = useState(false);
   const [enterpriseBadge, setEnterpriseBadge] = useState<string | null>(null);
   const [reraCompleted, setReraCompleted] = useState(true);
+  const [canUseInventory, setCanUseInventory] = useState(false);
   const adminIdleTimerRef = useRef<number | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -188,6 +234,8 @@ export default function App() {
       if ((e.key === "northstonecrm_token" || e.key === "dealios_token") && !e.newValue) {
         setAuthed(false);
         setIsAdmin(false);
+        setCanManageIntegrations(false);
+        setCanUseInventory(false);
         setEnterpriseBadge(null);
         setReraCompleted(true);
       }
@@ -199,6 +247,8 @@ export default function App() {
   useEffect(() => {
     if (!authed) {
       setIsAdmin(false);
+      setCanManageIntegrations(false);
+      setCanUseInventory(false);
       setEnterpriseBadge(null);
       setReraCompleted(true);
       return;
@@ -219,7 +269,10 @@ export default function App() {
           setIsAdmin(Boolean(me.is_admin));
           const plan = (me.plan || "free").toLowerCase();
           const ownerMode = plan === "enterprise" || plan === "builder";
+          const builderMode = plan === "builder";
           const memberRole = (me.enterprise_member_role || "").toLowerCase();
+          setCanManageIntegrations(Boolean(me.is_admin || ownerMode));
+          setCanUseInventory(Boolean(me.is_admin || builderMode));
           setEnterpriseBadge(
             me.enterprise_company_name?.trim() ||
               (
@@ -239,6 +292,8 @@ export default function App() {
       } catch {
         if (!cancelled) {
           setIsAdmin(false);
+          setCanManageIntegrations(false);
+          setCanUseInventory(false);
           setEnterpriseBadge(null);
           setReraCompleted(true);
         }
@@ -253,6 +308,8 @@ export default function App() {
     clearSession();
     setAuthed(false);
     setIsAdmin(false);
+    setCanManageIntegrations(false);
+    setCanUseInventory(false);
     setEnterpriseBadge(null);
     setReraCompleted(true);
     navigate("/login");
@@ -272,6 +329,7 @@ export default function App() {
         clearSession();
         setAuthed(false);
         setIsAdmin(false);
+        setCanUseInventory(false);
         setEnterpriseBadge(null);
         setReraCompleted(true);
         navigate("/login");
@@ -307,7 +365,9 @@ export default function App() {
     <div className="appShell">
       <TopBar
         isAdmin={isAdmin}
+        canManageIntegrations={canManageIntegrations}
         enterpriseBadge={enterpriseBadge}
+        canUseInventory={canUseInventory}
         onLogout={handleLogout}
       />
       <main className="content">
@@ -318,11 +378,15 @@ export default function App() {
           <Route path="/deals" element={isAdmin ? <AdminOwnerDealsPage /> : <DealsGridPage />} />
           <Route path="/deals/:dealId" element={<DealDetailPage />} />
           <Route path="/contacts" element={isAdmin ? <AdminOwnerContactsPage /> : <ContactsPage />} />
+          <Route path="/calls" element={<CallLogPage />} />
+          <Route path="/inventory" element={canUseInventory || isAdmin ? <InventoryPage /> : <Navigate to="/" replace />} />
           <Route path="/calc" element={<CalculatorPage />} />
           <Route path="/insights" element={<InsightsPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/apps" element={<AppsPage />} />
+          <Route path="/integrations/setup" element={canManageIntegrations ? <IntegrationsSetupPage /> : <Navigate to="/" replace />} />
+          <Route path="/webhooks" element={canManageIntegrations ? <WebhooksPage /> : <Navigate to="/" replace />} />
           <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/" replace />} />
           <Route path="/enterprise" element={<EnterprisePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

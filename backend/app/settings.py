@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import Any
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -48,9 +49,18 @@ class Settings(BaseSettings):
     formspree_endpoint: str = ""
     formspree_bearer_token: str = ""
     builder_sites_base_url: str = "https://northstonecrm.com/builders"
-    whatsapp_token: str = ""
+    whatsapp_token: str = Field(default="", validation_alias=AliasChoices("WHATSAPP_ACCESS_TOKEN", "WHATSAPP_TOKEN"))
     whatsapp_phone_number_id: str = ""
     whatsapp_verify_token: str = ""
+    fb_app_secret: str = ""
+    fb_page_access_token: str = ""
+    fb_verify_token: str = ""
+    google_leads_webhook_key: str = ""
+    google_calendar_webhook_token: str = ""
+    exotel_sid: str = ""
+    exotel_api_key: str = ""
+    exotel_api_token: str = ""
+    exotel_caller_id: str = ""
     login_max_attempts: int = 5
     login_lockout_minutes: int = 15
     jwt_exp_days: int = 30

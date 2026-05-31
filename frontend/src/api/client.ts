@@ -114,6 +114,8 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const timeoutMs =
     path.startsWith("/enterprise/builder-documents/generate")
       || path.startsWith("/enterprise/builder-website")
+      || path.startsWith("/telephony/")
+      || path.startsWith("/inventory/")
       ? 60000
       : path.startsWith("/auth/") || path.startsWith("/admin/") || path.startsWith("/enterprise/audit")
         ? 20000
@@ -163,9 +165,29 @@ export type WhatsAppMediaSendResponse = {
   wa_message_id: string;
 };
 
-export async function sendWhatsAppMedia(contactId: string, caption: string, file: File) {
+export async function listWhatsAppMessages(dealId: string) {
+  return api<import("./types").WhatsAppMessage[]>("/whatsapp/messages/" + dealId);
+}
+
+export async function listWhatsAppConversation(contactId: string) {
+  return api<import("./types").WhatsAppMessage[]>("/whatsapp/conversation/" + contactId);
+}
+
+export async function sendWhatsAppMessage(contactId: string, message: string, dealId?: string) {
+  return api<WhatsAppMediaSendResponse>("/whatsapp/send", {
+    method: "POST",
+    body: JSON.stringify({
+      contact_id: contactId,
+      deal_id: dealId ?? null,
+      message,
+    }),
+  });
+}
+
+export async function sendWhatsAppMedia(contactId: string, caption: string, file: File, dealId?: string) {
   const formData = new FormData();
   formData.append("contact_id", contactId);
+  if (dealId) formData.append("deal_id", dealId);
   formData.append("caption", caption);
   formData.append("file", file);
   return apiForm<WhatsAppMediaSendResponse>("/whatsapp/send-media", formData);
@@ -200,4 +222,154 @@ export async function closeDeal(dealId: string, closure_note: string) {
 
 export async function closureFeed() {
   return api<import("./types").DealClosureEvent[]>("/deals/closure-feed");
+}
+
+export async function getLeadCaptureOverview() {
+  return api<import("./types").LeadCaptureOverview>("/integrations/lead-sources");
+}
+
+export async function saveLeadCaptureMapping(
+  payload: {
+    platform: "facebook" | "google";
+    platform_id: string;
+    access_token: string;
+  },
+) {
+  return api<import("./types").IntegrationMapping>("/integrations/lead-sources/mappings", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteLeadCaptureMapping(mappingId: string) {
+  return api<{ deleted: boolean }>("/integrations/lead-sources/mappings/" + mappingId, {
+    method: "DELETE",
+  });
+}
+
+export async function createWebhookEndpoint(payload: { name: string; field_mapping: Record<string, string> }) {
+  return api<import("./types").WebhookEndpoint>("/webhooks/endpoints", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listWebhookEndpoints() {
+  return api<import("./types").WebhookEndpoint[]>("/webhooks/endpoints");
+}
+
+export async function updateWebhookEndpoint(endpointId: string, payload: Partial<{ name: string; is_active: boolean; field_mapping: Record<string, string> }>) {
+  return api<import("./types").WebhookEndpoint>("/webhooks/endpoints/" + endpointId, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deactivateWebhookEndpoint(endpointId: string) {
+  return api<{ deleted: boolean }>("/webhooks/endpoints/" + endpointId, {
+    method: "DELETE",
+  });
+}
+
+export async function listWebhookLogs(endpointId: string) {
+  return api<import("./types").WebhookLog[]>("/webhooks/logs/" + endpointId);
+}
+
+export async function getGoogleCalendarStatus() {
+  return api<import("./types").GoogleCalendarSyncStatus>("/integrations/google/calendar-status");
+}
+
+export async function getGoogleCalendarAuthUrl() {
+  return api<{ provider: string; auth_url: string }>("/integrations/google/auth-url");
+}
+
+export async function toggleGoogleCalendarSync(syncEnabled: boolean) {
+  return api<import("./types").GoogleCalendarSyncStatus>("/integrations/google/calendar-status", {
+    method: "PATCH",
+    body: JSON.stringify({ sync_enabled: syncEnabled }),
+  });
+}
+
+export async function syncAllGoogleCalendarActivities() {
+  return api<{ ok: boolean; synced_count: number; skipped_count: number; updated_activity_ids: string[] }>("/integrations/google/sync-all", {
+    method: "POST",
+  });
+}
+
+export async function initiateCall(payload: { to_number: string; deal_id?: string | null; contact_id?: string | null }) {
+  return api<import("./types").CallRecord>("/telephony/call/initiate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listDealCalls(dealId: string) {
+  return api<import("./types").CallRecord[]>("/telephony/calls/" + dealId);
+}
+
+export async function listCalls(params: { status?: string; deal_id?: string; from_date?: string; to_date?: string; page?: number; page_size?: number } = {}) {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.deal_id) query.set("deal_id", params.deal_id);
+  if (params.from_date) query.set("from_date", params.from_date);
+  if (params.to_date) query.set("to_date", params.to_date);
+  if (params.page) query.set("page", String(params.page));
+  if (params.page_size) query.set("page_size", String(params.page_size));
+  return api<import("./types").CallRecord[]>(`/telephony/calls${query.toString() ? `?${query.toString()}` : ""}`);
+}
+
+export async function createInventoryProject(payload: { name: string; location: string; total_units: number; launch_date?: string | null }) {
+  return api<import("./types").InventoryProject>("/inventory/projects", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listInventoryProjects() {
+  return api<import("./types").InventoryProject[]>("/inventory/projects");
+}
+
+export async function bulkCreateInventoryUnits(
+  projectId: string,
+  payload: Array<{
+    unit_number: string;
+    tower?: string | null;
+    floor?: number | null;
+    bhk_type: string;
+    area_sqft: number;
+    base_price: number;
+    status: string;
+  }>,
+) {
+  return api<import("./types").InventoryUnit[]>(`/inventory/projects/${projectId}/units`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listInventoryUnits(projectId: string, params: { status?: string; bhk_type?: string; floor?: number; tower?: string } = {}) {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.bhk_type) query.set("bhk_type", params.bhk_type);
+  if (params.floor != null) query.set("floor", String(params.floor));
+  if (params.tower) query.set("tower", params.tower);
+  return api<import("./types").InventoryUnit[]>(`/inventory/projects/${projectId}/units${query.toString() ? `?${query.toString()}` : ""}`);
+}
+
+export async function updateInventoryUnit(unitId: string, payload: { status?: string; current_price?: number | null; deal_id?: string | null }) {
+  return api<import("./types").InventoryUnit>(`/inventory/units/${unitId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function bookInventoryUnit(unitId: string, deal_id: string) {
+  return api<import("./types").InventoryUnit>(`/inventory/units/${unitId}/book`, {
+    method: "POST",
+    body: JSON.stringify({ deal_id }),
+  });
+}
+
+export async function getInventoryProjectSummary(projectId: string) {
+  return api<import("./types").InventoryProjectSummary>(`/inventory/projects/${projectId}/summary`);
 }

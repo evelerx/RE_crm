@@ -6,12 +6,17 @@ import {
   api,
   closeDeal,
   deleteDealImage,
+  initiateCall,
   listDealImages,
+  listDealCalls,
+  listWhatsAppConversation,
+  listWhatsAppMessages,
   sendWhatsAppMedia,
+  sendWhatsAppMessage,
   setPrimaryDealImage,
   uploadDealImages,
 } from "../api/client";
-import type { Activity, Contact, Deal, DealImage } from "../api/types";
+import type { Activity, CallRecord, Contact, Deal, DealImage, WhatsAppMessage } from "../api/types";
 
 type DealScoreResponse = { deal_id: string; close_probability: number; risk_flags: string[]; rationale: string[] };
 type FollowupResponse = { deal_id: string; message: string };
@@ -21,15 +26,6 @@ function normalizeWhatsAppNumber(value: string | null | undefined) {
   const digits = (value || "").replace(/\D+/g, "");
   if (digits.length < 10) return "";
   return digits;
-}
-
-function openWhatsApp(message: string, phone: string | null | undefined) {
-  const target = normalizeWhatsAppNumber(phone);
-  if (!target) {
-    throw new Error("Linked contact needs a valid phone or WhatsApp number before sending.");
-  }
-  const url = `https://wa.me/${target}?text=${encodeURIComponent(message)}`;
-  window.open(url, "_blank");
 }
 
 function formatMoney(value: number | null | undefined) {
@@ -62,6 +58,12 @@ function relativeTime(value: string | null | undefined) {
   return `${days}d ago`;
 }
 
+function formatMessageTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
 export default function DealDetailPage() {
   const { dealId } = useParams();
   const navigate = useNavigate();
@@ -73,6 +75,8 @@ export default function DealDetailPage() {
   const [score, setScore] = useState<DealScoreResponse | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [dealImages, setDealImages] = useState<DealImage[]>([]);
+  const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
+  const [whatsAppThread, setWhatsAppThread] = useState<WhatsAppMessage[]>([]);
   const [whatsAppContactId, setWhatsAppContactId] = useState("");
   const [editing, setEditing] = useState(false);
   const [notesBusy, setNotesBusy] = useState(false);
@@ -90,8 +94,11 @@ export default function DealDetailPage() {
   const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string>("");
   const [imageError, setImageError] = useState<string | null>(null);
   const [imageBusy, setImageBusy] = useState(false);
+  const [threadBusy, setThreadBusy] = useState(false);
+  const [callBusy, setCallBusy] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const threadRef = useRef<HTMLDivElement | null>(null);
   const [editPayload, setEditPayload] = useState({
     contact_id: "",
     visit_date: "",
@@ -105,15 +112,24 @@ export default function DealDetailPage() {
     risk_flags: ""
   });
 
+  const loadWhatsAppThread = useCallback(async (currentDealId: string, currentContactId?: string) => {
+    const rows = currentContactId
+      ? await listWhatsAppConversation(currentContactId)
+      : await listWhatsAppMessages(currentDealId);
+    setWhatsAppThread(rows);
+  }, []);
+
   const load = useCallback(async () => {
     if (!dealId) return;
     setError(null);
     try {
-      const [d, contactRows, a, imageRows] = await Promise.all([
+      const [d, contactRows, a, imageRows, threadRows, callRows] = await Promise.all([
         api<Deal>(`/deals/${dealId}`),
         api<Contact[]>("/contacts"),
         api<Activity[]>(`/activities?deal_id=${encodeURIComponent(dealId)}`),
         listDealImages(dealId),
+        listWhatsAppMessages(dealId),
+        listDealCalls(dealId),
       ]);
       setDeal(d);
       setNoteDraft(d.notes ?? "");
@@ -138,6 +154,8 @@ export default function DealDetailPage() {
         "";
       setWhatsAppContactId(preferredContactId);
       setActivities(a);
+      setWhatsAppThread(threadRows);
+      setCallRecords(callRows);
       setSuccessMessage(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deal");
@@ -147,6 +165,24 @@ export default function DealDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!dealId || !deal?.contact_id) return;
+    const interval = window.setInterval(() => {
+      void loadWhatsAppThread(dealId, whatsAppContactId || deal.contact_id || undefined);
+    }, 15000);
+    return () => window.clearInterval(interval);
+  }, [dealId, deal?.contact_id, loadWhatsAppThread, whatsAppContactId]);
+
+  useEffect(() => {
+    if (!dealId || !whatsAppContactId) return;
+    void loadWhatsAppThread(dealId, whatsAppContactId);
+  }, [dealId, loadWhatsAppThread, whatsAppContactId]);
+
+  useEffect(() => {
+    if (!threadRef.current) return;
+    threadRef.current.scrollTop = threadRef.current.scrollHeight;
+  }, [whatsAppThread]);
 
   async function saveNotes() {
     if (!dealId) return;
@@ -255,15 +291,6 @@ export default function DealDetailPage() {
     setAttachmentError(null);
     setSuccessMessage(null);
 
-    if (!attachmentFile) {
-      try {
-        openWhatsApp(followupDraft.trim(), whatsAppPhone);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "WhatsApp send failed");
-      }
-      return;
-    }
-
     if (!whatsAppContactId) {
       setAttachmentError("Choose a contact before sending an attachment.");
       return;
@@ -271,16 +298,45 @@ export default function DealDetailPage() {
 
     setWhatsAppSending(true);
     try {
-      await sendWhatsAppMedia(whatsAppContactId, followupDraft.trim(), attachmentFile);
+      if (attachmentFile) {
+        await sendWhatsAppMedia(whatsAppContactId, followupDraft.trim(), attachmentFile, deal?.id);
+      } else {
+        await sendWhatsAppMessage(whatsAppContactId, followupDraft.trim(), deal?.id);
+      }
       setFollowupDraft("");
       setAttachmentFile(null);
       setAttachmentPreviewUrl("");
       setSuccessMessage("Sent");
-      await addActivity({ kind: "whatsapp", summary: `WhatsApp media follow-up sent${attachmentFile.name ? `: ${attachmentFile.name}` : ""}` });
+      setThreadBusy(true);
+      await loadWhatsAppThread(deal!.id, whatsAppContactId);
     } catch (e) {
       setAttachmentError(e instanceof Error ? e.message : "WhatsApp media send failed");
     } finally {
+      setThreadBusy(false);
       setWhatsAppSending(false);
+    }
+  }
+
+  async function initiateDealCall() {
+    if (!deal) return;
+    const contact = contacts.find((row) => row.id === deal.contact_id) || contacts.find((row) => row.id === whatsAppContactId) || null;
+    const number = normalizeWhatsAppNumber(contact?.phone);
+    if (!contact || !number) {
+      setError("Choose or link a contact with a valid phone number before placing a call.");
+      return;
+    }
+    setCallBusy(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const record = await initiateCall({ to_number: number, deal_id: deal.id, contact_id: contact.id });
+      const updatedCalls = await listDealCalls(deal.id);
+      setCallRecords(updatedCalls.length ? updatedCalls : [record]);
+      setSuccessMessage("Call initiated. Status will refresh below.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not initiate call");
+    } finally {
+      setCallBusy(false);
     }
   }
 
@@ -641,6 +697,43 @@ export default function DealDetailPage() {
           </section>
 
           <section className="card">
+            <div className="cardTitle">Telephony</div>
+            <div className="muted">Launch a call from the linked contact and monitor completion, duration, and recordings.</div>
+            <div className="row">
+              <button className="btn" disabled={callBusy} onClick={() => void initiateDealCall()} type="button">
+                {callBusy ? "Calling..." : "Call contact"}
+              </button>
+              <button className="btn ghost" onClick={() => void load()} type="button">
+                Refresh call status
+              </button>
+            </div>
+            <div className="list">
+              {callRecords.length === 0 ? <div className="muted">No calls have been placed for this deal yet.</div> : null}
+              {callRecords.map((call) => (
+                <div key={call.id} className="listItem">
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div><strong>{call.contact_name || "Contact"}</strong></div>
+                      <div className="muted small">{formatMessageTime(call.started_at)}</div>
+                    </div>
+                    <span className={`statusPill ${call.status === "completed" ? "active" : call.status === "failed" ? "expired" : "expiringsoon"}`}>
+                      {call.status}
+                    </span>
+                  </div>
+                  <div className="row small">
+                    <span>Duration: {call.duration_seconds != null ? `${call.duration_seconds}s` : "-"}</span>
+                    {call.recording_url ? (
+                      <a className="link" href={call.recording_url} target="_blank" rel="noopener noreferrer">
+                        Open recording
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="card">
             <div className="cardTitle">AI Follow-up</div>
             <div className="muted">Generate a client-ready follow-up, send it to WhatsApp, or log it back into activity history.</div>
             <label>
@@ -654,6 +747,22 @@ export default function DealDetailPage() {
                 ))}
               </select>
             </label>
+            <div className="whatsAppThread" ref={threadRef}>
+              {threadBusy ? <div className="muted small">Refreshing thread...</div> : null}
+              {whatsAppThread.length === 0 ? <div className="muted">No WhatsApp messages yet for this contact.</div> : null}
+              {whatsAppThread.map((message) => (
+                <div
+                  key={message.id}
+                  className={`whatsAppBubble ${message.direction === "outbound" ? "outbound" : "inbound"}`}
+                >
+                  <div className="whatsAppBody">{message.message_body}</div>
+                  <div className="whatsAppMeta">
+                    <span>{formatMessageTime(message.timestamp)}</span>
+                    {message.direction === "outbound" ? <span className={`whatsAppStatus ${message.status}`}>{message.status}</span> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
             <textarea className="textarea" value={followupDraft} onChange={(e) => setFollowupDraft(e.target.value)} placeholder="Generate a follow-up message to begin." />
             <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
               <button className="btn ghost" onClick={() => attachmentInputRef.current?.click()} type="button">
@@ -730,7 +839,7 @@ export default function DealDetailPage() {
                 disabled={!followupDraft.trim() || !canSendWhatsApp || whatsAppSending}
                 onClick={() => void sendWhatsAppFollowup()}
               >
-                {whatsAppSending ? "Sending..." : "Send on WhatsApp"}
+                {whatsAppSending ? "Sending..." : attachmentFile ? "Send attachment" : "Send on WhatsApp"}
               </button>
               <button
                 className="btn ghost"

@@ -21,7 +21,7 @@ from ..auth import get_current_user, is_admin_email, require_enterprise
 from ..crypto import decrypt_if_configured, encrypt_if_configured
 from ..db import get_session
 from ..enterprise_scope import get_enterprise_owner_id, is_enterprise_owner
-from ..models import AppIntegrationConnection, User
+from ..models import AppIntegrationConnection, GoogleCalendarToken, User
 from ..schemas import (
     GoogleCalendarEventCreateRequest,
     GoogleCalendarEventResponse,
@@ -439,6 +439,15 @@ def google_disconnect(
         row.updated_at = now
         session.add(row)
         session.commit()
+    token_row = session.exec(select(GoogleCalendarToken).where(GoogleCalendarToken.owner_id == owner_id)).first()
+    if token_row:
+        token_row.sync_enabled = False
+        token_row.access_token = ""
+        token_row.refresh_token = ""
+        token_row.connected_email = ""
+        token_row.token_expiry = None
+        session.add(token_row)
+        session.commit()
     return {"ok": True}
 
 
@@ -721,6 +730,15 @@ async def google_callback(
     row.last_error = ""
     row.updated_at = now
     session.add(row)
+    token_row = session.exec(select(GoogleCalendarToken).where(GoogleCalendarToken.owner_id == owner.id)).first()
+    if not token_row:
+        token_row = GoogleCalendarToken(owner_id=owner.id)
+    token_row.access_token = row.encrypted_access_token
+    token_row.refresh_token = row.encrypted_refresh_token
+    token_row.token_expiry = row.token_expires_at
+    token_row.connected_email = email
+    token_row.sync_enabled = True
+    session.add(token_row)
     session.commit()
 
     return _status_redirect("connected", email or "connected")
@@ -793,4 +811,3 @@ async def microsoft_callback(
     session.commit()
 
     return _status_redirect_for("microsoft", "connected", email or "connected")
-
