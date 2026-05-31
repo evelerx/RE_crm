@@ -1944,3 +1944,216 @@ textarea.textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* MODIFIED: WhatsApp media attachments + deal closure feed + property image cards - adds the missing functional styles for newly wired UI states. */
+.dealCardImage {
+  width: calc(100% + 24px);
+  max-width: calc(100% + 24px);
+  height: 160px;
+  margin: -12px -12px 2px;
+  display: block;
+  object-fit: cover;
+  border-bottom: 1px solid var(--border);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dealCardImagePlaceholder {
+  width: calc(100% + 24px);
+  min-height: 132px;
+  margin: -12px -12px 4px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 12px 12px 0 0;
+  border-bottom-style: solid;
+  border-bottom-color: var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+    radial-gradient(circle at top right, rgba(95, 135, 198, 0.14), transparent 45%);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dealCardImagePlaceholder:hover {
+  border-color: rgba(135, 173, 228, 0.28);
+  color: var(--text);
+}
+
+.dealCardImagePlaceholderIcon {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(95, 135, 198, 0.18);
+  color: rgba(187, 210, 244, 0.96);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.pillClosed {
+  border-color: rgba(77, 160, 138, 0.3);
+  background: rgba(77, 160, 138, 0.14);
+  color: rgba(154, 226, 205, 0.96);
+}
+
+.dealsGridLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+.dealTableThumb {
+  width: 72px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.closureFeedPanel {
+  position: sticky;
+  top: 96px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(17, 25, 39, 0.78);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.feedRowNew {
+  border-color: rgba(95, 135, 198, 0.28) !important;
+  background: rgba(95, 135, 198, 0.09) !important;
+}
+
+.attachmentPreview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.attachmentThumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.attachmentFileIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  background: rgba(95, 135, 198, 0.12);
+  color: rgba(187, 210, 244, 0.96);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.attachmentMeta {
+  min-width: 0;
+  flex: 1;
+}
+
+.attachmentMeta > div:first-child {
+  overflow-wrap: anywhere;
+}
+
+.thumbnailStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.thumbnailCard {
+  position: relative;
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.thumbnailImage {
+  width: 160px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.primaryBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(77, 160, 138, 0.9);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.trashButton {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.trashButton:hover {
+  background: rgba(224, 100, 100, 0.12);
+  border-color: rgba(224, 100, 100, 0.24);
+}
+
+@media (max-width: 1080px) {
+  .dealsGridLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .closureFeedPanel {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .dealCardImage,
+  .dealCardImagePlaceholder {
+    min-height: 110px;
+    height: 110px;
+  }
+
+  .attachmentPreview {
+    align-items: flex-start;
+  }
+
+  .thumbnailCard,
+  .thumbnailImage {
+    width: 100%;
+  }
+}

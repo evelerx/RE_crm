@@ -106,6 +106,11 @@ class Deal(SQLModel, table=True):
 
     contact_id: Optional[UUID] = Field(default=None, foreign_key="contact.id")
     notes: str = ""
+    status: str = "open"  # open | closed | lost
+    closed_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    closed_by_user_name: str = ""
+    closed_at: Optional[datetime] = None
+    closure_note: str = ""
 
     last_activity_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -135,6 +140,38 @@ class DealStageEvent(SQLModel, table=True):
     from_stage: str = ""
     to_stage: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class DealClosureEvent(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    deal_id: UUID = Field(foreign_key="deal.id", index=True)
+    deal_title: str = ""
+    property_name: str = ""
+    closed_by_name: str = ""
+    closed_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+
+
+class DealImage(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    deal_id: UUID = Field(foreign_key="deal.id", index=True)
+    image_url: str = ""
+    filename: str = ""
+    uploaded_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    uploaded_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    is_primary: bool = False
+
+
+class WhatsAppMessage(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    owner_id: UUID = Field(foreign_key="user.id", index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    contact_id: UUID = Field(foreign_key="contact.id", index=True)
+    direction: str = "outbound"
+    message_body: str = ""
+    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    status: str = "sent"  # sent | delivered | read | failed
+    wa_message_id: Optional[str] = None
 
 
 class AuditEvent(SQLModel, table=True):

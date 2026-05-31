@@ -1,7 +1,7 @@
 import { DndContext, DragEndEvent, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { api } from "../api/client";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { api, uploadDealImages } from "../api/client";
 import type { AssetType, Contact, Deal, DealCreate, Stage } from "../api/types";
 import DealPriorityDashboard from "../components/DealPriorityDashboard";
 import DealCard from "../components/DealCard";
@@ -33,6 +33,9 @@ export default function PipelinePage() {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [canSeeDealPriority, setCanSeeDealPriority] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadingDealId, setUploadingDealId] = useState<string | null>(null);
+  const uploadRef = useRef<HTMLInputElement | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -102,6 +105,27 @@ export default function PipelinePage() {
 
   return (
     <div className="page">
+      <input
+        ref={uploadRef}
+        type="file"
+        hidden
+        accept="image/*"
+        multiple
+        onChange={async (event) => {
+          const files = Array.from(event.target.files || []);
+          if (!uploadingDealId || files.length === 0) return;
+          setUploadError(null);
+          try {
+            await uploadDealImages(uploadingDealId, files);
+            await load();
+          } catch (e) {
+            setUploadError(e instanceof Error ? e.message : "Image upload failed");
+          } finally {
+            setUploadingDealId(null);
+            if (uploadRef.current) uploadRef.current.value = "";
+          }
+        }}
+      />
       <div className="pageHeader">
         <div>
           <div className="h1">Pipeline</div>
@@ -118,6 +142,7 @@ export default function PipelinePage() {
       </div>
 
       {error ? <div className="alert">{error}</div> : null}
+      {uploadError ? <div className="alert">{uploadError}</div> : null}
       {loading ? <div className="muted">Loading pipeline...</div> : null}
       <DealPriorityDashboard visible={canSeeDealPriority} />
 
@@ -126,7 +151,14 @@ export default function PipelinePage() {
           {STAGES.map((st) => (
             <StageColumn key={st} stage={st} label={stageLabel(st)} count={byStage.get(st)?.length ?? 0}>
               {(byStage.get(st) ?? []).map((deal) => (
-                <DraggableDeal key={deal.id} deal={deal} />
+                <DraggableDeal
+                  key={deal.id}
+                  deal={deal}
+                  onAddPhoto={(dealId) => {
+                    setUploadingDealId(dealId);
+                    uploadRef.current?.click();
+                  }}
+                />
               ))}
             </StageColumn>
           ))}
@@ -169,7 +201,7 @@ function StageColumn({
   );
 }
 
-function DraggableDeal({ deal }: { deal: Deal }) {
+function DraggableDeal({ deal, onAddPhoto }: { deal: Deal; onAddPhoto?: (dealId: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
   const style: CSSProperties = {
     transform: CSS.Translate.toString(transform),
@@ -178,7 +210,7 @@ function DraggableDeal({ deal }: { deal: Deal }) {
 
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
-      <DealCard deal={deal} />
+      <DealCard deal={deal} onAddPhoto={onAddPhoto} />
     </div>
   );
 }

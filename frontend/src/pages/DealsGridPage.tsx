@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, apiBlob, apiForm } from "../api/client";
-import type { Deal } from "../api/types";
+import { API_BASE_URL, api, apiBlob, apiForm, closureFeed } from "../api/client";
+import type { Deal, DealClosureEvent } from "../api/types";
 
 function fmt(value: number | null, suffix = "") {
   if (value == null) return "-";
@@ -20,6 +20,18 @@ function formatVisitDate(value: string | null) {
   return date.toLocaleDateString();
 }
 
+function relativeTime(value: string | null | undefined) {
+  if (!value) return "-";
+  const diff = Date.now() - new Date(value).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -35,6 +47,8 @@ export default function DealsGridPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [q, setQ] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [feed, setFeed] = useState<DealClosureEvent[]>([]);
+  const [newFeedIds, setNewFeedIds] = useState<string[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [bulkStage, setBulkStage] = useState<Deal["stage"]>("lead");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -54,6 +68,33 @@ export default function DealsGridPage() {
   useEffect(() => {
     void load("");
   }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    const fetchFeed = async () => {
+      try {
+        const data = await closureFeed();
+        if (!active) return;
+        setFeed((prev) => {
+          const known = new Set(prev.map((item) => item.id));
+          const fresh = data.filter((item) => !known.has(item.id)).map((item) => item.id);
+          if (fresh.length) {
+            setNewFeedIds(fresh);
+            window.setTimeout(() => setNewFeedIds([]), 3000);
+          }
+          return data;
+        });
+      } catch {
+        // keep quiet on transient poll errors
+      }
+    };
+    void fetchFeed();
+    const timer = window.setInterval(fetchFeed, 60000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   async function deleteDeal(deal: Deal) {
     const confirmed = window.confirm(`Delete deal "${deal.title}"? This cannot be undone.`);
@@ -177,8 +218,9 @@ export default function DealsGridPage() {
         </div>
       ) : null}
 
-      <div className="tableWrap tableWrapWide">
-        <table className="table tableWide">
+      <div className="dealsGridLayout">
+        <div className="tableWrap tableWrapWide">
+          <table className="table tableWide">
           <thead>
             <tr>
               <th style={{ width: 34 }}>
@@ -198,9 +240,11 @@ export default function DealsGridPage() {
                   }}
                 />
               </th>
+              <th>Photo</th>
               <th>Title</th>
               <th>Asset</th>
               <th>Stage</th>
+              <th>Status</th>
               <th>Client phase</th>
               <th>Location</th>
               <th>Date of visit</th>
@@ -228,6 +272,13 @@ export default function DealsGridPage() {
                     }
                   />
                 </td>
+                <td>
+                  {d.primary_image_url ? (
+                    <img className="dealTableThumb" src={`${API_BASE_URL}${d.primary_image_url}`} alt={d.title} />
+                  ) : (
+                    <span className="muted small">No photo</span>
+                  )}
+                </td>
                 <td className="tdTitle">
                   <Link to={`/deals/${d.id}`} className="rowLink">
                     {d.title}
@@ -235,6 +286,17 @@ export default function DealsGridPage() {
                 </td>
                 <td>{d.asset_type}</td>
                 <td>{d.stage}</td>
+                <td>
+                  {d.status === "closed" ? (
+                    <div className="stack compact">
+                      <span className="pill pillClosed">Closed</span>
+                      <span className="muted small">Closed by {d.closed_by_user_name || "Unknown"}</span>
+                      <span className="muted small">{relativeTime(d.closed_at)}</span>
+                    </div>
+                  ) : (
+                    <span className="muted small">{d.status || "open"}</span>
+                  )}
+                </td>
                 <td>{d.client_phase || "-"}</td>
                 <td>
                   {d.area || "-"}
@@ -261,13 +323,31 @@ export default function DealsGridPage() {
             ))}
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={14} className="muted">
+                <td colSpan={16} className="muted">
                   No deals found.
                 </td>
               </tr>
             ) : null}
           </tbody>
-        </table>
+          </table>
+        </div>
+        <aside className="closureFeedPanel">
+          <div className="cardTitle">Closure Feed</div>
+          <div className="muted small">Org-wide deal closures refresh every 60 seconds.</div>
+          <div className="list">
+            {feed.length === 0 ? <div className="muted">No closures yet</div> : null}
+            {feed.map((item) => (
+              <div key={item.id} className={`listItem ${newFeedIds.includes(item.id) ? "feedRowNew" : ""}`}>
+                <div>
+                  <strong>{item.closed_by_name}</strong> closed <strong>{item.deal_title}</strong>
+                </div>
+                <div className="muted small">
+                  {item.property_name || "-"} - {relativeTime(item.closed_at)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
       </div>
     </div>
   );

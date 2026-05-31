@@ -17,11 +17,14 @@ from .models import (
     BuilderWebsiteProperty,
     Contact,
     Deal,
+    DealClosureEvent,
+    DealImage,
     DealStageEvent,
     PasswordResetToken,
     Profile,
     SupportChatMessage,
     User,
+    WhatsAppMessage,
 )
 from .settings import app_base_dir, settings
 
@@ -289,6 +292,18 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "deal", "customer_budget FLOAT")
             if "client_phase" not in cols:
                 _sqlite_add_column(conn, "deal", "client_phase VARCHAR DEFAULT ''")
+            if "status" not in cols:
+                _sqlite_add_column(conn, "deal", "status VARCHAR DEFAULT 'open'")
+            if "closed_by_user_id" not in cols:
+                _sqlite_add_column(conn, "deal", "closed_by_user_id VARCHAR")
+            if "closed_by_user_name" not in cols:
+                _sqlite_add_column(conn, "deal", "closed_by_user_name VARCHAR DEFAULT ''")
+            if "closed_at" not in cols:
+                _sqlite_add_column(conn, "deal", "closed_at DATETIME")
+            if "closure_note" not in cols:
+                _sqlite_add_column(conn, "deal", "closure_note VARCHAR DEFAULT ''")
+            conn.execute(text("UPDATE deal SET status='closed' WHERE stage='closed' AND (status IS NULL OR status='open' OR status='')"))
+            conn.execute(text("UPDATE deal SET status='lost' WHERE stage='lost' AND (status IS NULL OR status='open' OR status='')"))
         if _sqlite_table_exists(conn, "contact"):
             cols = _sqlite_table_columns(conn, "contact")
             if "owner_id" not in cols:
@@ -444,6 +459,13 @@ def _postgres_best_effort_migrate() -> None:
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_amount_inr INTEGER DEFAULT 0;
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_started_at TIMESTAMP;
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMP;
+                  ALTER TABLE deal ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'open';
+                  ALTER TABLE deal ADD COLUMN IF NOT EXISTS closed_by_user_id UUID;
+                  ALTER TABLE deal ADD COLUMN IF NOT EXISTS closed_by_user_name VARCHAR DEFAULT '';
+                  ALTER TABLE deal ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP;
+                  ALTER TABLE deal ADD COLUMN IF NOT EXISTS closure_note VARCHAR DEFAULT '';
+                  UPDATE deal SET status='closed' WHERE stage='closed' AND COALESCE(status, 'open') = 'open';
+                  UPDATE deal SET status='lost' WHERE stage='lost' AND COALESCE(status, 'open') = 'open';
                 EXCEPTION
                   WHEN duplicate_object THEN NULL;
                 END

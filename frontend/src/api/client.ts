@@ -155,3 +155,49 @@ export async function apiForm<T>(path: string, formData: FormData, init: Request
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
+
+export type WhatsAppMediaSendResponse = {
+  ok: boolean;
+  contact_id: string;
+  status: string;
+  wa_message_id: string;
+};
+
+export async function sendWhatsAppMedia(contactId: string, caption: string, file: File) {
+  const formData = new FormData();
+  formData.append("contact_id", contactId);
+  formData.append("caption", caption);
+  formData.append("file", file);
+  return apiForm<WhatsAppMediaSendResponse>("/whatsapp/send-media", formData);
+}
+
+export async function uploadDealImages(dealId: string, files: File[]) {
+  const formData = new FormData();
+  files.forEach((file) => formData.append("files", file));
+  return apiForm("/deals/" + dealId + "/images/", formData) as Promise<import("./types").DealImage[]>;
+}
+
+export async function listDealImages(dealId: string) {
+  return api<import("./types").DealImage[]>("/deals/" + dealId + "/images/");
+}
+
+export async function deleteDealImage(dealId: string, imageId: string) {
+  return api<{ deleted: boolean }>("/deals/" + dealId + "/images/" + imageId, { method: "DELETE" });
+}
+
+export async function setPrimaryDealImage(dealId: string, imageId: string) {
+  return api<import("./types").DealImage[]>("/deals/" + dealId + "/images/" + imageId + "/set-primary", {
+    method: "PATCH",
+  });
+}
+
+export async function closeDeal(dealId: string, closure_note: string) {
+  return api<import("./types").Deal>("/deals/" + dealId + "/close", {
+    method: "PATCH",
+    body: JSON.stringify({ closure_note }),
+  });
+}
+
+export async function closureFeed() {
+  return api<import("./types").DealClosureEvent[]>("/deals/closure-feed");
+}

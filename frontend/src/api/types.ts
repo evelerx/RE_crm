@@ -20,6 +20,11 @@ export type Deal = {
   risk_flags: string;
   contact_id: string | null;
   notes: string;
+  status: "open" | "closed" | "lost";
+  closed_by_user_name: string;
+  closed_at: string | null;
+  closure_note: string;
+  primary_image_url: string | null;
   last_activity_at: string | null;
   created_at: string;
   updated_at: string;
@@ -61,6 +66,24 @@ export type Activity = {
   due_at: string | null;
   completed: boolean;
   created_at: string;
+};
+
+export type DealImage = {
+  id: string;
+  deal_id: string;
+  image_url: string;
+  filename: string;
+  uploaded_at: string;
+  is_primary: boolean;
+};
+
+export type DealClosureEvent = {
+  id: string;
+  deal_id: string;
+  deal_title: string;
+  property_name: string;
+  closed_by_name: string;
+  closed_at: string;
 };
 
 export type Profile = {

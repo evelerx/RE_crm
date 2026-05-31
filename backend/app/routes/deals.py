@@ -1,26 +1,50 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
+from pathlib import Path
 from typing import List, Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func
 from sqlmodel import Session, col, delete, select
 
 from ..audit import log_audit_event
 from ..auth import get_current_user
 from ..db import get_session
-from ..enterprise_scope import assign_enterprise_fields, is_enterprise_member, user_can_access_record, user_read_filter
-from ..models import Activity, Contact, Deal, DealStageEvent, User
-from ..schemas import BulkStageUpdateRequest, DealCreate, DealPriorityDashboardRead, DealPriorityItem, DealRead, DealUpdate, StageSummary
+from ..enterprise_scope import (
+    assign_enterprise_fields,
+    get_enterprise_owner_id,
+    is_enterprise_member,
+    user_can_access_record,
+    user_read_filter,
+)
+from ..models import Activity, Contact, Deal, DealClosureEvent, DealImage, DealStageEvent, Profile, User
+from ..schemas import (
+    BulkStageUpdateRequest,
+    DealCloseRequest,
+    DealClosureEventRead,
+    DealCreate,
+    DealImageRead,
+    DealPriorityDashboardRead,
+    DealPriorityItem,
+    DealRead,
+    DealUpdate,
+    StageSummary,
+)
 
-# MODIFIED: Phase 1 — Deal Intelligence scoring endpoint — Adds server-side owner/main-only access and ranked deal recommendations.
+# MODIFIED: Phase 1 + media/closure/image features - keeps Deal Intelligence intact while adding closure visibility and property images.
 
 
 router = APIRouter(prefix="/deals", tags=["deals"])
 
+UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "uploads" / "deal_images"
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_IMAGE_COUNT = 10
+MAX_IMAGE_SIZE = 5 * 1024 * 1024
+
 
 def _require_main_or_owner(user: User) -> None:
     """Role-based access control verified server-side: employees/staff cannot access scoring data."""
+
     member_role = (getattr(user, "enterprise_member_role", "") or "").strip().lower()
     if is_enterprise_member(user) or member_role in {"employee", "staff"}:
         raise HTTPException(status_code=403, detail="Deal Intelligence is only available to main or owner accounts")
@@ -69,9 +93,9 @@ def _recommend_time_action(days_since_activity: int, overdue_count: int, days_in
     if overdue_count:
         return f"Clear {overdue_count} overdue follow-up task{'s' if overdue_count != 1 else ''} today"
     if days_since_activity >= 7:
-        return f"Send follow-up email — last contact was {days_since_activity} days ago"
+        return f"Send follow-up email - last contact was {days_since_activity} days ago"
     if days_in_stage > 10:
-        return f"Move the deal forward — stage has not changed for {days_in_stage} days"
+        return f"Move the deal forward - stage has not changed for {days_in_stage} days"
     if deal.visit_date:
         return "Confirm visit outcome and schedule the next commitment"
     return "Call the contact and lock the next step"
@@ -79,12 +103,74 @@ def _recommend_time_action(days_since_activity: int, overdue_count: int, days_in
 
 def _recommend_ad_action(lead_source: str, engagement: int, deal: Deal) -> str:
     if lead_source in {"organic", "referral"}:
-        return "Run retargeting ad — high-value organic/referral lead"
+        return "Run retargeting ad - high-value organic/referral lead"
     if engagement >= 20:
-        return "Warm lead — push with paid ads and a sharper offer"
+        return "Warm lead - push with paid ads and a sharper offer"
     if deal.asset_type in {"residential", "commercial"}:
-        return "Proven segment — scale spend with a focused audience"
+        return "Proven segment - scale spend with a focused audience"
     return "Test a small retargeting budget before scaling"
+
+
+def _property_name(deal: Deal) -> str:
+    return (deal.typology or "").strip() or (deal.area or "").strip() or (deal.city or "").strip() or deal.title
+
+
+def _scope_owner_id(user: User) -> UUID:
+    return get_enterprise_owner_id(user) or user.id
+
+
+def _closing_display_name(session: Session, user: User) -> str:
+    profile = session.exec(select(Profile).where(Profile.owner_id == user.id)).first()
+    if profile and (profile.full_name or "").strip():
+        return profile.full_name.strip()
+    return user.email
+
+
+def _primary_images_map(session: Session, deal_ids: list[UUID]) -> dict[UUID, str]:
+    if not deal_ids:
+        return {}
+    rows = session.exec(
+        select(DealImage).where(DealImage.deal_id.in_(deal_ids), DealImage.is_primary == True)  # noqa: E712
+    ).all()
+    return {row.deal_id: row.image_url for row in rows}
+
+
+def _deal_read(deal: Deal, primary_image_url: str | None) -> DealRead:
+    return DealRead(
+        id=deal.id,
+        title=deal.title,
+        asset_type=deal.asset_type,
+        stage=deal.stage,
+        city=deal.city,
+        area=deal.area,
+        visit_date=deal.visit_date,
+        typology=deal.typology,
+        ticket_size=deal.ticket_size,
+        customer_budget=deal.customer_budget,
+        expected_yield_pct=deal.expected_yield_pct,
+        expected_roi_pct=deal.expected_roi_pct,
+        liquidity_days_est=deal.liquidity_days_est,
+        client_phase=deal.client_phase,
+        close_probability=deal.close_probability,
+        risk_flags=deal.risk_flags,
+        contact_id=deal.contact_id,
+        notes=deal.notes,
+        status=deal.status,
+        closed_by_user_name=deal.closed_by_user_name,
+        closed_at=deal.closed_at,
+        closure_note=deal.closure_note,
+        primary_image_url=primary_image_url,
+        last_activity_at=deal.last_activity_at,
+        created_at=deal.created_at,
+        updated_at=deal.updated_at,
+    )
+
+
+def _delete_image_file(image_url: str) -> None:
+    relative = image_url.removeprefix("/uploads/")
+    target = Path(__file__).resolve().parents[2] / "uploads" / relative
+    if target.exists():
+        target.unlink()
 
 
 @router.get("", response_model=List[DealRead])
@@ -110,11 +196,15 @@ def list_deals(
             | (Deal.client_phase.ilike(like))
             | (Deal.asset_type.ilike(like))
             | (Deal.stage.ilike(like))
+            | (Deal.status.ilike(like))
             | (Deal.risk_flags.ilike(like))
             | (Deal.notes.ilike(like))
+            | (Deal.closed_by_user_name.ilike(like))
         )
     stmt = stmt.order_by(col(Deal.updated_at).desc())
-    return session.exec(stmt).all()
+    deals = session.exec(stmt).all()
+    primary_map = _primary_images_map(session, [deal.id for deal in deals])
+    return [_deal_read(deal, primary_map.get(deal.id)) for deal in deals]
 
 
 @router.get("/stages/summary", response_model=List[StageSummary])
@@ -133,6 +223,22 @@ def stage_summary(
         ).one()
         out.append(StageSummary(stage=st, count=count))
     return out
+
+
+@router.get("/closure-feed", response_model=List[DealClosureEventRead])
+def closure_feed(
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Return the latest 50 deal closures visible to the current enterprise scope."""
+
+    scope_owner_id = _scope_owner_id(user)
+    return session.exec(
+        select(DealClosureEvent)
+        .where(DealClosureEvent.enterprise_owner_id == scope_owner_id)
+        .order_by(col(DealClosureEvent.closed_at).desc())
+        .limit(50)
+    ).all()
 
 
 @router.get("/intelligence/priority", response_model=DealPriorityDashboardRead)
@@ -248,6 +354,10 @@ def create_deal(
         if not contact or not user_can_access_record(contact, user):
             raise HTTPException(status_code=404, detail="Contact not found")
     deal = Deal(**payload.model_dump())
+    if deal.stage == "closed":
+        deal.status = "closed"
+    elif deal.stage == "lost":
+        deal.status = "lost"
     assign_enterprise_fields(deal, user)
     session.add(deal)
     log_audit_event(
@@ -260,7 +370,7 @@ def create_deal(
     )
     session.commit()
     session.refresh(deal)
-    return deal
+    return _deal_read(deal, None)
 
 
 @router.patch("/bulk-stage")
@@ -291,6 +401,7 @@ def bulk_stage(
                 )
             )
             d.stage = payload.stage
+            d.status = "closed" if payload.stage == "closed" else "lost" if payload.stage == "lost" else "open"
             d.updated_at = now
             session.add(d)
             log_audit_event(
@@ -306,6 +417,67 @@ def bulk_stage(
     return {"updated": updated}
 
 
+@router.patch("/{deal_id}/close", response_model=DealRead)
+def close_deal(
+    deal_id: UUID,
+    payload: DealCloseRequest,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Mark a deal as closed and record an enterprise-wide closure feed entry."""
+
+    deal = session.get(Deal, deal_id)
+    if not deal or not user_can_access_record(deal, user):
+        raise HTTPException(status_code=404, detail="Deal not found")
+
+    now = datetime.utcnow()
+    old_stage = deal.stage
+    if deal.stage != "closed":
+        session.add(
+            DealStageEvent(
+                owner_id=deal.owner_id,
+                enterprise_owner_id=getattr(deal, "enterprise_owner_id", None),
+                created_by_user_id=user.id,
+                deal_id=deal.id,
+                from_stage=deal.stage,
+                to_stage="closed",
+                created_at=now,
+            )
+        )
+
+    display_name = _closing_display_name(session, user)
+    deal.stage = "closed"
+    deal.status = "closed"
+    deal.closed_by_user_id = user.id
+    deal.closed_by_user_name = display_name
+    deal.closed_at = now
+    deal.closure_note = payload.closure_note or ""
+    deal.updated_at = now
+    session.add(deal)
+
+    session.add(
+        DealClosureEvent(
+            deal_id=deal.id,
+            deal_title=deal.title,
+            property_name=_property_name(deal),
+            closed_by_name=display_name,
+            closed_at=now,
+            enterprise_owner_id=_scope_owner_id(user),
+        )
+    )
+    log_audit_event(
+        session,
+        actor=user,
+        kind="deal.close",
+        summary=f"Closed deal {deal.title}",
+        detail=f"stage={old_stage}->closed",
+        enterprise_owner_id=getattr(deal, "enterprise_owner_id", None),
+    )
+    session.commit()
+    session.refresh(deal)
+    return _deal_read(deal, _primary_images_map(session, [deal.id]).get(deal.id))
+
+
 @router.get("/{deal_id}", response_model=DealRead)
 def get_deal(
     deal_id: UUID,
@@ -315,7 +487,119 @@ def get_deal(
     deal = session.get(Deal, deal_id)
     if not deal or not user_can_access_record(deal, user):
         raise HTTPException(status_code=404, detail="Deal not found")
-    return deal
+    return _deal_read(deal, _primary_images_map(session, [deal.id]).get(deal.id))
+
+
+@router.post("/{deal_id}/images/", response_model=List[DealImageRead])
+async def upload_deal_images(
+    deal_id: UUID,
+    files: List[UploadFile] = File(...),
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Upload one or more property images for a deal."""
+
+    deal = session.get(Deal, deal_id)
+    if not deal or not user_can_access_record(deal, user):
+        raise HTTPException(status_code=404, detail="Deal not found")
+
+    existing_images = session.exec(select(DealImage).where(DealImage.deal_id == deal_id)).all()
+    if len(existing_images) + len(files) > MAX_IMAGE_COUNT:
+        raise HTTPException(status_code=400, detail="Max 10 images per deal")
+
+    deal_dir = UPLOAD_ROOT / str(deal_id)
+    deal_dir.mkdir(parents=True, exist_ok=True)
+
+    created: list[DealImage] = []
+    has_primary = any(image.is_primary for image in existing_images)
+    for index, upload in enumerate(files):
+        if (upload.content_type or "") not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+        content = await upload.read()
+        if len(content) > MAX_IMAGE_SIZE:
+            raise HTTPException(status_code=413, detail="File too large")
+
+        suffix = Path(upload.filename or "image").suffix or ".bin"
+        safe_name = f"{uuid4().hex}{suffix}"
+        destination = deal_dir / safe_name
+        destination.write_bytes(content)
+
+        image = DealImage(
+            deal_id=deal_id,
+            image_url=f"/uploads/deal_images/{deal_id}/{safe_name}",
+            filename=upload.filename or safe_name,
+            uploaded_by_user_id=user.id,
+            is_primary=not has_primary and index == 0,
+        )
+        created.append(image)
+        session.add(image)
+
+    session.commit()
+    for image in created:
+        session.refresh(image)
+    return created
+
+
+@router.get("/{deal_id}/images/", response_model=List[DealImageRead])
+def list_deal_images(
+    deal_id: UUID,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Return all images for a deal in upload order."""
+
+    deal = session.get(Deal, deal_id)
+    if not deal or not user_can_access_record(deal, user):
+        raise HTTPException(status_code=404, detail="Deal not found")
+    return session.exec(select(DealImage).where(DealImage.deal_id == deal_id).order_by(col(DealImage.uploaded_at))).all()
+
+
+@router.delete("/{deal_id}/images/{image_id}")
+def delete_deal_image(
+    deal_id: UUID,
+    image_id: UUID,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Delete a property image and keep the remaining set consistent."""
+
+    deal = session.get(Deal, deal_id)
+    image = session.get(DealImage, image_id)
+    if not deal or not image or not user_can_access_record(deal, user) or image.deal_id != deal_id:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    _delete_image_file(image.image_url)
+    session.delete(image)
+    session.commit()
+
+    remaining = session.exec(select(DealImage).where(DealImage.deal_id == deal_id).order_by(col(DealImage.uploaded_at))).all()
+    if remaining and not any(item.is_primary for item in remaining):
+        remaining[0].is_primary = True
+        session.add(remaining[0])
+        session.commit()
+    return {"deleted": True}
+
+
+@router.patch("/{deal_id}/images/{image_id}/set-primary", response_model=List[DealImageRead])
+def set_primary_deal_image(
+    deal_id: UUID,
+    image_id: UUID,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Set one deal image as primary for cards and detail views."""
+
+    deal = session.get(Deal, deal_id)
+    image = session.get(DealImage, image_id)
+    if not deal or not image or not user_can_access_record(deal, user) or image.deal_id != deal_id:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    rows = session.exec(select(DealImage).where(DealImage.deal_id == deal_id)).all()
+    for row in rows:
+        row.is_primary = row.id == image_id
+        session.add(row)
+    session.commit()
+    return session.exec(select(DealImage).where(DealImage.deal_id == deal_id).order_by(col(DealImage.uploaded_at))).all()
 
 
 @router.patch("/{deal_id}", response_model=DealRead)
@@ -351,6 +635,8 @@ def update_deal(
 
     for key, value in data.items():
         setattr(deal, key, value)
+    if "stage" in data and data["stage"] is not None:
+        deal.status = "closed" if deal.stage == "closed" else "lost" if deal.stage == "lost" else "open"
     deal.updated_at = now
 
     session.add(deal)
@@ -364,7 +650,7 @@ def update_deal(
     )
     session.commit()
     session.refresh(deal)
-    return deal
+    return _deal_read(deal, _primary_images_map(session, [deal.id]).get(deal.id))
 
 
 @router.delete("/{deal_id}")
@@ -385,6 +671,10 @@ def delete_deal(
     )
     session.exec(delete(Activity).where(Activity.deal_id == deal.id))
     session.exec(delete(DealStageEvent).where(DealStageEvent.deal_id == deal.id))
+    session.exec(delete(DealClosureEvent).where(DealClosureEvent.deal_id == deal.id))
+    for image in session.exec(select(DealImage).where(DealImage.deal_id == deal.id)).all():
+        _delete_image_file(image.image_url)
+        session.delete(image)
     session.delete(deal)
     session.commit()
     return {"deleted": True}

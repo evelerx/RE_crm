@@ -23,6 +23,7 @@ from .routes import (
     next_actions,
     profile,
     public,
+    whatsapp,
 )
 from .settings import settings
 
@@ -52,6 +53,8 @@ def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
 
 
 app = FastAPI(title=settings.app_name)
+uploads_dir = Path(__file__).resolve().parents[1] / "uploads"
+uploads_dir.mkdir(parents=True, exist_ok=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -97,6 +100,8 @@ app.include_router(next_actions.router, dependencies=deps)
 app.include_router(csvio.router, dependencies=deps)
 app.include_router(insights.router, dependencies=deps)
 app.include_router(enterprise.router, dependencies=deps)
+app.include_router(whatsapp.router, dependencies=deps)
+app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 
 # Optional: serve built frontend (no separate web server needed).

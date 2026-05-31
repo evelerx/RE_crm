@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     formspree_endpoint: str = ""
     formspree_bearer_token: str = ""
     builder_sites_base_url: str = "https://northstonecrm.com/builders"
+    whatsapp_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    whatsapp_verify_token: str = ""
     login_max_attempts: int = 5
     login_lockout_minutes: int = 15
     jwt_exp_days: int = 30

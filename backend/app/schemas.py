@@ -603,9 +603,43 @@ class DealRead(BaseModel):
     risk_flags: str
     contact_id: Optional[UUID] = None
     notes: str
+    status: str = "open"
+    closed_by_user_name: str = ""
+    closed_at: Optional[datetime] = None
+    closure_note: str = ""
+    primary_image_url: Optional[str] = None
     last_activity_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+
+
+class DealCloseRequest(BaseModel):
+    closure_note: str = Field(default="", max_length=4000)
+
+
+class DealClosureEventRead(BaseModel):
+    id: UUID
+    deal_id: UUID
+    deal_title: str
+    property_name: str = ""
+    closed_by_name: str
+    closed_at: datetime
+
+
+class DealImageRead(BaseModel):
+    id: UUID
+    deal_id: UUID
+    image_url: str
+    filename: str
+    uploaded_at: datetime
+    is_primary: bool
+
+
+class WhatsAppMediaSendResponse(BaseModel):
+    ok: bool
+    contact_id: UUID
+    status: str
+    wa_message_id: str = ""
 
 
 class ActivityCreate(BaseModel):

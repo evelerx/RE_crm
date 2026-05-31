@@ -1,7 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ApiError, api } from "../api/client";
-import type { Activity, Contact, Deal } from "../api/types";
+import {
+  API_BASE_URL,
+  ApiError,
+  api,
+  closeDeal,
+  deleteDealImage,
+  listDealImages,
+  sendWhatsAppMedia,
+  setPrimaryDealImage,
+  uploadDealImages,
+} from "../api/client";
+import type { Activity, Contact, Deal, DealImage } from "../api/types";
 
 type DealScoreResponse = { deal_id: string; close_probability: number; risk_flags: string[]; rationale: string[] };
 type FollowupResponse = { deal_id: string; message: string };
@@ -34,6 +44,24 @@ function formatDate(value: string | null | undefined) {
   return date.toLocaleDateString();
 }
 
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
+function relativeTime(value: string | null | undefined) {
+  if (!value) return "";
+  const diff = Date.now() - new Date(value).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export default function DealDetailPage() {
   const { dealId } = useParams();
   const navigate = useNavigate();
@@ -44,14 +72,26 @@ export default function DealDetailPage() {
   const [followupDraft, setFollowupDraft] = useState("");
   const [score, setScore] = useState<DealScoreResponse | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [dealImages, setDealImages] = useState<DealImage[]>([]);
   const [whatsAppContactId, setWhatsAppContactId] = useState("");
   const [editing, setEditing] = useState(false);
   const [notesBusy, setNotesBusy] = useState(false);
   const [followupBusy, setFollowupBusy] = useState(false);
+  const [whatsAppSending, setWhatsAppSending] = useState(false);
   const [activityBusy, setActivityBusy] = useState(false);
   const [reminderBusy, setReminderBusy] = useState(false);
   const [scoreBusy, setScoreBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [closeBusy, setCloseBusy] = useState(false);
+  const [closureNote, setClosureNote] = useState("");
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string>("");
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [editPayload, setEditPayload] = useState({
     contact_id: "",
     visit_date: "",
@@ -69,13 +109,16 @@ export default function DealDetailPage() {
     if (!dealId) return;
     setError(null);
     try {
-      const [d, contactRows, a] = await Promise.all([
+      const [d, contactRows, a, imageRows] = await Promise.all([
         api<Deal>(`/deals/${dealId}`),
         api<Contact[]>("/contacts"),
-        api<Activity[]>(`/activities?deal_id=${encodeURIComponent(dealId)}`)
+        api<Activity[]>(`/activities?deal_id=${encodeURIComponent(dealId)}`),
+        listDealImages(dealId),
       ]);
       setDeal(d);
       setNoteDraft(d.notes ?? "");
+      setClosureNote(d.closure_note ?? "");
+      setDealImages(imageRows);
       setEditPayload({
         contact_id: d.contact_id ?? "",
         visit_date: d.visit_date ?? "",
@@ -95,6 +138,7 @@ export default function DealDetailPage() {
         "";
       setWhatsAppContactId(preferredContactId);
       setActivities(a);
+      setSuccessMessage(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deal");
     }
@@ -179,6 +223,117 @@ export default function DealDetailPage() {
     setActivities((prev) => prev.map((x) => (x.id === a.id ? updated : x)));
   }
 
+  useEffect(() => {
+    if (!attachmentFile || !attachmentFile.type.startsWith("image/")) {
+      setAttachmentPreviewUrl("");
+      return;
+    }
+    const url = URL.createObjectURL(attachmentFile);
+    setAttachmentPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [attachmentFile]);
+
+  async function closeCurrentDeal() {
+    if (!deal) return;
+    setCloseBusy(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const updated = await closeDeal(deal.id, closureNote);
+      setDeal(updated);
+      setSuccessMessage("Deal closed by you");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not close deal");
+    } finally {
+      setCloseBusy(false);
+    }
+  }
+
+  async function sendWhatsAppFollowup() {
+    if (!followupDraft.trim()) return;
+    setError(null);
+    setAttachmentError(null);
+    setSuccessMessage(null);
+
+    if (!attachmentFile) {
+      try {
+        openWhatsApp(followupDraft.trim(), whatsAppPhone);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "WhatsApp send failed");
+      }
+      return;
+    }
+
+    if (!whatsAppContactId) {
+      setAttachmentError("Choose a contact before sending an attachment.");
+      return;
+    }
+
+    setWhatsAppSending(true);
+    try {
+      await sendWhatsAppMedia(whatsAppContactId, followupDraft.trim(), attachmentFile);
+      setFollowupDraft("");
+      setAttachmentFile(null);
+      setAttachmentPreviewUrl("");
+      setSuccessMessage("Sent");
+      await addActivity({ kind: "whatsapp", summary: `WhatsApp media follow-up sent${attachmentFile.name ? `: ${attachmentFile.name}` : ""}` });
+    } catch (e) {
+      setAttachmentError(e instanceof Error ? e.message : "WhatsApp media send failed");
+    } finally {
+      setWhatsAppSending(false);
+    }
+  }
+
+  async function uploadPropertyImages(files: FileList | null) {
+    if (!deal || !files || files.length === 0) return;
+    const allFiles = Array.from(files);
+    const oversized = allFiles.find((file) => file.size > 5 * 1024 * 1024);
+    if (oversized) {
+      setImageError("Each image must be 5MB or smaller.");
+      return;
+    }
+    setImageBusy(true);
+    setImageError(null);
+    try {
+      const images = await uploadDealImages(deal.id, allFiles);
+      setDealImages((prev) => [...prev, ...images]);
+      const refreshed = await api<Deal>(`/deals/${deal.id}`);
+      setDeal(refreshed);
+    } catch (e) {
+      setImageError(e instanceof Error ? e.message : "Image upload failed");
+    } finally {
+      setImageBusy(false);
+      if (imageInputRef.current) imageInputRef.current.value = "";
+    }
+  }
+
+  async function removeDealImage(imageId: string) {
+    if (!deal) return;
+    setImageError(null);
+    try {
+      await deleteDealImage(deal.id, imageId);
+      const images = await listDealImages(deal.id);
+      setDealImages(images);
+      const refreshed = await api<Deal>(`/deals/${deal.id}`);
+      setDeal(refreshed);
+    } catch (e) {
+      setImageError(e instanceof Error ? e.message : "Could not delete image");
+    }
+  }
+
+  async function makePrimaryImage(imageId: string) {
+    if (!deal) return;
+    setImageError(null);
+    try {
+      const images = await setPrimaryDealImage(deal.id, imageId);
+      setDealImages(images);
+      const refreshed = await api<Deal>(`/deals/${deal.id}`);
+      setDeal(refreshed);
+    } catch (e) {
+      setImageError(e instanceof Error ? e.message : "Could not set primary image");
+    }
+  }
+
   async function saveDealSnapshot() {
     if (!dealId) return;
     const payload: Record<string, unknown> = {
@@ -221,6 +376,31 @@ export default function DealDetailPage() {
 
   return (
     <div className="page">
+      <input
+        ref={imageInputRef}
+        type="file"
+        hidden
+        multiple
+        accept="image/*"
+        onChange={(e) => void uploadPropertyImages(e.target.files)}
+      />
+      <input
+        ref={attachmentInputRef}
+        type="file"
+        hidden
+        accept="image/*,video/mp4,application/pdf,audio/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0] || null;
+          if (!file) return;
+          if (file.size > 16 * 1024 * 1024) {
+            setAttachmentError("File too large (max 16MB)");
+            e.target.value = "";
+            return;
+          }
+          setAttachmentError(null);
+          setAttachmentFile(file);
+        }}
+      />
       <div className="pageHeader">
         <div>
           <div className="h1">{deal?.title ?? "Deal"}</div>
@@ -236,6 +416,7 @@ export default function DealDetailPage() {
         </button>
       </div>
       {error ? <div className="alert">{error}</div> : null}
+      {successMessage ? <div className="alert ok">{successMessage}</div> : null}
 
       {deal ? (
         <div className="detailGrid">
@@ -395,6 +576,71 @@ export default function DealDetailPage() {
           </section>
 
           <section className="card">
+            <div className="cardTitle">Closure</div>
+            {deal.status === "closed" ? (
+              <div className="list">
+                <div className="listItem">
+                  <div className="muted">Status</div>
+                  <div>Closed</div>
+                </div>
+                <div className="listItem">
+                  <div className="muted">Closed by</div>
+                  <div>{deal.closed_by_user_name || "Unknown"}</div>
+                </div>
+                <div className="listItem">
+                  <div className="muted">Closed at</div>
+                  <div>{relativeTime(deal.closed_at)}</div>
+                </div>
+                {deal.closure_note ? (
+                  <div className="listItem">
+                    <div className="muted">Note</div>
+                    <div>{deal.closure_note}</div>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="form">
+                <label>
+                  Add a closure note (optional)
+                  <textarea className="textarea" value={closureNote} onChange={(e) => setClosureNote(e.target.value)} />
+                </label>
+                <div className="row right">
+                  <button className="btn" disabled={closeBusy} onClick={() => void closeCurrentDeal()} type="button">
+                    {closeBusy ? "Closing..." : "Mark as Closed"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="card">
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+              <div className="cardTitle">Images</div>
+              <button className="btn ghost" onClick={() => imageInputRef.current?.click()} disabled={imageBusy} type="button">
+                {imageBusy ? "Uploading..." : "Add images"}
+              </button>
+            </div>
+            {imageError ? <div className="alert">{imageError}</div> : null}
+            <div className="thumbnailStrip">
+              {dealImages.map((image) => (
+                <div key={image.id} className="thumbnailCard">
+                  <img
+                    src={`${API_BASE_URL}${image.image_url}`}
+                    alt={image.filename}
+                    className="thumbnailImage"
+                    onClick={() => void makePrimaryImage(image.id)}
+                  />
+                  {image.is_primary ? <span className="primaryBadge">Primary</span> : null}
+                  <button className="trashButton" onClick={() => void removeDealImage(image.id)} type="button">
+                    Delete
+                  </button>
+                </div>
+              ))}
+              {dealImages.length === 0 ? <div className="muted">No property images yet.</div> : null}
+            </div>
+          </section>
+
+          <section className="card">
             <div className="cardTitle">AI Follow-up</div>
             <div className="muted">Generate a client-ready follow-up, send it to WhatsApp, or log it back into activity history.</div>
             <label>
@@ -409,6 +655,38 @@ export default function DealDetailPage() {
               </select>
             </label>
             <textarea className="textarea" value={followupDraft} onChange={(e) => setFollowupDraft(e.target.value)} placeholder="Generate a follow-up message to begin." />
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+              <button className="btn ghost" onClick={() => attachmentInputRef.current?.click()} type="button">
+                Attach file
+              </button>
+              {attachmentFile ? <div className="muted small">Attachment ready</div> : null}
+            </div>
+            {attachmentFile ? (
+              <div className="attachmentPreview">
+                {attachmentPreviewUrl ? (
+                  <img src={attachmentPreviewUrl} alt={attachmentFile.name} className="attachmentThumb" />
+                ) : (
+                  <div className="attachmentFileIcon">FILE</div>
+                )}
+                <div className="attachmentMeta">
+                  <div>{attachmentFile.name}</div>
+                  <div className="muted small">{formatFileSize(attachmentFile.size)}</div>
+                </div>
+                <button
+                  className="btn ghost compact"
+                  onClick={() => {
+                    setAttachmentFile(null);
+                    setAttachmentPreviewUrl("");
+                    setAttachmentError(null);
+                    if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+                  }}
+                  type="button"
+                >
+                  X
+                </button>
+              </div>
+            ) : null}
+            {attachmentError ? <div className="muted small">{attachmentError}</div> : null}
             <div className="row">
               <button
                 className="btn"
@@ -449,16 +727,10 @@ export default function DealDetailPage() {
               <button
                 className="btn ghost"
                 type="button"
-                disabled={!followupDraft.trim() || !canSendWhatsApp}
-                onClick={() => {
-                  try {
-                    openWhatsApp(followupDraft.trim(), whatsAppPhone);
-                  } catch (e) {
-                    setError(e instanceof Error ? e.message : "WhatsApp send failed");
-                  }
-                }}
+                disabled={!followupDraft.trim() || !canSendWhatsApp || whatsAppSending}
+                onClick={() => void sendWhatsAppFollowup()}
               >
-                Send on WhatsApp
+                {whatsAppSending ? "Sending..." : "Send on WhatsApp"}
               </button>
               <button
                 className="btn ghost"
