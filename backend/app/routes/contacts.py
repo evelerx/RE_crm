@@ -5,7 +5,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, col, select
 
-from ..automation_engine import run_automations
 from ..auth import get_current_user
 from ..db import get_session
 from ..enterprise_scope import assign_enterprise_fields, user_can_access_record, user_read_filter
@@ -30,7 +29,7 @@ def list_contacts(
 
 
 @router.post("", response_model=ContactRead)
-async def create_contact(
+def create_contact(
     payload: ContactCreate,
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
@@ -40,21 +39,6 @@ async def create_contact(
     session.add(contact)
     session.commit()
     session.refresh(contact)
-    await run_automations(
-        session,
-        owner_id=contact.enterprise_owner_id or contact.owner_id,
-        trigger_event="contact_created",
-        payload={
-            "owner_id": str(contact.owner_id),
-            "enterprise_owner_id": str(contact.enterprise_owner_id) if contact.enterprise_owner_id else "",
-            "contact_id": str(contact.id),
-            "contact_name": contact.name,
-            "contact_email": contact.email or "",
-            "contact_phone": contact.phone or "",
-            "source": contact.lead_source,
-        },
-        trigger_key=f"contact_created:{contact.id}",
-    )
     return contact
 
 

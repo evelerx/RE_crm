@@ -357,42 +357,6 @@ class InventoryUnit(SQLModel, table=True):
     booked_at: Optional[datetime] = None
 
 
-class AutomationRule(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    owner_id: UUID = Field(foreign_key="user.id", index=True)
-    name: str = ""
-    trigger_event: str = Field(index=True)
-    trigger_filters: str = "{}"
-    actions_config: str = "[]"
-    is_active: bool = Field(default=True, index=True)
-    run_count: int = 0
-    last_run_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-
-
-class AutomationLog(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    rule_id: UUID = Field(foreign_key="automationrule.id", index=True)
-    owner_id: UUID = Field(foreign_key="user.id", index=True)
-    trigger_event: str = Field(index=True)
-    trigger_key: str = Field(default="", index=True)
-    actions_executed: str = "[]"
-    status: str = Field(default="success", index=True)
-    error_message: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-
-
-class PushSubscription(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    user_id: UUID = Field(foreign_key="user.id", index=True)
-    owner_id: UUID = Field(foreign_key="user.id", index=True)
-    fcm_token: str = Field(index=True, unique=True)
-    device_type: str = Field(default="web", index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-
-
 class WebhookEndpoint(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     owner_id: UUID = Field(foreign_key="user.id", index=True)

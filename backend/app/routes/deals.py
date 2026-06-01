@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func
 from sqlmodel import Session, col, delete, select
 
-from ..automation_engine import run_automations
 from ..audit import log_audit_event
 from ..auth import get_current_user
 from ..db import get_session
@@ -345,7 +344,7 @@ def deal_priority_dashboard(
 
 
 @router.post("", response_model=DealRead)
-async def create_deal(
+def create_deal(
     payload: DealCreate,
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
@@ -371,30 +370,11 @@ async def create_deal(
     )
     session.commit()
     session.refresh(deal)
-    await run_automations(
-        session,
-        owner_id=deal.enterprise_owner_id or deal.owner_id,
-        trigger_event="deal_created",
-        payload={
-            "owner_id": str(deal.owner_id),
-            "enterprise_owner_id": str(deal.enterprise_owner_id) if deal.enterprise_owner_id else "",
-            "deal_id": str(deal.id),
-            "deal_title": deal.title,
-            "contact_id": str(deal.contact_id) if deal.contact_id else "",
-            "source": deal.lead_source,
-            "stage": deal.stage,
-            "probability": deal.close_probability or 0,
-            "score": deal.close_probability or 0,
-            "assigned_user_id": str(deal.created_by_user_id) if deal.created_by_user_id else "",
-            "contact_email": "",
-        },
-        trigger_key=f"deal_created:{deal.id}",
-    )
     return _deal_read(deal, None)
 
 
 @router.patch("/bulk-stage")
-async def bulk_stage(
+def bulk_stage(
     payload: BulkStageUpdateRequest,
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
@@ -432,26 +412,6 @@ async def bulk_stage(
                 enterprise_owner_id=getattr(d, "enterprise_owner_id", None),
             )
             updated += 1
-            await run_automations(
-                session,
-                owner_id=d.enterprise_owner_id or d.owner_id,
-                trigger_event="deal_stage_changed",
-                payload={
-                    "owner_id": str(d.owner_id),
-                    "enterprise_owner_id": str(d.enterprise_owner_id) if d.enterprise_owner_id else "",
-                    "deal_id": str(d.id),
-                    "deal_title": d.title,
-                    "contact_id": str(d.contact_id) if d.contact_id else "",
-                    "source": d.lead_source,
-                    "from_stage": previous_stage,
-                    "to_stage": payload.stage,
-                    "stage": payload.stage,
-                    "probability": d.close_probability or 0,
-                    "score": d.close_probability or 0,
-                    "assigned_user_id": str(d.created_by_user_id) if d.created_by_user_id else "",
-                },
-                trigger_key=f"deal_stage_changed:{d.id}:{payload.stage}",
-            )
 
     session.commit()
     return {"updated": updated}
@@ -643,7 +603,7 @@ def set_primary_deal_image(
 
 
 @router.patch("/{deal_id}", response_model=DealRead)
-async def update_deal(
+def update_deal(
     deal_id: UUID,
     payload: DealUpdate,
     session: Session = Depends(get_session),
@@ -690,46 +650,6 @@ async def update_deal(
     )
     session.commit()
     session.refresh(deal)
-    if "stage" in data and data["stage"] is not None and old_stage != deal.stage:
-        await run_automations(
-            session,
-            owner_id=deal.enterprise_owner_id or deal.owner_id,
-            trigger_event="deal_stage_changed",
-            payload={
-                "owner_id": str(deal.owner_id),
-                "enterprise_owner_id": str(deal.enterprise_owner_id) if deal.enterprise_owner_id else "",
-                "deal_id": str(deal.id),
-                "deal_title": deal.title,
-                "contact_id": str(deal.contact_id) if deal.contact_id else "",
-                "source": deal.lead_source,
-                "from_stage": old_stage,
-                "to_stage": deal.stage,
-                "stage": deal.stage,
-                "probability": deal.close_probability or 0,
-                "score": deal.close_probability or 0,
-                "assigned_user_id": str(deal.created_by_user_id) if deal.created_by_user_id else "",
-            },
-            trigger_key=f"deal_stage_changed:{deal.id}:{deal.stage}",
-        )
-    if (deal.close_probability or 0) <= 40:
-        await run_automations(
-            session,
-            owner_id=deal.enterprise_owner_id or deal.owner_id,
-            trigger_event="deal_score_low",
-            payload={
-                "owner_id": str(deal.owner_id),
-                "enterprise_owner_id": str(deal.enterprise_owner_id) if deal.enterprise_owner_id else "",
-                "deal_id": str(deal.id),
-                "deal_title": deal.title,
-                "contact_id": str(deal.contact_id) if deal.contact_id else "",
-                "source": deal.lead_source,
-                "stage": deal.stage,
-                "probability": deal.close_probability or 0,
-                "score": deal.close_probability or 0,
-                "assigned_user_id": str(deal.created_by_user_id) if deal.created_by_user_id else "",
-            },
-            trigger_key=f"deal_score_low:{deal.id}:{deal.close_probability or 0}",
-        )
     return _deal_read(deal, _primary_images_map(session, [deal.id]).get(deal.id))
 
 

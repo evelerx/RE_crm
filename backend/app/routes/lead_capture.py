@@ -10,13 +10,11 @@ import httpx
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 from sqlmodel import Session, col, select
 
-from ..automation_engine import run_automations
 from ..audit import log_audit_event
 from ..auth import get_current_user, is_admin_email
 from ..db import get_session
 from ..enterprise_scope import assign_enterprise_fields, get_enterprise_owner_id, is_enterprise_owner, org_owner_filter
 from ..models import Activity, Contact, Deal, IntegrationMapping, User
-from ..push_service import notify_owner_scope
 from ..schemas import (
     IntegrationMappingRead,
     IntegrationMappingUpsertRequest,
@@ -359,34 +357,6 @@ async def ingest_facebook_lead(
                     enterprise_owner_id=get_enterprise_owner_id(owner),
                 )
                 session.commit()
-                await run_automations(
-                    session,
-                    owner_id=get_enterprise_owner_id(owner) or owner.id,
-                    trigger_event="deal_created",
-                    payload={
-                        "owner_id": str(deal.owner_id),
-                        "enterprise_owner_id": str(deal.enterprise_owner_id) if deal.enterprise_owner_id else "",
-                        "deal_id": str(deal.id),
-                        "deal_title": deal.title,
-                        "contact_id": str(contact.id),
-                        "contact_name": contact.name,
-                        "contact_email": contact.email or "",
-                        "contact_phone": contact.phone or "",
-                        "source": deal.lead_source,
-                        "stage": deal.stage,
-                        "probability": deal.close_probability or 0,
-                        "score": deal.close_probability or 0,
-                        "assigned_user_id": str(deal.created_by_user_id) if deal.created_by_user_id else "",
-                    },
-                    trigger_key=f"lead_capture_facebook:{deal.id}",
-                )
-                await notify_owner_scope(
-                    session,
-                    get_enterprise_owner_id(owner) or owner.id,
-                    "New Facebook lead",
-                    f"{name} was captured from Facebook Ads.",
-                    {"deal_id": str(deal.id), "contact_id": str(contact.id), "type": "facebook_lead"},
-                )
             except Exception:
                 session.rollback()
                 continue
@@ -484,34 +454,6 @@ async def ingest_google_lead(
         enterprise_owner_id=get_enterprise_owner_id(owner),
     )
     session.commit()
-    await run_automations(
-        session,
-        owner_id=get_enterprise_owner_id(owner) or owner.id,
-        trigger_event="deal_created",
-        payload={
-            "owner_id": str(deal.owner_id),
-            "enterprise_owner_id": str(deal.enterprise_owner_id) if deal.enterprise_owner_id else "",
-            "deal_id": str(deal.id),
-            "deal_title": deal.title,
-            "contact_id": str(contact.id),
-            "contact_name": contact.name,
-            "contact_email": contact.email or "",
-            "contact_phone": contact.phone or "",
-            "source": deal.lead_source,
-            "stage": deal.stage,
-            "probability": deal.close_probability or 0,
-            "score": deal.close_probability or 0,
-            "assigned_user_id": str(deal.created_by_user_id) if deal.created_by_user_id else "",
-        },
-        trigger_key=f"lead_capture_google:{deal.id}",
-    )
-    await notify_owner_scope(
-        session,
-        get_enterprise_owner_id(owner) or owner.id,
-        "New Google lead",
-        f"{name} was captured from Google Ads.",
-        {"deal_id": str(deal.id), "contact_id": str(contact.id), "type": "google_lead"},
-    )
     return {"received": True, "processed": True, "deal_id": str(deal.id)}
 
 

@@ -14,7 +14,6 @@ from ..auth import get_current_user
 from ..db import get_session
 from ..enterprise_scope import assign_enterprise_fields, user_can_access_record
 from ..models import Activity, Contact, Deal, User, WhatsAppMessage
-from ..push_service import notify_owner_scope
 from ..schemas import (
     WhatsAppConversationSummaryRead,
     WhatsAppMediaSendResponse,
@@ -235,13 +234,6 @@ async def receive_webhook(request: Request, session: Session = Depends(get_sessi
                     sender_name = names_by_wa_id.get(sender_phone) or contact.name or "Contact"
                     _add_activity(session, contact, deal, f"WhatsApp from {sender_name}: {message_body}", timestamp, "whatsapp_inbound")
                     _touch_deal_activity(session, deal, timestamp)
-                    await notify_owner_scope(
-                        session,
-                        contact.enterprise_owner_id or contact.owner_id,
-                        "New WhatsApp message",
-                        f"{sender_name}: {message_body[:120]}",
-                        {"contact_id": str(contact.id), "deal_id": str(deal.id) if deal else "", "type": "whatsapp_inbound"},
-                    )
 
         session.commit()
     except Exception:  # noqa: BLE001

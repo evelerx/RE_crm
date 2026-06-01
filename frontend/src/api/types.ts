@@ -164,53 +164,6 @@ export type WebhookLog = {
   created_at: string;
 };
 
-export type AutomationAction = {
-  type: "send_whatsapp" | "create_activity" | "assign_deal" | "send_email" | "update_deal_field" | "webhook_notify";
-  config: Record<string, string | number | boolean | null>;
-};
-
-export type AutomationRule = {
-  id: string;
-  owner_id: string;
-  name: string;
-  trigger_event: "contact_created" | "deal_created" | "deal_stage_changed" | "activity_overdue" | "deal_score_low";
-  trigger_filters: Record<string, string | number | boolean | null>;
-  actions: AutomationAction[];
-  is_active: boolean;
-  run_count: number;
-  last_run_at: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type AutomationLog = {
-  id: string;
-  rule_id: string;
-  owner_id: string;
-  trigger_event: string;
-  trigger_key: string;
-  actions_executed: string[];
-  status: "success" | "failed";
-  error_message: string;
-  created_at: string;
-};
-
-export type PushSubscription = {
-  id: string;
-  user_id: string;
-  owner_id: string;
-  fcm_token: string;
-  device_type: string;
-  created_at: string;
-  updated_at: string;
-};
-
-export type PushSendResponse = {
-  ok: boolean;
-  delivered: number;
-  failed: number;
-};
-
 export type GoogleCalendarSyncStatus = {
   connected: boolean;
   auth_url: string;
