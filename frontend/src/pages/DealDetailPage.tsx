@@ -109,9 +109,9 @@ export default function DealDetailPage() {
     if (!dealId) return;
     setError(null);
     try {
-      // Fetch deal, activities and images in parallel — contacts are loaded separately.
-      const [d, a, imageRows] = await Promise.all([
+      const [d, contactRows, a, imageRows] = await Promise.all([
         api<Deal>(`/deals/${dealId}`),
+        api<Contact[]>("/contacts"),
         api<Activity[]>(`/activities?deal_id=${encodeURIComponent(dealId)}`),
         listDealImages(dealId),
       ]);
@@ -131,20 +131,14 @@ export default function DealDetailPage() {
         liquidity_days_est: d.liquidity_days_est == null ? "" : String(d.liquidity_days_est),
         risk_flags: d.risk_flags ?? ""
       });
+      setContacts(contactRows);
+      const preferredContactId =
+        (d.contact_id && contactRows.some((contact) => contact.id === d.contact_id) ? d.contact_id : "") ||
+        contactRows.find((contact) => normalizeWhatsAppNumber(contact.phone))?.id ||
+        "";
+      setWhatsAppContactId(preferredContactId);
       setActivities(a);
       setSuccessMessage(null);
-
-      // Load contacts in the background — doesn't block page render.
-      api<Contact[]>("/contacts")
-        .then((all) => {
-          setContacts(all);
-          setWhatsAppContactId(
-            (d.contact_id && all.some((c) => c.id === d.contact_id) ? d.contact_id : "") ||
-              all.find((c) => normalizeWhatsAppNumber(c.phone))?.id ||
-              ""
-          );
-        })
-        .catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deal");
     }

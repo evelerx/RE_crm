@@ -7,7 +7,6 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
-from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select
 
@@ -427,8 +426,11 @@ def _demo_plan_from_user(user: User) -> str:
     return "solo"
 
 
-def _chat_row_payload(row: SupportChatMessage, email_by_id: dict) -> SupportChatMessageRead:
-    sender_email = email_by_id.get(row.sender_user_id, "") if row.sender_user_id else ""
+def _chat_row_payload(session: Session, row: SupportChatMessage) -> SupportChatMessageRead:
+    sender_email = ""
+    if row.sender_user_id:
+        sender = session.get(User, row.sender_user_id)
+        sender_email = sender.email if sender else ""
     return SupportChatMessageRead(
         id=row.id,
         enterprise_owner_id=row.enterprise_owner_id,
@@ -855,124 +857,10 @@ def enterprise_list(
     _: User = Depends(require_admin),
 ) -> list[dict]:
     owners = session.exec(select(User).where(User.plan.in_(["enterprise", "builder"])).order_by(User.created_at.desc())).all()
-    if not owners:
-        return []
-
-    owner_ids = [o.id for o in owners]
-
-    # Batch 1: all owner profiles
-    owner_profiles = session.exec(select(Profile).where(Profile.owner_id.in_(owner_ids))).all()
-    profile_by_owner = {p.owner_id: p for p in owner_profiles}
-
-    # Batch 2: all employees across all orgs
-    all_employees = session.exec(
-        select(User).where(User.enterprise_owner_id.in_(owner_ids)).order_by(User.created_at.desc())
-    ).all()
-    employees_by_owner: dict[UUID, list[User]] = {}
-    for emp in all_employees:
-        employees_by_owner.setdefault(emp.enterprise_owner_id, []).append(emp)
-
-    # Batch 3: all employee profiles
-    employee_ids = [e.id for e in all_employees]
-    emp_profiles = session.exec(select(Profile).where(Profile.owner_id.in_(employee_ids))).all() if employee_ids else []
-    emp_profile_by_owner = {p.owner_id: p for p in emp_profiles}
-
-    # Batch 4: org-level record counts via GROUP BY (3 queries total vs N×3)
-    deal_counts: dict[UUID, int] = {
-        row[0]: row[1]
-        for row in session.exec(
-            select(Deal.enterprise_owner_id, func.count(Deal.id))
-            .where(Deal.enterprise_owner_id.in_(owner_ids))
-            .group_by(Deal.enterprise_owner_id)
-        ).all()
-    }
-    contact_counts: dict[UUID, int] = {
-        row[0]: row[1]
-        for row in session.exec(
-            select(Contact.enterprise_owner_id, func.count(Contact.id))
-            .where(Contact.enterprise_owner_id.in_(owner_ids))
-            .group_by(Contact.enterprise_owner_id)
-        ).all()
-    }
-    activity_counts: dict[UUID, int] = {
-        row[0]: row[1]
-        for row in session.exec(
-            select(Activity.enterprise_owner_id, func.count(Activity.id))
-            .where(Activity.enterprise_owner_id.in_(owner_ids))
-            .group_by(Activity.enterprise_owner_id)
-        ).all()
-    }
-
-    # Batch 5: per-employee deal/contact/activity counts (3 queries vs N_employees×3)
-    emp_counts: dict[UUID, dict] = {
-        eid: {"deals": 0, "closed_deals": 0, "open_deals": 0, "lost_deals": 0, "contacts": 0, "activities": 0}
-        for eid in employee_ids
-    }
-    if employee_ids:
-        for eid, stage in session.exec(select(Deal.owner_id, Deal.stage).where(Deal.owner_id.in_(employee_ids))).all():
-            if eid in emp_counts:
-                emp_counts[eid]["deals"] += 1
-                if stage == "closed":
-                    emp_counts[eid]["closed_deals"] += 1
-                elif stage == "lost":
-                    emp_counts[eid]["lost_deals"] += 1
-                else:
-                    emp_counts[eid]["open_deals"] += 1
-        for eid in session.exec(select(Contact.owner_id).where(Contact.owner_id.in_(employee_ids))).all():
-            if eid in emp_counts:
-                emp_counts[eid]["contacts"] += 1
-        for eid in session.exec(select(Activity.owner_id).where(Activity.owner_id.in_(employee_ids))).all():
-            if eid in emp_counts:
-                emp_counts[eid]["activities"] += 1
-
     out: list[dict] = []
     for owner in owners:
-        op = profile_by_owner.get(owner.id)
-        employees = employees_by_owner.get(owner.id, [])
-        out.append({
-            "enterprise_owner_id": str(owner.id),
-            "owner_email": owner.email,
-            "owner_full_name": op.full_name if op else "",
-            "owner_phone": op.phone if op else "",
-            "owner_whatsapp": op.whatsapp if op else "",
-            "company": op.company if op else "",
-            "company_city": op.city if op else "",
-            "owner_areas_served": op.areas_served if op else "",
-            "owner_specialization": op.specialization if op else "",
-            "owner_has_rera_id": bool((op.rera_id if op else "") or ""),
-            "llm_provider": getattr(owner, "llm_provider", "") or "",
-            "llm_model": getattr(owner, "llm_model", "") or "",
-            "llm_allocated_at": getattr(owner, "llm_allocated_at", None),
-            "has_llm_api_key": bool((getattr(owner, "llm_api_key", "") or "").strip()),
-            "employee_limit": int(getattr(owner, "employee_limit", 0) or 0),
-            "employee_count": len(employees),
-            "counts": {
-                "deals": deal_counts.get(owner.id, 0),
-                "contacts": contact_counts.get(owner.id, 0),
-                "activities": activity_counts.get(owner.id, 0),
-            },
-            "employees": [
-                {
-                    "id": str(emp.id),
-                    "email": emp.email,
-                    "full_name": (emp_profile_by_owner.get(emp.id).full_name if emp_profile_by_owner.get(emp.id) else ""),
-                    "phone": (emp_profile_by_owner.get(emp.id).phone if emp_profile_by_owner.get(emp.id) else ""),
-                    "whatsapp": (emp_profile_by_owner.get(emp.id).whatsapp if emp_profile_by_owner.get(emp.id) else ""),
-                    "company": (emp_profile_by_owner.get(emp.id).company if emp_profile_by_owner.get(emp.id) else ""),
-                    "city": (emp_profile_by_owner.get(emp.id).city if emp_profile_by_owner.get(emp.id) else ""),
-                    "areas_served": (emp_profile_by_owner.get(emp.id).areas_served if emp_profile_by_owner.get(emp.id) else ""),
-                    "specialization": (emp_profile_by_owner.get(emp.id).specialization if emp_profile_by_owner.get(emp.id) else ""),
-                    "has_rera_id": bool(((emp_profile_by_owner.get(emp.id).rera_id if emp_profile_by_owner.get(emp.id) else "") or "").strip()),
-                    "role_label": getattr(emp, "enterprise_member_role", "") or "employee",
-                    "created_at": emp.created_at,
-                    "is_blacklisted": bool(getattr(emp, "is_blacklisted", False)),
-                    "blacklist_reason": getattr(emp, "blacklist_reason", "") or "",
-                    "blacklisted_at": getattr(emp, "blacklisted_at", None),
-                    "counts": emp_counts.get(emp.id, {"deals": 0, "closed_deals": 0, "open_deals": 0, "lost_deals": 0, "contacts": 0, "activities": 0}),
-                }
-                for emp in employees
-            ],
-        })
+        detail = _enterprise_detail_payload(session, owner)
+        out.append(detail)
     return out
 
 
@@ -1865,10 +1753,7 @@ def support_chat(
         .order_by(SupportChatMessage.created_at.asc())
         .limit(200)
     ).all()
-    sender_ids = list({r.sender_user_id for r in rows if r.sender_user_id})
-    users = session.exec(select(User).where(User.id.in_(sender_ids))).all() if sender_ids else []
-    email_by_id = {u.id: u.email for u in users}
-    return [_chat_row_payload(row, email_by_id) for row in rows]
+    return [_chat_row_payload(session, row) for row in rows]
 
 
 @router.post("/support-chat/{enterprise_owner_id}", response_model=SupportChatMessageRead)
@@ -1899,4 +1784,4 @@ def send_support_chat(
     )
     _commit_or_http(session, "Unable to send support chat")
     session.refresh(row)
-    return _chat_row_payload(row, {admin_user.id: admin_user.email})
+    return _chat_row_payload(session, row)

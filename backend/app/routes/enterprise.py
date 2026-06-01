@@ -199,8 +199,11 @@ def _audit_row_payload(session: Session, row: AuditEvent) -> dict[str, Any]:
     }
 
 
-def _chat_row_payload(row: SupportChatMessage, email_by_id: dict) -> SupportChatMessageRead:
-    sender_email = email_by_id.get(row.sender_user_id, "") if row.sender_user_id else ""
+def _chat_row_payload(session: Session, row: SupportChatMessage) -> SupportChatMessageRead:
+    sender_email = ""
+    if row.sender_user_id:
+        sender = session.get(User, row.sender_user_id)
+        sender_email = sender.email if sender else ""
     return SupportChatMessageRead(
         id=row.id,
         enterprise_owner_id=row.enterprise_owner_id,
@@ -1108,10 +1111,7 @@ def enterprise_support_chat(
         .order_by(SupportChatMessage.created_at.asc())
         .limit(200)
     ).all()
-    sender_ids = list({r.sender_user_id for r in rows if r.sender_user_id})
-    users = session.exec(select(User).where(User.id.in_(sender_ids))).all() if sender_ids else []
-    email_by_id = {u.id: u.email for u in users}
-    return [_chat_row_payload(row, email_by_id) for row in rows]
+    return [_chat_row_payload(session, row) for row in rows]
 
 
 @router.post("/support-chat", response_model=SupportChatMessageRead)
@@ -1139,7 +1139,7 @@ def enterprise_send_support_chat(
     )
     session.commit()
     session.refresh(row)
-    return _chat_row_payload(row, {user.id: user.email})
+    return _chat_row_payload(session, row)
 
 
 @router.post("/employees", response_model=EnterpriseEmployeeRead)
