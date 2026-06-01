@@ -47,6 +47,7 @@ export default function DealsGridPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [q, setQ] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [feed, setFeed] = useState<DealClosureEvent[]>([]);
   const [newFeedIds, setNewFeedIds] = useState<string[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -55,6 +56,7 @@ export default function DealsGridPage() {
 
   const load = useCallback(async (search: string) => {
     setError(null);
+    setLoading(true);
     try {
       const qq = search.trim();
       const data = await api<Deal[]>(qq ? `/deals?q=${encodeURIComponent(qq)}` : "/deals");
@@ -62,6 +64,8 @@ export default function DealsGridPage() {
       setSelected({});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deals");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -321,7 +325,15 @@ export default function DealsGridPage() {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 ? (
+            {loading ? (
+              [1, 2, 3, 4, 5].map((i) => (
+                <tr key={i}>
+                  {[60, 40, 30, 35, 40, 25, 30, 35, 30, 25, 20, 20, 20, 20, 50].map((w, j) => (
+                    <td key={j}><div className="skeletonBar" style={{ width: `${w}%` }} /></td>
+                  ))}
+                </tr>
+              ))
+            ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={16} className="muted">
                   No deals found.

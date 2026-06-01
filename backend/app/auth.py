@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hmac
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
@@ -15,6 +16,9 @@ from .db import delete_demo_account_tree, get_session
 from .models import Profile, User
 from .settings import settings
 
+
+_rera_cache: dict[str, float] = {}  # user_id -> monotonic expiry timestamp
+_RERA_CACHE_TTL = 300  # 5 minutes; only positive results are cached
 
 pwd_context = CryptContext(
     schemes=["pbkdf2_sha256"],
@@ -154,10 +158,13 @@ def get_current_user(
         "/profile",
     }
     if not is_admin and path not in rera_exempt_paths:
-        profile = session.exec(select(Profile).where(Profile.owner_id == user.id)).first()
-        rera_id = (profile.rera_id if profile else "") or ""
-        if not rera_id.strip():
-            raise HTTPException(status_code=403, detail="RERA ID required. Complete your profile to continue.")
+        uid = str(user_id)
+        if _rera_cache.get(uid, 0) < time.monotonic():
+            profile = session.exec(select(Profile).where(Profile.owner_id == user.id)).first()
+            rera_id = (profile.rera_id if profile else "") or ""
+            if not rera_id.strip():
+                raise HTTPException(status_code=403, detail="RERA ID required. Complete your profile to continue.")
+            _rera_cache[uid] = time.monotonic() + _RERA_CACHE_TTL
 
     # Lightweight usage tracking: throttle DB writes to at most once/minute/user.
     now = _utc_now_naive()

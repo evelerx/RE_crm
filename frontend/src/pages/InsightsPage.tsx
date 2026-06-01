@@ -40,9 +40,11 @@ export default function InsightsPage() {
   const [summary, setSummary] = useState<InsightsSummary | null>(null);
   const [stages, setStages] = useState<StageSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   async function load() {
     setError(null);
+    setLoading(true);
     try {
       const [s, st] = await Promise.all([
         api<InsightsSummary>("/insights/summary?stuck_days=7&window_days=30"),
@@ -52,6 +54,8 @@ export default function InsightsPage() {
       setStages(st);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load insights");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -73,7 +77,24 @@ export default function InsightsPage() {
 
       {error ? <div className="alert">{error}</div> : null}
 
-      {summary ? (
+      {loading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="statsGrid">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="skeletonCard" style={{ minHeight: 124 }}>
+                <div className="skeletonBar" style={{ width: "55%" }} />
+                <div className="skeletonBar" style={{ width: "35%", height: 26 }} />
+                <div className="skeletonBar" style={{ width: "70%" }} />
+              </div>
+            ))}
+          </div>
+          <div className="skeletonCard" style={{ height: 140 }} />
+          <div className="skeletonCard" style={{ height: 100 }} />
+          <div className="skeletonCard" style={{ height: 120 }} />
+        </div>
+      ) : null}
+
+      {!loading && summary ? (
         <div className="detailGrid">
           <section className="card" style={{ gridColumn: "1 / -1" }}>
             <div className="cardTitle">Revenue view</div>

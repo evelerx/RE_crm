@@ -780,7 +780,13 @@ export default function AdminPage() {
       </div>
 
       {error ? <div className="alert">{error}</div> : null}
-      {loading ? <div className="muted">Loading...</div> : null}
+      {loading ? (
+        <div className="skeletonCard" style={{ padding: "20px" }}>
+          {[90, 75, 85, 60, 80, 70].map((w, i) => (
+            <div key={i} className="skeletonBar" style={{ width: `${w}%`, marginBottom: 14 }} />
+          ))}
+        </div>
+      ) : null}
 
       <nav className="adminSidebarNav" aria-label="Admin portal sections">
         {[

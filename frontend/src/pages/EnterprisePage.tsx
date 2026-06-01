@@ -352,7 +352,21 @@ export default function EnterprisePage() {
       </div>
 
       {error ? <div className="alert">{error}</div> : null}
-      {loading ? <div className="muted">Loading...</div> : null}
+      {loading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="statsGrid">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="skeletonCard" style={{ minHeight: 124 }}>
+                <div className="skeletonBar" style={{ width: "60%" }} />
+                <div className="skeletonBar" style={{ width: "40%", height: 24 }} />
+                <div className="skeletonBar" style={{ width: "75%" }} />
+              </div>
+            ))}
+          </div>
+          <div className="skeletonCard" style={{ height: 160 }} />
+          <div className="skeletonCard" style={{ height: 110 }} />
+        </div>
+      ) : null}
       {publicPreviewMode ? (
         <div className="alert ok">
           Public preview mode: everyone can see the organization workspace during demos and onboarding, but live team controls,

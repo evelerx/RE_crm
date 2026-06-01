@@ -143,7 +143,26 @@ export default function PipelinePage() {
 
       {error ? <div className="alert">{error}</div> : null}
       {uploadError ? <div className="alert">{uploadError}</div> : null}
-      {loading ? <div className="muted">Loading pipeline...</div> : null}
+      {loading ? (
+        <div className="kanban">
+          {["Lead", "Visit", "Negotiation", "Closed", "Lost"].map((col) => (
+            <div key={col} className="col">
+              <div className="colHeader">
+                <div className="skeletonBar" style={{ width: "55%" }} />
+                <div className="skeletonBar" style={{ width: "20px" }} />
+              </div>
+              <div className="colBody" style={{ padding: "10px", display: "flex", flexDirection: "column", gap: 8 }}>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="skeletonCard">
+                    <div className="skeletonBar" style={{ width: "80%" }} />
+                    <div className="skeletonBar" style={{ width: "50%" }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <DealPriorityDashboard visible={canSeeDealPriority} />
 
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>

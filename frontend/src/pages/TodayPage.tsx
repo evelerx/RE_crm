@@ -71,11 +71,13 @@ export default function TodayPage() {
   const [salesSummary, setSalesSummary] = useState<SalesSummary | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyActId, setBusyActId] = useState<string | null>(null);
 
   async function load() {
     setError(null);
+    setLoading(true);
     try {
       const [actions, insights, contactRows] = await Promise.all([
         api<NextActionsResponse>("/next-actions?days=3&stuck_days=7"),
@@ -87,6 +89,8 @@ export default function TodayPage() {
       setContacts(contactRows);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load next actions");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -164,7 +168,23 @@ export default function TodayPage() {
 
       {error ? <div className="alert">{error}</div> : null}
 
-      {salesSummary ? (
+      {loading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="statsGrid">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="skeletonCard" style={{ minHeight: 100 }}>
+                <div className="skeletonBar" style={{ width: "55%" }} />
+                <div className="skeletonBar" style={{ width: "35%", height: 22 }} />
+                <div className="skeletonBar" style={{ width: "70%" }} />
+              </div>
+            ))}
+          </div>
+          <div className="skeletonCard" style={{ height: 120 }} />
+          <div className="skeletonCard" style={{ height: 120 }} />
+        </div>
+      ) : null}
+
+      {!loading && salesSummary ? (
         <section className="card">
           <div className="cardTitle">Sales snapshot</div>
           <div className="statsGrid">

@@ -418,6 +418,18 @@ export default function DealDetailPage() {
       {error ? <div className="alert">{error}</div> : null}
       {successMessage ? <div className="alert ok">{successMessage}</div> : null}
 
+      {!deal && !error ? (
+        <div className="detailGrid">
+          <div className="skeletonCard">
+            {[80, 55, 70, 45, 65, 50].map((w, i) => (
+              <div key={i} className="skeletonBar" style={{ width: `${w}%` }} />
+            ))}
+          </div>
+          <div className="skeletonCard" style={{ height: 140 }} />
+          <div className="skeletonCard" style={{ height: 100 }} />
+        </div>
+      ) : null}
+
       {deal ? (
         <div className="detailGrid">
           <section className="card premiumPanel">

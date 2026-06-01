@@ -18,13 +18,17 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   async function load() {
     setError(null);
+    setLoading(true);
     try {
       setContacts(await api<Contact[]>("/contacts"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load contacts");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -108,7 +112,15 @@ export default function ContactsPage() {
                 <td className="colTags">{c.tags || "-"}</td>
               </tr>
             ))}
-            {contacts.length === 0 ? (
+            {loading ? (
+              [1, 2, 3, 4, 5].map((i) => (
+                <tr key={i}>
+                  {[80, 55, 40, 50, 60, 45].map((w, j) => (
+                    <td key={j}><div className="skeletonBar" style={{ width: `${w}%` }} /></td>
+                  ))}
+                </tr>
+              ))
+            ) : contacts.length === 0 ? (
               <tr>
                 <td colSpan={6} className="muted">
                   No contacts yet. Add your first one to start building deal relationships.
