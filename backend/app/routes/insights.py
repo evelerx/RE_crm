@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
+from sqlalchemy import and_, case, func
 from sqlmodel import Session, select
 
 from ..auth import get_current_user
@@ -23,90 +23,76 @@ def summary(
     user: User = Depends(get_current_user),
 ):
     now = datetime.utcnow()
-
-    total_deals = session.exec(
-        select(func.count()).select_from(Deal).where(user_read_filter(Deal, user))
-    ).one()
-    closed = session.exec(
-        select(func.count())
-        .select_from(Deal)
-        .where(user_read_filter(Deal, user))
-        .where(Deal.stage == "closed")
-    ).one()
-    lost = session.exec(
-        select(func.count())
-        .select_from(Deal)
-        .where(user_read_filter(Deal, user))
-        .where(Deal.stage == "lost")
-    ).one()
-
-    decided = int(closed) + int(lost)
-    win_rate = (int(closed) / decided) if decided else None
-
     cutoff_stuck = now - timedelta(days=stuck_days)
-    stuck_count = session.exec(
-        select(func.count())
-        .select_from(Deal)
-        .where(user_read_filter(Deal, user))
-        .where(Deal.stage.notin_(["closed", "lost"]))
-        .where(func.coalesce(Deal.last_activity_at, Deal.updated_at) <= cutoff_stuck)
-    ).one()
-
-    overdue_count = session.exec(
-        select(func.count())
-        .select_from(Activity)
-        .where(user_read_filter(Activity, user))
-        .where(Activity.completed == False)  # noqa: E712
-        .where(Activity.due_at.is_not(None))
-        .where(Activity.due_at < now)
-    ).one()
-
-    next_3_days = now + timedelta(days=3)
-    upcoming_count = session.exec(
-        select(func.count())
-        .select_from(Activity)
-        .where(user_read_filter(Activity, user))
-        .where(Activity.completed == False)  # noqa: E712
-        .where(Activity.due_at.is_not(None))
-        .where(Activity.due_at >= now)
-        .where(Activity.due_at <= next_3_days)
-    ).one()
-
     recent_cutoff = now - timedelta(days=7)
-    activities_7d = session.exec(
-        select(func.count())
-        .select_from(Activity)
-        .where(user_read_filter(Activity, user))
-        .where(Activity.created_at >= recent_cutoff)
-    ).one()
-
-    open_deals = session.exec(
-        select(Deal)
-        .where(user_read_filter(Deal, user))
-        .where(Deal.stage.notin_(["closed", "lost"]))
-    ).all()
-    open_pipeline_value = sum(float(d.ticket_size or 0) for d in open_deals if d.ticket_size is not None)
-    weighted_open_probability = sum(
-        float(d.ticket_size or 0) * float((d.close_probability or 0) / 100.0)
-        for d in open_deals
-        if d.ticket_size is not None
-    )
-    avg_close_probability = (
-        sum(float(d.close_probability or 0) for d in open_deals if d.close_probability is not None) / max(1, len([d for d in open_deals if d.close_probability is not None]))
-        if any(d.close_probability is not None for d in open_deals)
-        else None
-    )
-
-    completed_7d = session.exec(
-        select(func.count())
-        .select_from(Activity)
-        .where(user_read_filter(Activity, user))
-        .where(Activity.completed == True)  # noqa: E712
-        .where(Activity.created_at >= recent_cutoff)
-    ).one()
-    followup_completion_rate = (int(completed_7d) / int(activities_7d)) if int(activities_7d) else None
-
+    next_3_days = now + timedelta(days=3)
     trans_cutoff = now - timedelta(days=window_days)
+
+    _is_open = Deal.stage.notin_(["closed", "lost"])
+    _is_stuck = func.coalesce(Deal.last_activity_at, Deal.updated_at) <= cutoff_stuck
+
+    # Single-pass deal aggregation — replaces 6–8 separate COUNT/SELECT queries.
+    ds = session.exec(
+        select(
+            func.count().label("total"),
+            func.sum(case((Deal.stage == "closed", 1), else_=0)).label("closed"),
+            func.sum(case((Deal.stage == "lost", 1), else_=0)).label("lost"),
+            func.sum(case((and_(_is_open, _is_stuck), 1), else_=0)).label("stuck"),
+            func.coalesce(func.sum(case((_is_open, Deal.ticket_size), else_=None)), 0).label("open_pipeline"),
+            func.coalesce(func.sum(case(
+                (and_(_is_open, Deal.ticket_size.isnot(None), Deal.close_probability.isnot(None)),
+                 Deal.ticket_size * Deal.close_probability / 100.0),
+                else_=None,
+            )), 0).label("weighted"),
+            func.avg(case((_is_open, Deal.close_probability), else_=None)).label("avg_prob"),
+            func.sum(case((Deal.stage == "lead", 1), else_=0)).label("lead_count"),
+            func.sum(case((Deal.stage == "visit", 1), else_=0)).label("visit_count"),
+            func.sum(case((Deal.stage == "negotiation", 1), else_=0)).label("negotiation_count"),
+        ).where(user_read_filter(Deal, user))
+    ).one()
+
+    _not_done = Activity.completed == False  # noqa: E712
+    _is_recent = Activity.created_at >= recent_cutoff
+
+    # Single-pass activity aggregation — replaces 4 separate COUNT queries.
+    ac = session.exec(
+        select(
+            func.sum(case(
+                (and_(_not_done, Activity.due_at.isnot(None), Activity.due_at < now), 1),
+                else_=0,
+            )).label("overdue"),
+            func.sum(case(
+                (and_(_not_done, Activity.due_at.isnot(None), Activity.due_at >= now, Activity.due_at <= next_3_days), 1),
+                else_=0,
+            )).label("upcoming"),
+            func.sum(case((_is_recent, 1), else_=0)).label("activities_7d"),
+            func.sum(case((and_(Activity.completed == True, _is_recent), 1), else_=0)).label("completed_7d"),  # noqa: E712
+        ).where(user_read_filter(Activity, user))
+    ).one()
+
+    total_deals = int(ds.total or 0)
+    closed = int(ds.closed or 0)
+    lost = int(ds.lost or 0)
+    stuck_count = int(ds.stuck or 0)
+    open_pipeline_value = float(ds.open_pipeline or 0)
+    weighted_open_probability = float(ds.weighted or 0)
+    avg_close_probability = float(ds.avg_prob) if ds.avg_prob is not None else None
+    lead_count = int(ds.lead_count or 0)
+    visit_count = int(ds.visit_count or 0)
+    negotiation_count = int(ds.negotiation_count or 0)
+
+    decided = closed + lost
+    win_rate = (closed / decided) if decided else None
+    close_rate_from_lead = (closed / lead_count) if lead_count else None
+    visit_to_negotiation_rate = (negotiation_count / visit_count) if visit_count else None
+
+    overdue_count = int(ac.overdue or 0)
+    upcoming_count = int(ac.upcoming or 0)
+    activities_7d = int(ac.activities_7d or 0)
+    completed_7d = int(ac.completed_7d or 0)
+    followup_completion_rate = (completed_7d / activities_7d) if activities_7d else None
+
+    # Stage transitions (single GROUP BY query — unchanged)
     trans_stmt = (
         select(DealStageEvent.from_stage, DealStageEvent.to_stage, func.count())
         .where(user_read_filter(DealStageEvent, user))
@@ -119,15 +105,6 @@ def summary(
         {"from": fs, "to": ts, "count": int(c)}
         for fs, ts, c in session.exec(trans_stmt).all()
     ]
-
-    stage_totals = {deal.stage: 0 for deal in open_deals}
-    for deal in open_deals:
-        stage_totals[deal.stage] = stage_totals.get(deal.stage, 0) + 1
-    lead_count = stage_totals.get("lead", 0)
-    visit_count = stage_totals.get("visit", 0)
-    negotiation_count = stage_totals.get("negotiation", 0)
-    close_rate_from_lead = (int(closed) / lead_count) if lead_count else None
-    visit_to_negotiation_rate = (negotiation_count / visit_count) if visit_count else None
 
     team_breakdown: list[dict] = []
     owner_id = get_enterprise_owner_id(user)
@@ -178,15 +155,15 @@ def summary(
 
     return {
         "now": now.isoformat() + "Z",
-        "total_deals": int(total_deals),
-        "closed_deals": int(closed),
-        "lost_deals": int(lost),
+        "total_deals": total_deals,
+        "closed_deals": closed,
+        "lost_deals": lost,
         "win_rate": win_rate,
-        "stuck_deals": int(stuck_count),
-        "overdue_reminders": int(overdue_count),
-        "upcoming_reminders_3d": int(upcoming_count),
-        "activities_7d": int(activities_7d),
-        "completed_activities_7d": int(completed_7d),
+        "stuck_deals": stuck_count,
+        "overdue_reminders": overdue_count,
+        "upcoming_reminders_3d": upcoming_count,
+        "activities_7d": activities_7d,
+        "completed_activities_7d": completed_7d,
         "followup_completion_rate_7d": followup_completion_rate,
         "open_pipeline_value": open_pipeline_value,
         "weighted_open_pipeline_value": weighted_open_probability,

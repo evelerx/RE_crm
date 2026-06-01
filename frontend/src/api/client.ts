@@ -153,9 +153,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     path.startsWith("/enterprise/builder-documents/generate")
       || path.startsWith("/enterprise/builder-website")
       ? 60000
-      : path.startsWith("/auth/") || path.startsWith("/admin/") || path.startsWith("/enterprise/audit")
-        ? 20000
-        : 8000;
+      : 25000;
   let res: Response;
   try {
     res = await request(path, { ...init, headers }, timeoutMs);
