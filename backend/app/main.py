@@ -12,22 +12,17 @@ from .routes import (
     admin,
     ai,
     auth,
-    calendar_sync,
     contacts,
     csvio,
     deals,
     enterprise,
     integrations,
     insights,
-    inventory,
-    lead_capture,
     llm,
     meta,
     next_actions,
     profile,
     public,
-    telephony,
-    webhooks,
     whatsapp,
 )
 from .settings import settings
@@ -91,8 +86,6 @@ app.include_router(meta.router)
 app.include_router(public.router)
 app.include_router(auth.router)
 app.include_router(integrations.router)
-app.include_router(lead_capture.public_router)
-app.include_router(webhooks.public_router)
 
 # Protected routers (API key optional, but if set it must match)
 deps = [Depends(require_api_key)]
@@ -107,14 +100,6 @@ app.include_router(next_actions.router, dependencies=deps)
 app.include_router(csvio.router, dependencies=deps)
 app.include_router(insights.router, dependencies=deps)
 app.include_router(enterprise.router, dependencies=deps)
-app.include_router(lead_capture.router, dependencies=deps)
-app.include_router(lead_capture.admin_router, dependencies=deps)
-app.include_router(calendar_sync.router, dependencies=deps)
-app.include_router(inventory.router, dependencies=deps)
-app.include_router(telephony.public_router)
-app.include_router(telephony.router, dependencies=deps)
-app.include_router(webhooks.router, dependencies=deps)
-app.include_router(whatsapp.public_router)
 app.include_router(whatsapp.router, dependencies=deps)
 app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 

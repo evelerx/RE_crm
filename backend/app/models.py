@@ -73,7 +73,6 @@ class Contact(SQLModel, table=True):
     occupation: str = ""
     phone: Optional[str] = None
     email: Optional[str] = None
-    lead_source: str = "manual"
     role: str = "buyer"  # buyer | seller | investor | tenant | other
     tags: str = ""  # comma-separated for MVP
     notes: str = ""
@@ -106,7 +105,6 @@ class Deal(SQLModel, table=True):
     risk_flags: str = ""  # JSON-ish string for MVP (e.g. "pricing,legal")
 
     contact_id: Optional[UUID] = Field(default=None, foreign_key="contact.id")
-    lead_source: str = "manual"
     notes: str = ""
     status: str = "open"  # open | closed | lost
     closed_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
@@ -130,7 +128,6 @@ class Activity(SQLModel, table=True):
     summary: str = ""
     due_at: Optional[datetime] = None
     completed: bool = False
-    google_event_id: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -170,13 +167,11 @@ class WhatsAppMessage(SQLModel, table=True):
     owner_id: UUID = Field(foreign_key="user.id", index=True)
     enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
     contact_id: UUID = Field(foreign_key="contact.id", index=True)
-    deal_id: Optional[UUID] = Field(default=None, foreign_key="deal.id", index=True)
     direction: str = "outbound"
     message_body: str = ""
     timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
     status: str = "sent"  # sent | delivered | read | failed
     wa_message_id: Optional[str] = None
-    read_at: Optional[datetime] = None
 
 
 class AuditEvent(SQLModel, table=True):
@@ -292,87 +287,3 @@ class AppIntegrationConnection(SQLModel, table=True):
     last_error: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-
-
-class IntegrationMapping(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    owner_id: UUID = Field(foreign_key="user.id", index=True)
-    platform: str = Field(index=True)  # facebook | google
-    platform_id: str = Field(index=True)
-    access_token: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-
-
-class GoogleCalendarToken(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    owner_id: UUID = Field(foreign_key="user.id", index=True, unique=True)
-    access_token: str = ""
-    refresh_token: str = ""
-    token_expiry: Optional[datetime] = None
-    calendar_id: str = "primary"
-    sync_enabled: bool = Field(default=True, index=True)
-    connected_email: str = ""
-    last_sync_at: Optional[datetime] = None
-    synced_events_count: int = 0
-
-
-class CallRecord(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    owner_id: UUID = Field(foreign_key="user.id", index=True)
-    initiated_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
-    deal_id: Optional[UUID] = Field(default=None, foreign_key="deal.id", index=True)
-    contact_id: Optional[UUID] = Field(default=None, foreign_key="contact.id", index=True)
-    call_sid: str = Field(index=True, unique=True)
-    status: str = Field(default="initiated", index=True)
-    duration_seconds: Optional[int] = None
-    recording_url: Optional[str] = None
-    started_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    ended_at: Optional[datetime] = None
-
-
-class InventoryProject(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    owner_id: UUID = Field(foreign_key="user.id", index=True)
-    name: str = ""
-    location: str = ""
-    total_units: int = 0
-    launch_date: Optional[date] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-
-
-class InventoryUnit(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    project_id: UUID = Field(foreign_key="inventoryproject.id", index=True)
-    unit_number: str = ""
-    tower: Optional[str] = None
-    floor: Optional[int] = None
-    bhk_type: str = "2BHK"
-    area_sqft: float = 0
-    base_price: float = 0
-    current_price: Optional[float] = None
-    status: str = Field(default="available", index=True)
-    deal_id: Optional[UUID] = Field(default=None, foreign_key="deal.id", index=True)
-    booked_by: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
-    booked_at: Optional[datetime] = None
-
-
-class WebhookEndpoint(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    owner_id: UUID = Field(foreign_key="user.id", index=True)
-    name: str = ""
-    webhook_key: str = Field(index=True, unique=True)
-    field_mapping: str = Field(default="{}")
-    is_active: bool = Field(default=True, index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-
-
-class WebhookLog(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    endpoint_id: UUID = Field(foreign_key="webhookendpoint.id", index=True)
-    payload_preview: str = ""
-    status: str = Field(default="ok", index=True)
-    created_contact_id: Optional[UUID] = Field(default=None, foreign_key="contact.id", index=True)
-    created_deal_id: Optional[UUID] = Field(default=None, foreign_key="deal.id", index=True)
-    error_message: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
