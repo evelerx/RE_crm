@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
@@ -39,7 +40,7 @@ def verify_admin_password(password: str) -> bool:
         except Exception:
             return False
     if settings.admin_password:
-        return password == settings.admin_password
+        return hmac.compare_digest(password, settings.admin_password)
     return False
 
 

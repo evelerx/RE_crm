@@ -475,16 +475,32 @@ def _postgres_best_effort_migrate() -> None:
         )
 
 
+_db_initialized = False
+
+
 def init_db() -> None:
+    global _db_initialized, _last_purge
+    if _db_initialized:
+        return
     _sqlite_best_effort_migrate()
     _postgres_best_effort_migrate()
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         normalize_existing_enterprise_data(session)
         purge_expired_demo_accounts(session)
+    _last_purge = _utc_now_naive()
+    _db_initialized = True
+
+
+_last_purge: datetime | None = None
+_PURGE_INTERVAL_SECONDS = 600  # run at most once every 10 minutes per process
 
 
 def get_session():
+    global _last_purge
     with Session(engine) as session:
-        purge_expired_demo_accounts(session)
+        now = _utc_now_naive()
+        if _last_purge is None or (now - _last_purge).total_seconds() >= _PURGE_INTERVAL_SECONDS:
+            purge_expired_demo_accounts(session)
+            _last_purge = now
         yield session

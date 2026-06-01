@@ -51,6 +51,16 @@ DEAL_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 
+_FORMULA_STARTERS = frozenset(("=", "+", "-", "@", "\t", "\r"))
+
+
+def _csv_safe(value: str) -> str:
+    """Prevent spreadsheet formula injection by prefixing dangerous leading characters."""
+    if value and value[0] in _FORMULA_STARTERS:
+        return "'" + value
+    return value
+
+
 def _csv_response(filename: str, content: str) -> StreamingResponse:
     bio = io.BytesIO(content.encode("utf-8-sig"))
     return StreamingResponse(
@@ -212,7 +222,15 @@ def export_contacts(
     w = csv.writer(out)
     w.writerow(["name", "occupation", "purpose", "phone", "email", "feedback", "notes"])
     for c in rows:
-        w.writerow([c.name, c.occupation or "", c.role, c.phone or "", c.email or "", c.tags or "", c.notes or ""])
+        w.writerow([
+            _csv_safe(c.name or ""),
+            _csv_safe(c.occupation or ""),
+            _csv_safe(c.role or ""),
+            c.phone or "",
+            c.email or "",
+            _csv_safe(c.tags or ""),
+            _csv_safe(c.notes or ""),
+        ])
     return _csv_response("contacts.csv", out.getvalue())
 
 
@@ -224,6 +242,16 @@ def export_deals(
     rows = session.exec(
         select(Deal).where(user_read_filter(Deal, user)).order_by(Deal.created_at.desc())
     ).all()
+
+    # Pre-fetch all relevant contacts in one query to avoid N+1 on Supabase.
+    contact_ids = [d.contact_id for d in rows if d.contact_id]
+    contacts_by_id: dict = {}
+    if contact_ids:
+        contact_rows = session.exec(select(Contact).where(Contact.id.in_(contact_ids))).all()
+        contacts_by_id = {
+            c.id: c for c in contact_rows if user_can_access_record(c, user) and c.email
+        }
+
     out = io.StringIO()
     w = csv.writer(out)
     w.writerow(
@@ -250,12 +278,12 @@ def export_deals(
     for d in rows:
         contact_email = ""
         if d.contact_id:
-            c = session.get(Contact, d.contact_id)
-            if c and user_can_access_record(c, user) and c.email:
+            c = contacts_by_id.get(d.contact_id)
+            if c:
                 contact_email = c.email
         w.writerow(
             [
-                d.title,
+                _csv_safe(d.title or ""),
                 d.asset_type,
                 d.stage,
                 d.city,
@@ -269,9 +297,9 @@ def export_deals(
                 d.expected_roi_pct if d.expected_roi_pct is not None else "",
                 d.liquidity_days_est if d.liquidity_days_est is not None else "",
                 d.close_probability if d.close_probability is not None else "",
-                d.risk_flags or "",
+                _csv_safe(d.risk_flags or ""),
                 contact_email,
-                d.notes or "",
+                _csv_safe(d.notes or ""),
             ]
         )
     return _csv_response("deals.csv", out.getvalue())
@@ -308,11 +336,11 @@ def export_activities(
         w.writerow(
             [
                 a.kind,
-                a.summary or "",
+                _csv_safe(a.summary or ""),
                 a.due_at.isoformat() + "Z" if a.due_at else "",
                 "1" if a.completed else "0",
-                deal_title.get(a.deal_id, "") if a.deal_id else "",
-                contact_name.get(a.contact_id, "") if a.contact_id else "",
+                _csv_safe(deal_title.get(a.deal_id, "") if a.deal_id else ""),
+                _csv_safe(contact_name.get(a.contact_id, "") if a.contact_id else ""),
                 a.created_at.isoformat() + "Z",
             ]
         )

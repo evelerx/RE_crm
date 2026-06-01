@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -7,6 +8,8 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .db import init_db
+
+logger = logging.getLogger(__name__)
 from .routes import (
     activities,
     admin,
@@ -59,7 +62,7 @@ uploads_dir.mkdir(parents=True, exist_ok=True)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins(),
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|\d{1,3}(?:\.\d{1,3}){3})(?::(4173|5173))?$",
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|\d{1,3}(?:\.\d{1,3}){3})(?::(4173|5173))?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -79,6 +82,11 @@ async def security_headers(request: Request, call_next):
 
 @app.on_event("startup")
 def _startup():
+    if settings.jwt_secret == "change-me":
+        logger.warning(
+            "SECURITY: JWT_SECRET is using the insecure default 'change-me'. "
+            "Set a strong random JWT_SECRET in backend/.env before deploying."
+        )
     init_db()
 
 

@@ -38,6 +38,7 @@ router = APIRouter(prefix="/deals", tags=["deals"])
 
 UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "uploads" / "deal_images"
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+_CONTENT_TYPE_TO_EXT = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 MAX_IMAGE_COUNT = 10
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
@@ -519,7 +520,7 @@ async def upload_deal_images(
         if len(content) > MAX_IMAGE_SIZE:
             raise HTTPException(status_code=413, detail="File too large")
 
-        suffix = Path(upload.filename or "image").suffix or ".bin"
+        suffix = _CONTENT_TYPE_TO_EXT.get(upload.content_type or "", ".bin")
         safe_name = f"{uuid4().hex}{suffix}"
         destination = deal_dir / safe_name
         destination.write_bytes(content)
