@@ -134,22 +134,15 @@ export default function DealDetailPage() {
       setActivities(a);
       setSuccessMessage(null);
 
-      // Fast path: fetch only the linked contact for immediate display.
-      const linkedContacts = d.contact_id
-        ? await api<Contact[]>(`/contacts?ids=${encodeURIComponent(d.contact_id)}`)
-        : [];
-      setContacts(linkedContacts);
-      const preferredContactId =
-        (d.contact_id && linkedContacts.some((c) => c.id === d.contact_id) ? d.contact_id : "") ||
-        linkedContacts.find((c) => normalizeWhatsAppNumber(c.phone))?.id ||
-        "";
-      setWhatsAppContactId(preferredContactId);
-
-      // Background: load all contacts for the contact picker (non-blocking).
+      // Load contacts in the background — doesn't block page render.
       api<Contact[]>("/contacts")
         .then((all) => {
           setContacts(all);
-          setWhatsAppContactId((prev) => prev || all.find((c) => normalizeWhatsAppNumber(c.phone))?.id || "");
+          setWhatsAppContactId(
+            (d.contact_id && all.some((c) => c.id === d.contact_id) ? d.contact_id : "") ||
+              all.find((c) => normalizeWhatsAppNumber(c.phone))?.id ||
+              ""
+          );
         })
         .catch(() => {});
     } catch (e) {

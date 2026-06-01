@@ -878,27 +878,30 @@ def enterprise_list(
     emp_profile_by_owner = {p.owner_id: p for p in emp_profiles}
 
     # Batch 4: org-level record counts via GROUP BY (3 queries total vs N×3)
-    deal_counts: dict[UUID, int] = dict(
-        session.exec(
+    deal_counts: dict[UUID, int] = {
+        row[0]: row[1]
+        for row in session.exec(
             select(Deal.enterprise_owner_id, func.count(Deal.id))
             .where(Deal.enterprise_owner_id.in_(owner_ids))
             .group_by(Deal.enterprise_owner_id)
         ).all()
-    )
-    contact_counts: dict[UUID, int] = dict(
-        session.exec(
+    }
+    contact_counts: dict[UUID, int] = {
+        row[0]: row[1]
+        for row in session.exec(
             select(Contact.enterprise_owner_id, func.count(Contact.id))
             .where(Contact.enterprise_owner_id.in_(owner_ids))
             .group_by(Contact.enterprise_owner_id)
         ).all()
-    )
-    activity_counts: dict[UUID, int] = dict(
-        session.exec(
+    }
+    activity_counts: dict[UUID, int] = {
+        row[0]: row[1]
+        for row in session.exec(
             select(Activity.enterprise_owner_id, func.count(Activity.id))
             .where(Activity.enterprise_owner_id.in_(owner_ids))
             .group_by(Activity.enterprise_owner_id)
         ).all()
-    )
+    }
 
     # Batch 5: per-employee deal/contact/activity counts (3 queries vs N_employees×3)
     emp_counts: dict[UUID, dict] = {
@@ -915,10 +918,10 @@ def enterprise_list(
                     emp_counts[eid]["lost_deals"] += 1
                 else:
                     emp_counts[eid]["open_deals"] += 1
-        for (eid,) in session.exec(select(Contact.owner_id).where(Contact.owner_id.in_(employee_ids))).all():
+        for eid in session.exec(select(Contact.owner_id).where(Contact.owner_id.in_(employee_ids))).all():
             if eid in emp_counts:
                 emp_counts[eid]["contacts"] += 1
-        for (eid,) in session.exec(select(Activity.owner_id).where(Activity.owner_id.in_(employee_ids))).all():
+        for eid in session.exec(select(Activity.owner_id).where(Activity.owner_id.in_(employee_ids))).all():
             if eid in emp_counts:
                 emp_counts[eid]["activities"] += 1
 
