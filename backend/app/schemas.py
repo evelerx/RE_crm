@@ -385,6 +385,94 @@ class WebhookLogRead(BaseModel):
     created_at: datetime
 
 
+class AutomationActionInput(BaseModel):
+    type: str = Field(pattern="^(send_whatsapp|create_activity|assign_deal|send_email|update_deal_field|webhook_notify)$")
+    config: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+
+
+class AutomationRuleCreateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    trigger_event: str = Field(pattern="^(contact_created|deal_created|deal_stage_changed|activity_overdue|deal_score_low)$")
+    trigger_filters: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+    actions: list[AutomationActionInput] = Field(min_length=1)
+    is_active: bool = True
+
+
+class AutomationRuleUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    trigger_filters: dict[str, str | int | float | bool | None] | None = None
+    actions: list[AutomationActionInput] | None = None
+    is_active: bool | None = None
+
+
+class AutomationRuleRead(BaseModel):
+    id: UUID
+    owner_id: UUID
+    name: str
+    trigger_event: str
+    trigger_filters: dict[str, str | int | float | bool | None]
+    actions: list[AutomationActionInput]
+    is_active: bool
+    run_count: int
+    last_run_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AutomationLogRead(BaseModel):
+    id: UUID
+    rule_id: UUID
+    owner_id: UUID
+    trigger_event: str
+    trigger_key: str = ""
+    actions_executed: list[str]
+    status: str
+    error_message: str = ""
+    created_at: datetime
+
+
+class PushSubscriptionCreateRequest(BaseModel):
+    fcm_token: str = Field(min_length=20, max_length=4096)
+    device_type: str = Field(default="web", max_length=80)
+
+
+class PushSubscriptionDeleteRequest(BaseModel):
+    fcm_token: str = Field(min_length=20, max_length=4096)
+
+
+class PushSubscriptionRead(BaseModel):
+    id: UUID
+    user_id: UUID
+    owner_id: UUID
+    fcm_token: str
+    device_type: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class PushSendRequest(BaseModel):
+    user_id: UUID | None = None
+    title: str = Field(min_length=1, max_length=160)
+    body: str = Field(min_length=1, max_length=4000)
+    data: dict[str, str] = Field(default_factory=dict)
+
+
+class PushSendResponse(BaseModel):
+    ok: bool
+    delivered: int = 0
+    failed: int = 0
+
+
+class FirebaseWebConfigRead(BaseModel):
+    apiKey: str = ""
+    authDomain: str = ""
+    projectId: str = ""
+    messagingSenderId: str = ""
+    appId: str = ""
+    vapidKey: str = ""
+    configured: bool = False
+
+
 class GoogleConnectionTestResponse(BaseModel):
     ok: bool
     connected_account_email: str = ""

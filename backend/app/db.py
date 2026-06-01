@@ -10,6 +10,8 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from .enterprise_scope import normalize_existing_enterprise_data
 from .models import (
     Activity,
+    AutomationLog,
+    AutomationRule,
     AppIntegrationConnection,
     AuditEvent,
     BuilderDocument,
@@ -26,6 +28,7 @@ from .models import (
     IntegrationMapping,
     PasswordResetToken,
     Profile,
+    PushSubscription,
     CallRecord,
     SupportChatMessage,
     User,

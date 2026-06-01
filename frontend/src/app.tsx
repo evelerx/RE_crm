@@ -22,7 +22,14 @@ import LoginPage from "./pages/LoginPage";
 import PipelinePage from "./pages/PipelinePage";
 import SettingsPage from "./pages/SettingsPage";
 import TodayPage from "./pages/TodayPage";
+import AutomationsPage from "./pages/AutomationsPage";
 import WebhooksPage from "./pages/WebhooksPage";
+import { initPushNotifications } from "./utils/push";
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
 
 function TopBar({
   isAdmin,
@@ -102,6 +109,11 @@ function TopBar({
           Apps
         </NavLink>
         {canManageIntegrations ? (
+          <NavLink to="/automations" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+            Automations
+          </NavLink>
+        ) : null}
+        {canManageIntegrations ? (
           <NavLink to="/integrations/setup" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
             Integrations
           </NavLink>
@@ -168,6 +180,11 @@ function TopBar({
           Apps
         </NavLink>
         {canManageIntegrations ? (
+          <NavLink to="/automations" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+            Automations
+          </NavLink>
+        ) : null}
+        {canManageIntegrations ? (
           <NavLink to="/integrations/setup" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
             Integrations
           </NavLink>
@@ -225,6 +242,8 @@ export default function App() {
   const [enterpriseBadge, setEnterpriseBadge] = useState<string | null>(null);
   const [reraCompleted, setReraCompleted] = useState(true);
   const [canUseInventory, setCanUseInventory] = useState(false);
+  const [installPromptEvent, setInstallPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  const [pushToast, setPushToast] = useState<{ title: string; body: string } | null>(null);
   const adminIdleTimerRef = useRef<number | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -345,6 +364,44 @@ export default function App() {
     };
   }, [authed, isAdmin, navigate]);
 
+  useEffect(() => {
+    function handleBeforeInstallPrompt(event: Event) {
+      event.preventDefault();
+      setInstallPromptEvent(event as BeforeInstallPromptEvent);
+    }
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+  }, []);
+
+  useEffect(() => {
+    if (!authed) return;
+    let cancelled = false;
+    void initPushNotifications((title, body) => {
+      if (!cancelled) setPushToast({ title, body });
+    }).catch(() => {
+      // Push notifications are optional and should never interrupt normal CRM use.
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authed]);
+
+  useEffect(() => {
+    if (!pushToast) return;
+    const timer = window.setTimeout(() => setPushToast(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [pushToast]);
+
+  async function handleInstallApp() {
+    if (!installPromptEvent) return;
+    await installPromptEvent.prompt();
+    try {
+      await installPromptEvent.userChoice;
+    } finally {
+      setInstallPromptEvent(null);
+    }
+  }
+
   if (location.pathname.startsWith("/builders/")) {
     return <BuilderPublicPage />;
   }
@@ -370,6 +427,22 @@ export default function App() {
         canUseInventory={canUseInventory}
         onLogout={handleLogout}
       />
+      {installPromptEvent ? (
+        <div className="installPromptBanner">
+          <div>
+            <strong>Install Northstone</strong>
+            <div className="small muted">Save the CRM to your device for faster access and push notifications.</div>
+          </div>
+          <div className="row">
+            <button className="btn compact" type="button" onClick={() => void handleInstallApp()}>
+              Install app
+            </button>
+            <button className="btn ghost compact" type="button" onClick={() => setInstallPromptEvent(null)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      ) : null}
       <main className="content">
         <Routes>
           <Route path="/login" element={<Navigate to="/" replace />} />
@@ -385,6 +458,7 @@ export default function App() {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/apps" element={<AppsPage />} />
+          <Route path="/automations" element={canManageIntegrations ? <AutomationsPage /> : <Navigate to="/" replace />} />
           <Route path="/integrations/setup" element={canManageIntegrations ? <IntegrationsSetupPage /> : <Navigate to="/" replace />} />
           <Route path="/webhooks" element={canManageIntegrations ? <WebhooksPage /> : <Navigate to="/" replace />} />
           <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/" replace />} />
@@ -398,6 +472,15 @@ export default function App() {
         email={getEmail() || ""}
       />
       {showBottomNav ? <BottomNav /> : null}
+      {pushToast ? (
+        <div className="pushToast" role="status" aria-live="polite">
+          <div className="pushToastTitle">{pushToast.title}</div>
+          <div className="small muted">{pushToast.body}</div>
+          <button className="pushToastClose" type="button" onClick={() => setPushToast(null)} aria-label="Dismiss notification">
+            ×
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

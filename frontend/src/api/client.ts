@@ -116,6 +116,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       || path.startsWith("/enterprise/builder-website")
       || path.startsWith("/telephony/")
       || path.startsWith("/inventory/")
+      || path.startsWith("/automations")
       ? 60000
       : path.startsWith("/auth/") || path.startsWith("/admin/") || path.startsWith("/enterprise/audit")
         ? 20000
@@ -372,4 +373,77 @@ export async function bookInventoryUnit(unitId: string, deal_id: string) {
 
 export async function getInventoryProjectSummary(projectId: string) {
   return api<import("./types").InventoryProjectSummary>(`/inventory/projects/${projectId}/summary`);
+}
+
+export async function listAutomationRules() {
+  return api<import("./types").AutomationRule[]>("/automations");
+}
+
+export async function createAutomationRule(payload: {
+  name: string;
+  trigger_event: "contact_created" | "deal_created" | "deal_stage_changed" | "activity_overdue" | "deal_score_low";
+  trigger_filters: Record<string, string | number | boolean | null>;
+  actions: Array<{ type: string; config: Record<string, string | number | boolean | null> }>;
+  is_active: boolean;
+}) {
+  return api<import("./types").AutomationRule>("/automations", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAutomationRule(
+  ruleId: string,
+  payload: Partial<{
+    name: string;
+    trigger_filters: Record<string, string | number | boolean | null>;
+    actions: Array<{ type: string; config: Record<string, string | number | boolean | null> }>;
+    is_active: boolean;
+  }>,
+) {
+  return api<import("./types").AutomationRule>(`/automations/${ruleId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteAutomationRule(ruleId: string) {
+  return api<{ deleted: boolean }>(`/automations/${ruleId}`, { method: "DELETE" });
+}
+
+export async function listAutomationLogs(ruleId: string) {
+  return api<import("./types").AutomationLog[]>(`/automations/${ruleId}/logs`);
+}
+
+export async function getFirebaseWebConfig() {
+  return api<{
+    apiKey: string;
+    authDomain: string;
+    projectId: string;
+    messagingSenderId: string;
+    appId: string;
+    vapidKey: string;
+    configured: boolean;
+  }>("/push/firebase-config");
+}
+
+export async function subscribePush(fcm_token: string, device_type = "web") {
+  return api<import("./types").PushSubscription>("/push/subscribe", {
+    method: "POST",
+    body: JSON.stringify({ fcm_token, device_type }),
+  });
+}
+
+export async function unsubscribePush(fcm_token: string) {
+  return api<{ deleted: boolean }>("/push/subscribe", {
+    method: "DELETE",
+    body: JSON.stringify({ fcm_token }),
+  });
+}
+
+export async function sendPushTest(payload: { user_id?: string; title: string; body: string; data?: Record<string, string> }) {
+  return api<import("./types").PushSendResponse>("/push/send", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }

@@ -2278,3 +2278,116 @@ textarea.textarea {
   border-radius: 14px;
   background: rgba(13, 20, 31, 0.58);
 }
+
+.installPromptBanner {
+  width: min(1180px, calc(100% - 36px));
+  margin: 14px auto 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(95, 135, 198, 0.34);
+  border-radius: 16px;
+  background: rgba(15, 24, 38, 0.92);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.pushToast {
+  position: fixed;
+  right: 18px;
+  bottom: 26px;
+  z-index: 50;
+  width: min(360px, calc(100vw - 24px));
+  padding: 14px 16px;
+  border: 1px solid rgba(95, 135, 198, 0.34);
+  border-radius: 16px;
+  background: rgba(10, 18, 32, 0.96);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+}
+
+.pushToastTitle {
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.pushToastClose {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: none;
+  background: transparent;
+  color: rgba(225, 233, 244, 0.86);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.automationsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.automationsBuilder,
+.automationsLibrary {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.automationActionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.automationActionCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.checkboxLabel input {
+  width: auto;
+}
+
+.automationSelected {
+  border-color: rgba(95, 135, 198, 0.44);
+  background: rgba(95, 135, 198, 0.1);
+}
+
+.automationRuleHead {
+  align-items: flex-start;
+}
+
+.automationRuleActions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+@media (max-width: 1080px) {
+  .automationsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .installPromptBanner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

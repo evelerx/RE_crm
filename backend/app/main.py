@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 import os
 from pathlib import Path
 
@@ -7,10 +9,12 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .db import init_db
+from .automation_engine import run_overdue_activity_automations_once
 from .routes import (
     activities,
     admin,
     ai,
+    automations,
     auth,
     calendar_sync,
     contacts,
@@ -26,6 +30,7 @@ from .routes import (
     next_actions,
     profile,
     public,
+    push,
     telephony,
     webhooks,
     whatsapp,
@@ -87,6 +92,29 @@ def _startup():
     init_db()
 
 
+async def _automation_poller() -> None:
+    while True:
+        try:
+            await run_overdue_activity_automations_once()
+        except Exception:
+            pass
+        await asyncio.sleep(900)
+
+
+@app.on_event("startup")
+async def _startup_background_tasks():
+    app.state.automation_poller = asyncio.create_task(_automation_poller())
+
+
+@app.on_event("shutdown")
+async def _shutdown_background_tasks():
+    task = getattr(app.state, "automation_poller", None)
+    if task:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
 app.include_router(meta.router)
 app.include_router(public.router)
 app.include_router(auth.router)
@@ -109,8 +137,10 @@ app.include_router(insights.router, dependencies=deps)
 app.include_router(enterprise.router, dependencies=deps)
 app.include_router(lead_capture.router, dependencies=deps)
 app.include_router(lead_capture.admin_router, dependencies=deps)
+app.include_router(automations.router, dependencies=deps)
 app.include_router(calendar_sync.router, dependencies=deps)
 app.include_router(inventory.router, dependencies=deps)
+app.include_router(push.router, dependencies=deps)
 app.include_router(telephony.public_router)
 app.include_router(telephony.router, dependencies=deps)
 app.include_router(webhooks.router, dependencies=deps)

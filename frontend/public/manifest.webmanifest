@@ -1,7 +1,8 @@
 {
   "name": "Northstone",
   "short_name": "Northstone",
-  "start_url": "/login",
+  "description": "Northstone CRM for pipeline, deals, enterprise operations, and automation.",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
