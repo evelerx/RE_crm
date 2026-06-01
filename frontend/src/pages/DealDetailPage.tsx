@@ -109,9 +109,9 @@ export default function DealDetailPage() {
     if (!dealId) return;
     setError(null);
     try {
-      const [d, contactRows, a, imageRows] = await Promise.all([
+      // Fetch deal, activities and images in parallel — contacts are loaded separately.
+      const [d, a, imageRows] = await Promise.all([
         api<Deal>(`/deals/${dealId}`),
-        api<Contact[]>("/contacts"),
         api<Activity[]>(`/activities?deal_id=${encodeURIComponent(dealId)}`),
         listDealImages(dealId),
       ]);
@@ -131,14 +131,27 @@ export default function DealDetailPage() {
         liquidity_days_est: d.liquidity_days_est == null ? "" : String(d.liquidity_days_est),
         risk_flags: d.risk_flags ?? ""
       });
-      setContacts(contactRows);
-      const preferredContactId =
-        (d.contact_id && contactRows.some((contact) => contact.id === d.contact_id) ? d.contact_id : "") ||
-        contactRows.find((contact) => normalizeWhatsAppNumber(contact.phone))?.id ||
-        "";
-      setWhatsAppContactId(preferredContactId);
       setActivities(a);
       setSuccessMessage(null);
+
+      // Fast path: fetch only the linked contact for immediate display.
+      const linkedContacts = d.contact_id
+        ? await api<Contact[]>(`/contacts?ids=${encodeURIComponent(d.contact_id)}`)
+        : [];
+      setContacts(linkedContacts);
+      const preferredContactId =
+        (d.contact_id && linkedContacts.some((c) => c.id === d.contact_id) ? d.contact_id : "") ||
+        linkedContacts.find((c) => normalizeWhatsAppNumber(c.phone))?.id ||
+        "";
+      setWhatsAppContactId(preferredContactId);
+
+      // Background: load all contacts for the contact picker (non-blocking).
+      api<Contact[]>("/contacts")
+        .then((all) => {
+          setContacts(all);
+          setWhatsAppContactId((prev) => prev || all.find((c) => normalizeWhatsAppNumber(c.phone))?.id || "");
+        })
+        .catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deal");
     }

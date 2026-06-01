@@ -1,8 +1,8 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, select
 
 from ..auth import get_current_user
@@ -17,14 +17,23 @@ router = APIRouter(prefix="/contacts", tags=["contacts"])
 
 @router.get("", response_model=List[ContactRead])
 def list_contacts(
+    ids: Optional[str] = Query(default=None, description="Comma-separated UUIDs to fetch only specific contacts"),
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    stmt = (
-        select(Contact)
-        .where(user_read_filter(Contact, user))
-        .order_by(col(Contact.updated_at).desc())
-    )
+    if ids:
+        id_list = [i.strip() for i in ids.split(",") if i.strip()]
+        try:
+            uuid_list = [UUID(i) for i in id_list]
+        except ValueError:
+            return []
+        stmt = select(Contact).where(user_read_filter(Contact, user)).where(Contact.id.in_(uuid_list))
+    else:
+        stmt = (
+            select(Contact)
+            .where(user_read_filter(Contact, user))
+            .order_by(col(Contact.updated_at).desc())
+        )
     return session.exec(stmt).all()
 
 
