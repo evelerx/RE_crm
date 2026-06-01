@@ -1,3 +1,32 @@
+// In-memory GET response cache — survives route changes, expires after 45s.
+// Any mutating request (POST/PATCH/DELETE) clears the entire cache.
+const _apiCache = new Map<string, { data: unknown; exp: number }>();
+const _CACHE_TTL = 45_000;
+
+// Paths that should never be cached
+const _SKIP_CACHE_PREFIXES = [
+  "/auth/",
+  "/admin/",
+  "/ai/",
+  "/whatsapp/",
+  "/enterprise/builder-documents/generate",
+  "/enterprise/builder-website",
+];
+
+function _isCacheable(path: string, method: string): boolean {
+  if (method !== "GET") return false;
+  return !_SKIP_CACHE_PREFIXES.some((p) => path.startsWith(p));
+}
+
+function _mkKey(path: string): string {
+  const t = getToken();
+  return `${t.length > 8 ? t.slice(-8) : t}|${path}`;
+}
+
+export function invalidateCache(): void {
+  _apiCache.clear();
+}
+
 export const fallbackHost =
   typeof globalThis !== "undefined" && "location" in globalThis && globalThis.location
     ? globalThis.location.hostname
@@ -81,6 +110,7 @@ async function request(path: string, init: RequestInit, timeoutMs: number): Prom
 async function throwIfNotOk(res: Response) {
   if (res.ok) return;
   if (res.status === 401) {
+    _apiCache.clear();
     try {
       localStorage.removeItem(EMAIL_KEY);
       localStorage.removeItem(TOKEN_KEY);
@@ -110,6 +140,14 @@ async function throwIfNotOk(res: Response) {
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const method = (init.method ?? "GET").toUpperCase();
+  const cacheKey = _isCacheable(path, method) ? _mkKey(path) : null;
+
+  if (cacheKey) {
+    const hit = _apiCache.get(cacheKey);
+    if (hit && hit.exp > Date.now()) return hit.data as T;
+  }
+
   const headers = buildHeaders(init, "application/json");
   const timeoutMs =
     path.startsWith("/enterprise/builder-documents/generate")
@@ -126,7 +164,15 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   await throwIfNotOk(res);
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  const data = (await res.json()) as T;
+
+  if (cacheKey) {
+    _apiCache.set(cacheKey, { data, exp: Date.now() + _CACHE_TTL });
+  } else if (method !== "GET") {
+    _apiCache.clear();
+  }
+
+  return data;
 }
 
 export async function apiBlob(path: string, init: RequestInit = {}): Promise<Blob> {
