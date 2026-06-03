@@ -40,6 +40,11 @@
   ],
   "redirects": [
     {
+      "source": "/copyright",
+      "destination": "/copyright.html",
+      "permanent": false
+    },
+    {
       "source": "/Northstone-landing",
       "destination": "/",
       "permanent": true

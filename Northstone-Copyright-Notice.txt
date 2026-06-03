@@ -1,0 +1,69 @@
+Northstone CRM
+Copyright and Intellectual Property Notice
+
+Last updated: June 3, 2026
+Website: https://www.northstonecrm.com
+App: https://app.northstonecrm.com
+Contact: niharlakhani2@gmail.com | +91 98342 41892
+
+1. Ownership of the Platform
+All rights, title, and interest in and to Northstone CRM, Deal Intelligence OS, and all related software, code, system architecture, workflows, features, interfaces, dashboards, builder-site tools, communication modules, integrations, APIs, analytics outputs, documents, branding, and associated intellectual property are owned exclusively by Northstone CRM and/or its licensors unless expressly stated otherwise in writing.
+
+2. Materials Covered by Copyright
+This includes, without limitation:
+- source code, object code, scripts, and compiled assets
+- backend logic, API structures, request/response schemas, and route systems
+- frontend components, layouts, forms, dashboards, and UI flows
+- database structures, schema design, data models, and protected arrangement of information
+- builder website templates, rendering systems, publishing workflows, and listing layouts
+- generated documents, reports, analytics views, chart layouts, and formatted output systems
+- text, graphics, icons, screenshots, visual identity assets, and platform presentation materials
+
+3. Protected Platform Functionality
+Northstone CRM claims copyright in the specific software implementation, structure, arrangement, design, wording, formatting, and visual/technical expression of its CRM features, including but not limited to:
+- lead, contact, deal, and pipeline management workflows
+- activity tracking, follow-up systems, and communication workflows
+- enterprise owner, employee, and admin control systems
+- builder document generation and builder website publishing workflows
+- property listing, property image, and property presentation systems
+- AI-assisted content generation, formatting logic, summaries, and builder copy systems
+- analytics, ROI, insights, security, support, and subscription visibility systems
+
+4. User Data and Customer Content
+Users retain ownership of the business information they enter into the CRM, including contacts, notes, deal data, property content, uploaded images, and related records, subject to the rights necessary for Northstone CRM to host, process, transmit, display, secure, and support the service. Northstone CRM retains ownership of the platform, software, templates, rendering systems, builder-site framework, and all underlying technology.
+
+5. AI-Assisted and System-Generated Output
+Any AI-assisted, rule-based, or system-generated output produced through the platform, including drafts, follow-up content, website copy, builder documents, summaries, and formatted CRM output, is generated using proprietary or licensed systems used by Northstone CRM. Use of that output does not transfer ownership of the underlying platform, software, prompt structures, formatting logic, or generation systems.
+
+6. Builder Website and Template Rights
+Any builder website, listing page, or microsite generated through Northstone CRM is created using proprietary software systems and templates owned by Northstone CRM. Users may use those sites within their subscription rights, but do not acquire ownership of the underlying builder engine, page structures, reusable templates, rendering logic, or publishing framework.
+
+7. Restrictions
+Except where expressly permitted in writing, no person or entity may:
+- copy, reproduce, mirror, republish, adapt, translate, modify, or create derivative works from the platform
+- reverse engineer, decompile, disassemble, extract, or attempt to recreate the software or templates
+- copy the UI, workflows, builder-site layouts, reports, dashboards, or design systems for competing or commercial use
+- resell, sublicense, lease, scrape, frame, or commercially exploit the platform or protected parts of it
+- remove or alter copyright, attribution, trademark, or ownership notices
+
+8. Branding and Trademarks
+“Northstone”, “Northstone CRM”, “Deal Intelligence OS”, related names, logos, marks, and brand assets are proprietary to Northstone CRM and may not be used without prior written permission except for legitimate nominative reference.
+
+9. Databases and Structured Information
+The selection, coordination, organization, formatting, and presentation of CRM data structures, database views, builder listing arrangements, and reporting layouts may also be protected to the maximum extent permitted by applicable intellectual property, database, and trade secret laws.
+
+10. Feedback
+If any user submits suggestions, feature ideas, workflow recommendations, or product feedback relating to Northstone CRM, Northstone CRM may use such feedback without restriction or compensation unless otherwise agreed in writing.
+
+11. Third-Party Services
+Northstone CRM may integrate with third-party services including cloud infrastructure, communication tools, workspace providers, AI providers, or payment systems. All third-party names and services remain the property of their respective owners. This notice covers Northstone CRM’s own implementation, platform logic, and proprietary expression only.
+
+12. Reservation of Rights
+All rights not expressly granted are reserved. No implied license, transfer, assignment, or waiver of intellectual property rights is created through access to or use of the platform.
+
+13. Contact for Copyright and IP Matters
+Email: niharlakhani2@gmail.com
+Phone: +91 98342 41892
+
+Short-form notice:
+© 2026 Northstone CRM. All rights reserved. Software, UI, builder website systems, templates, databases, documents, reports, and platform content are proprietary.
