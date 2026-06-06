@@ -650,9 +650,12 @@ export default function AdminPage() {
   const activeSubscriptions = displayRows.filter((row) => !row.enterprise_owner_id && !row.is_blacklisted && row.subscription_plan && row.subscription_plan !== "demo");
   const estimatedMrr = activeSubscriptions.reduce((sum, row) => {
     const amount = Number(row.subscription_amount_inr || 0);
+    const isAnnual = row.subscription_cycle === "annual" || row.subscription_cycle === "yearly";
     if (amount > 0) {
-      return sum + (row.subscription_cycle === "annual" || row.subscription_cycle === "yearly" ? amount / 12 : amount);
+      // Annual subscriptions: divide by 12 to get monthly equivalent; monthly: count as-is
+      return sum + (isAnnual ? amount / 12 : amount);
     }
+    // Fallback estimates (monthly values only, not annualized)
     if (row.plan === "enterprise") return sum + 6999;
     if (row.plan === "builder") return sum + 11999;
     return sum + (row.subscription_plan === "solo" ? 1199 : 0);
@@ -797,7 +800,9 @@ export default function AdminPage() {
           ["Security", "admin-security", "A"],
           ["CRM Settings", "admin-settings", "C"],
           ["Org & Demo", "admin-organization", "O"],
+          ["Enterprise", "admin-enterprise", "E"],
           ["AI Assign", "admin-ai-assignment", "I"],
+          ["Compliance", "admin-compliance", "M"],
           ["Support", "admin-support", "P"],
           ["Logs", "admin-logs", "L"],
         ].map(([label, href, shortcut]) => (
@@ -939,7 +944,7 @@ export default function AdminPage() {
           <button className="btn secondary" type="button" disabled={!selectedAdminUsers.length} onClick={() => void bulkSetActive(false)}>
             Deactivate selected
           </button>
-          <a className="btn secondary" href={`mailto:${selectedAdminUsers.map((row) => row.email).join(",")}`}>
+          <a className="btn secondary" href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(selectedAdminUsers.map((row) => row.email).join(","))}`} target="_blank" rel="noopener noreferrer">
             Bulk email
           </a>
         </div>
@@ -1002,7 +1007,7 @@ export default function AdminPage() {
                   <td>
                     <div className="row adminRowActions">
                       <button className="btn ghost" type="button" onClick={() => void impersonateForSupport(row)}>Impersonate</button>
-                      <a className="btn ghost" href={`mailto:${row.email}`}>Email</a>
+                      <a className="btn ghost" href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(row.email)}`} target="_blank" rel="noopener noreferrer">Email</a>
                     </div>
                   </td>
                 </tr>
@@ -1790,7 +1795,7 @@ export default function AdminPage() {
         </form>
       </section>
 
-      <section className="card">
+      <section className="card" id="admin-ai-assignment">
         <div className="cardTitle">Allocate AI key</div>
         <div className="muted">Assign one API key to a solo user, to yourself as admin, or to an enterprise / builder owner. Team underlings inherit the owner allocation automatically.</div>
         <form
@@ -1875,7 +1880,7 @@ export default function AdminPage() {
         </form>
       </section>
 
-      <section className="card">
+      <section className="card adminAnchorTarget" id="admin-enterprise">
         <div className="cardTitle">Enterprise subscriptions</div>
         <div className="grid2">
           <label>
@@ -2365,7 +2370,7 @@ export default function AdminPage() {
       </section>
 
       {displayCompliance ? (
-        <section id="admin-ai-assignment" className="card premiumPanel adminAnchorTarget">
+        <section id="admin-compliance" className="card premiumPanel adminAnchorTarget">
           <div className="cardTitle">Compliance evidence</div>
           <div className="statsGrid">
             <div className="statCard">
@@ -2545,6 +2550,12 @@ export default function AdminPage() {
           </div>
         </section>
       ) : null}
+
+      <datalist id="admin-user-emails">
+        {displayRows.map((row) => (
+          <option key={row.id} value={row.email}>{row.full_name ? `${row.email} · ${row.full_name}` : row.email}</option>
+        ))}
+      </datalist>
 
       <div className="tableWrap">
         <table className="table">

@@ -110,7 +110,7 @@ export default function RevenueGraph() {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grain, plan]);
+  }, [grain, plan, startDate, endDate]);
 
   const linePoints = useMemo(() => pointsForLine(data?.timeline.map((row) => row.gross_revenue) || [], 520, 180), [data]);
   const growthPoints = useMemo(() => pointsForLine(data?.growth.map((row) => row.total_active) || [], 520, 160), [data]);
@@ -133,9 +133,10 @@ export default function RevenueGraph() {
           </select>
           <select value={plan} onChange={(e) => setPlan(e.target.value)} aria-label="Plan filter">
             <option value="all">All plans</option>
-            <option value="starter">Starter</option>
-            <option value="growth">Growth</option>
+            <option value="enterprise">Enterprise</option>
             <option value="builder">Builder</option>
+            <option value="solo">Solo</option>
+            <option value="free">Free</option>
           </select>
           <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} aria-label="Start date" />
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} aria-label="End date" />

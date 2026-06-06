@@ -161,7 +161,7 @@ export default function SubscriberDataTable() {
           </div>
           <div className="adminFilters left">
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, email, company" aria-label="Search subscribers" />
-            <select value={plan} onChange={(e) => setPlan(e.target.value)}><option value="all">All plans</option><option value="starter">Starter</option><option value="growth">Growth</option><option value="builder">Builder</option></select>
+            <select value={plan} onChange={(e) => setPlan(e.target.value)}><option value="all">All plans</option><option value="enterprise">Enterprise</option><option value="builder">Builder</option><option value="solo">Solo</option><option value="free">Free</option></select>
             <select value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">All status</option><option value="active">Active</option><option value="expiring_soon">Expiring Soon</option><option value="expired">Expired</option><option value="cancelled">Cancelled</option></select>
             <select value={health} onChange={(e) => setHealth(e.target.value)}><option value="all">All health</option><option value="at_risk">At Risk</option><option value="stable">Stable</option><option value="power_user">Power User</option></select>
             <select value={renewal} onChange={(e) => setRenewal(e.target.value)}><option value="all">All renewals</option><option value="7d">Renewal &lt; 7d</option><option value="30d">Renewal &lt; 30d</option></select>
@@ -215,9 +215,9 @@ export default function SubscriberDataTable() {
           <div className="card">
             <div className="row right"><button className="btn ghost compact" type="button" onClick={() => setEmailTarget(null)}>Close</button></div>
             <div className="cardTitle">Send Email</div>
-            <p className="muted small">Compose for {emailTarget.email}. This opens your email client.</p>
+            <p className="muted small">Compose for {emailTarget.email}. This opens Gmail.</p>
             <textarea value={emailDraft} onChange={(e) => setEmailDraft(e.target.value)} placeholder="Message..." />
-            <a className="btn" href={`mailto:${emailTarget.email}?subject=${encodeURIComponent("Northstone subscription update")}&body=${encodeURIComponent(emailDraft)}`}>Open email</a>
+            <a className="btn" href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailTarget.email)}&su=${encodeURIComponent("Northstone subscription update")}&body=${encodeURIComponent(emailDraft)}`} target="_blank" rel="noopener noreferrer">Open Gmail</a>
           </div>
         </div>
       ) : null}
