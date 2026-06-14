@@ -308,17 +308,245 @@ New sections added:
     .person { margin-top: 22px; display: flex; gap: 12px; align-items: center; }
     .avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--brand); color: #fff; font-weight: 900; }
 
+    .pricing-dark {
+      background: transparent;
+      color: var(--ink);
+    }
+    .pricing-dark .section-head h2,
+    .pricing-dark .section-head p,
+    .pricing-dark .eyebrow,
+    .pricing-dark .estimator-title,
+    .pricing-dark .estimator-note,
+    .pricing-dark .estimator-item label,
+    .pricing-dark .estimator-total,
+    .pricing-dark .plan-card h3,
+    .pricing-dark .plan-card p,
+    .pricing-dark .plan-price,
+    .pricing-dark .plan-price small,
+    .pricing-dark .plan-subnote,
+    .pricing-dark .plan-allocation,
+    .pricing-dark .plan-allocation strong,
+    .pricing-dark .plan-card li,
+    .pricing-dark .plan-cta-inline {
+      color: var(--ink);
+    }
+    .pricing-dark .eyebrow {
+      background: var(--accent-soft);
+      color: #03665f;
+      border: 1px solid transparent;
+    }
+    .pricing-dark .lead,
+    .pricing-dark .section-head p,
+    .pricing-dark .plan-subtitle,
+    .pricing-dark .plan-subnote,
+    .pricing-dark .plan-allocation span,
+    .pricing-dark .estimator-note,
+    .pricing-dark .estimator-hint {
+      color: var(--muted);
+    }
     .pricing-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 24px;
       align-items: stretch;
     }
-    .price-card { position: relative; display: grid; gap: 18px; }
-    .price-card.popular { border: 2px solid var(--brand); box-shadow: var(--shadow); }
-    .popular-badge { position: absolute; top: 20px; right: 20px; background: var(--brand); color: #fff; }
-    .price { font-size: clamp(2.1rem, 4vw, 3.4rem); font-weight: 800; letter-spacing: -0.04em; color: var(--ink); }
-    .price small { font-size: 1rem; color: var(--muted); letter-spacing: 0; }
+    .plan-card {
+      position: relative;
+      display: grid;
+      gap: 18px;
+      padding: 28px;
+      border-radius: 28px;
+      border: 1px solid #d7dfec;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 18px 46px rgba(16, 24, 40, 0.06);
+    }
+    .plan-card.popular {
+      border: 2px solid #3b7dd8;
+      box-shadow: 0 18px 40px rgba(59, 125, 216, 0.14);
+    }
+    .popular-badge {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: #3b7dd8;
+      color: #fff;
+      border-color: transparent;
+    }
+    .plan-price {
+      font-size: clamp(2.1rem, 4vw, 3.4rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--ink);
+    }
+    .plan-price small {
+      font-size: 1rem;
+      color: var(--muted);
+      letter-spacing: 0;
+    }
+    .plan-subtitle,
+    .plan-subnote {
+      margin: 0;
+    }
+    .plan-allocation {
+      display: grid;
+      gap: 8px;
+      padding: 18px;
+      border-radius: 20px;
+      border: 1px solid #d7dfec;
+      background: #f7f9fc;
+    }
+    .plan-allocation strong {
+      font-size: 0.92rem;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .plan-allocation span {
+      display: block;
+      font-size: 0.98rem;
+    }
+    .plan-card ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 14px;
+    }
+    .plan-card li {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 10px;
+      color: var(--ink);
+    }
+    .plan-card .good {
+      color: #027a48;
+    }
+    .plan-card .bad {
+      color: #98a2b3;
+    }
+    .plan-cta-inline {
+      width: 100%;
+      justify-content: center;
+      border-color: #d7dfec;
+      background: #fff;
+      color: var(--ink);
+    }
+    .plan-card.popular .plan-cta-inline {
+      background: #3b7dd8;
+      color: #fff;
+      box-shadow: 0 16px 32px rgba(59, 125, 216, 0.24);
+    }
+    .estimator-bar {
+      margin-top: 28px;
+      padding: 24px;
+      border: 1px solid #d7dfec;
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.9);
+      display: grid;
+      gap: 22px;
+      box-shadow: 0 18px 46px rgba(16, 24, 40, 0.06);
+    }
+    .estimator-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .estimator-item {
+      display: grid;
+      gap: 10px;
+      padding: 18px;
+      border-radius: 20px;
+      border: 1px solid #d7dfec;
+      background: #f7f9fc;
+    }
+    .estimator-item input {
+      width: 100%;
+      min-height: 52px;
+      border: 1px solid #d7dfec;
+      border-radius: 14px;
+      background: #fff;
+      color: var(--ink);
+      padding: 0 14px;
+    }
+    .estimator-item input:focus-visible {
+      border-color: #3b7dd8;
+    }
+    .estimator-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+    }
+    .estimator-total {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .marketing-section {
+      background: #fff;
+    }
+    .marketing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+      align-items: stretch;
+    }
+    .marketing-card {
+      position: relative;
+      display: grid;
+      gap: 18px;
+      padding: 28px;
+      border-radius: 28px;
+      border: 1px solid #d7dfec;
+      background: #fff;
+      box-shadow: 0 18px 46px rgba(16, 24, 40, 0.06);
+    }
+    .marketing-card.recommended {
+      border: 2px solid #3b7dd8;
+      box-shadow: 0 18px 40px rgba(59, 125, 216, 0.14);
+    }
+    .marketing-tag {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      min-height: 34px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid #d7dfec;
+      background: #f7f9fc;
+      color: #1f2937;
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .marketing-card.recommended .marketing-tag {
+      border-color: transparent;
+      background: #3b7dd8;
+      color: #fff;
+    }
+    .marketing-price {
+      font-size: clamp(2rem, 3vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--ink);
+    }
+    .marketing-note {
+      color: var(--muted);
+      margin: -8px 0 0;
+    }
+    .marketing-card ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 14px;
+    }
+    .marketing-card li {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 10px;
+      color: var(--ink);
+    }
+    .marketing-card .btn {
+      width: 100%;
+      justify-content: center;
+    }
 
     .faq-list { display: grid; gap: 12px; }
     .faq-item { border: 1px solid var(--line); border-radius: 18px; background: #fff; overflow: hidden; }
@@ -423,7 +651,8 @@ New sections added:
 
     @media (max-width: 1024px) {
       .hero-grid, .contact-grid { grid-template-columns: 1fr; }
-      .feature-grid, .pricing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .feature-grid, .pricing-grid, .marketing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .estimator-grid { grid-template-columns: 1fr; }
       .proof-strip { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 767px) {
@@ -435,7 +664,7 @@ New sections added:
       .menu-toggle { display: inline-block; }
       .brand span small { display: none; }
       .hero-actions .btn, .form-actions .btn, .cta-banner .btn { width: 100%; }
-      .two-col, .feature-grid, .steps, .pricing-grid, .field-grid, .footer-grid, .footer-links { grid-template-columns: 1fr; }
+      .two-col, .feature-grid, .steps, .pricing-grid, .marketing-grid, .field-grid, .footer-grid, .footer-links, .estimator-grid { grid-template-columns: 1fr; }
       .testimonial-grid {
         display: flex;
         overflow-x: auto;
@@ -680,48 +909,157 @@ New sections added:
       </div>
     </section>
 
-    <section class="section" id="pricing">
+    <section class="section pricing-dark" id="pricing">
       <div class="container">
         <div class="section-head">
           <span class="eyebrow">Pricing</span>
           <h2>Plans for solo closers, teams, and builders.</h2>
-          <p class="lead">Payment links can be connected after gateway approval. Until then, each plan can be requested directly from this page.</p>
+          <p class="lead">Choose the CRM subscription that matches your structure, ID count, and operating model.</p>
         </div>
         <div class="pricing-grid">
-          <article class="card price-card">
-            <h3>Starter</h3>
-            <p>For solo brokers and consultants.</p>
-            <div class="price">₹1,199 <small>/month</small></div>
+          <article class="plan-card">
+            <h3>Solo</h3>
+            <p class="plan-subtitle">For individual brokers and solo closers.</p>
+            <div class="plan-price">₹1,199 <small>/month</small></div>
+            <div class="plan-allocation">
+              <strong>ID Allocation</strong>
+              <span>Included IDs: 1 ID</span>
+              <span>Extra IDs: Not available</span>
+              <span>Min. capital required: ₹1,199/mo</span>
+            </div>
             <ul>
               <li><span class="good">✓</span><span>Personal pipeline, contacts, deals, ROI, and insights</span></li>
               <li><span class="good">✓</span><span>AI follow-up access when allocated</span></li>
               <li><span class="good">✓</span><span>Import, export, and account-level reporting</span></li>
+              <li><span class="bad">—</span><span>No team or employee ID support</span></li>
+              <li><span class="bad">—</span><span>No builder website tools</span></li>
+              <li><span class="bad">—</span><span>No enterprise owner controls</span></li>
             </ul>
-            <a class="btn btn-secondary plan-cta" href="#contact" data-plan="Starter">Start Starter</a>
+            <button class="btn plan-cta-inline pricing-pay-btn" type="button" data-plan="Solo">Start Solo ↗</button>
           </article>
-          <article class="card price-card popular">
+          <article class="plan-card popular">
             <span class="pill popular-badge">Most Popular</span>
-            <h3>Growth</h3>
-            <p>For brokerages and CP networks.</p>
-            <div class="price">₹6,999 <small>/month base</small></div>
+            <h3>Enterprise</h3>
+            <p class="plan-subtitle">For brokerages, CP networks, and owner-led sales teams.</p>
+            <div class="plan-price">₹6,999 <small>/month base</small></div>
+            <p class="plan-subnote">5 IDs included · Extra IDs at ₹899/mo each</p>
+            <div class="plan-allocation">
+              <strong>ID Allocation</strong>
+              <span>Included IDs: 5 IDs</span>
+              <span>Owner / admin: 1 ID</span>
+              <span>Employee / team: 4 IDs</span>
+              <span>Extra IDs: ₹899/mo each</span>
+              <span>Min. capital required: ₹6,999/mo</span>
+            </div>
             <ul>
               <li><span class="good">✓</span><span>Enterprise owner account with employee ID creation</span></li>
               <li><span class="good">✓</span><span>Org-wide reporting, user controls, and AI inheritance</span></li>
               <li><span class="good">✓</span><span>Private support thread and employee drill-down</span></li>
+              <li><span class="good">✓</span><span>All Solo features included</span></li>
+              <li><span class="bad">—</span><span>No builder website tools</span></li>
             </ul>
-            <a class="btn btn-primary plan-cta" href="#contact" data-plan="Growth">Request Growth</a>
+            <button class="btn plan-cta-inline pricing-enterprise-btn" type="button" data-plan="Enterprise">Request Enterprise ↗</button>
           </article>
-          <article class="card price-card">
+          <article class="plan-card">
             <h3>Builder</h3>
-            <p>For developers and construction-led sales teams.</p>
-            <div class="price">₹11,999 <small>/month base</small></div>
+            <p class="plan-subtitle">For developers and construction-led sales teams.</p>
+            <div class="plan-price">₹11,999 <small>/month base</small></div>
+            <p class="plan-subnote">5 IDs included · Extra IDs at ₹999/mo each</p>
+            <div class="plan-allocation">
+              <strong>ID Allocation</strong>
+              <span>Included IDs: 5 IDs</span>
+              <span>Builder owner / admin: 1 ID</span>
+              <span>Team / employee: 4 IDs</span>
+              <span>Extra IDs: ₹999/mo each</span>
+              <span>Min. capital required: ₹11,999/mo</span>
+            </div>
             <ul>
-              <li><span class="good">✓</span><span>Everything in Growth, plus builder workflows</span></li>
+              <li><span class="good">✓</span><span>Everything in Enterprise, plus builder workflows</span></li>
               <li><span class="good">✓</span><span>AI builder documents and public AI website builder</span></li>
               <li><span class="good">✓</span><span>Property gallery, Formspree-ready inquiries, and site editing</span></li>
-              <li><span class="good">✓</span><span>Automatic /builders/company-url page with custom-domain option</span></li>
+              <li><span class="good">✓</span><span>Auto /builders/company-url page with custom domain option</span></li>
+              <li><span class="good">✓</span><span>Domain and ad budget are separate if used</span></li>
             </ul>
-            <a class="btn btn-secondary plan-cta" href="#contact" data-plan="Builder">Start Builder</a>
+            <button class="btn plan-cta-inline pricing-pay-btn" type="button" data-plan="Builder">Start Builder ↗</button>
+          </article>
+        </div>
+        <div class="estimator-bar" aria-label="Monthly cost estimator">
+          <div>
+            <div class="estimator-title">Monthly cost estimator</div>
+            <div class="estimator-note">Use the included ID structure below to estimate your monthly CRM total before checkout.</div>
+          </div>
+          <div class="estimator-grid">
+            <article class="estimator-item">
+              <div class="estimator-title">Solo</div>
+              <div class="estimator-hint">Extra IDs not available</div>
+              <div class="estimator-total" id="soloEstimate">₹1,199/mo</div>
+            </article>
+            <article class="estimator-item">
+              <div class="estimator-title">Enterprise</div>
+              <label for="enterpriseExtraIds">Extra IDs needed</label>
+              <input id="enterpriseExtraIds" type="number" min="0" value="0" inputmode="numeric">
+              <div class="estimator-total" id="enterpriseEstimate">₹6,999/mo</div>
+            </article>
+            <article class="estimator-item">
+              <div class="estimator-title">Builder</div>
+              <label for="builderExtraIds">Extra IDs needed</label>
+              <input id="builderExtraIds" type="number" min="0" value="0" inputmode="numeric">
+              <div class="estimator-total" id="builderEstimate">₹11,999/mo</div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section marketing-section" id="marketing-addons">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Marketing Add-ons</span>
+          <h2>Add managed marketing on top of your CRM plan.</h2>
+          <p class="lead">These add-ons are billed separately and can be attached to the CRM plan that fits your team structure.</p>
+        </div>
+        <div class="marketing-grid">
+          <article class="marketing-card">
+            <span class="marketing-tag">↗ Growth</span>
+            <h3>Growth Marketing</h3>
+            <div class="marketing-price">₹18,000/month</div>
+            <p class="marketing-note">Billed as ₹54,000 · 3-month mandate</p>
+            <ul>
+              <li><span class="good">✓</span><span>21 videos + 21 posters + festival posts</span></li>
+              <li><span class="good">✓</span><span>Social media management + strategy</span></li>
+              <li><span class="good">✓</span><span>2 influencer videos</span></li>
+              <li><span class="good">✓</span><span>Meta ads setup</span></li>
+              <li><span class="good">✓</span><span>Monthly performance report</span></li>
+            </ul>
+            <button class="btn btn-ghost marketing-pay-btn" type="button" data-addon="Growth Marketing">Add to plan ↗</button>
+          </article>
+          <article class="marketing-card recommended">
+            <span class="marketing-tag">⚡ Recommended</span>
+            <h3>Scale Marketing</h3>
+            <div class="marketing-price">₹25,000/month</div>
+            <p class="marketing-note">Billed as ₹75,000 · 3-month mandate</p>
+            <ul>
+              <li><span class="good">✓</span><span>24 videos + 24 posters + festival posts</span></li>
+              <li><span class="good">✓</span><span>Social media management + strategy</span></li>
+              <li><span class="good">✓</span><span>3 influencer videos</span></li>
+              <li><span class="good">✓</span><span>Meta ads setup + ₹3,000 ad run credit</span></li>
+              <li><span class="good">✓</span><span>Monthly performance report + CRM attribution</span></li>
+            </ul>
+            <button class="btn btn-primary marketing-pay-btn" type="button" data-addon="Scale Marketing">Add to plan ↗</button>
+          </article>
+          <article class="marketing-card">
+            <span class="marketing-tag">◯ AI Branding · 1 month</span>
+            <h3>AI Brand Launch</h3>
+            <div class="marketing-price">₹16,000/month</div>
+            <p class="marketing-note">Billed as ₹16,000 · 1-month only</p>
+            <ul>
+              <li><span class="good">✓</span><span>Social media management + strategy</span></li>
+              <li><span class="good">✓</span><span>AI video + AI-generated brand images</span></li>
+              <li><span class="good">✓</span><span>AI influencer branding (1 video)</span></li>
+              <li><span class="good">✓</span><span>Meta ads setup</span></li>
+              <li><span class="good">✓</span><span>Brand asset handoff report</span></li>
+            </ul>
+            <button class="btn btn-ghost marketing-pay-btn" type="button" data-addon="AI Brand Launch">Add to plan ↗</button>
           </article>
         </div>
       </div>
@@ -918,6 +1256,20 @@ New sections added:
       const API_BASE = "https://api.northstonecrm.com"; // SECURITY FIX: HTTPS-only production endpoint prevents insecure form submission.
       const menuButton = document.querySelector(".menu-toggle");
       const mobileMenu = document.getElementById("mobileMenu");
+      const razorpayKey =
+        (globalThis.process && globalThis.process.env && globalThis.process.env.VITE_RAZORPAY_KEY_ID) ||
+        globalThis.VITE_RAZORPAY_KEY_ID ||
+        "YOUR_RAZORPAY_KEY_ID";
+      const pricingState = {
+        enterpriseExtraIds: 0,
+        builderExtraIds: 0
+      };
+      const amountMap = {
+        Solo: 119900,
+        "Growth Marketing": 1800000,
+        "Scale Marketing": 2500000,
+        "AI Brand Launch": 1600000
+      };
 
       function cleanText(value, maxLength) {
         // SECURITY FIX: Strip angle brackets and cap length before any user-entered value is processed.
@@ -932,6 +1284,98 @@ New sections added:
         // SECURITY FIX: Use text nodes so user-controlled values cannot execute as markup.
         node.textContent = message;
         node.className = `form-message ${type || ""}`.trim();
+      }
+
+      function formatInr(amount) {
+        return new Intl.NumberFormat("en-IN", {
+          style: "currency",
+          currency: "INR",
+          maximumFractionDigits: 0
+        }).format(amount);
+      }
+
+      function parseExtraIds(value) {
+        const parsed = Number.parseInt(String(value || "0"), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+      }
+
+      function enterpriseMonthlyTotal() {
+        return 6999 + pricingState.enterpriseExtraIds * 899;
+      }
+
+      function builderMonthlyTotal() {
+        return 11999 + pricingState.builderExtraIds * 999;
+      }
+
+      function updateEstimatorUi() {
+        const soloNode = document.getElementById("soloEstimate");
+        const enterpriseNode = document.getElementById("enterpriseEstimate");
+        const builderNode = document.getElementById("builderEstimate");
+        if (soloNode) soloNode.textContent = `${formatInr(1199)}/mo`;
+        if (enterpriseNode) enterpriseNode.textContent = `${formatInr(enterpriseMonthlyTotal())}/mo`;
+        if (builderNode) builderNode.textContent = `${formatInr(builderMonthlyTotal())}/mo`;
+      }
+
+      function setContactPlan(plan, message) {
+        const textarea = document.getElementById("contactMessage");
+        const planSelect = document.getElementById("contactPlan");
+        if (planSelect && plan) planSelect.value = plan;
+        if (textarea && message) textarea.value = message;
+      }
+
+      function redirectEnterpriseInquiry() {
+        setContactPlan(
+          "Enterprise",
+          `I want to discuss the Enterprise plan for my real-estate business. We currently need ${pricingState.enterpriseExtraIds} extra IDs beyond the 5 included IDs.`
+        );
+        const contactSection = document.getElementById("contact");
+        if (contactSection) contactSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function ensureRazorpayScript() {
+        return new Promise((resolve, reject) => {
+          if (globalThis.Razorpay) {
+            resolve();
+            return;
+          }
+          const existing = document.querySelector('script[data-razorpay-checkout="true"]');
+          if (existing) {
+            existing.addEventListener("load", () => resolve(), { once: true });
+            existing.addEventListener("error", () => reject(new Error("Razorpay checkout failed to load.")), { once: true });
+            return;
+          }
+          const script = document.createElement("script");
+          script.src = "https://checkout.razorpay.com/v1/checkout.js";
+          script.dataset.razorpayCheckout = "true";
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error("Razorpay checkout failed to load."));
+          document.body.appendChild(script);
+        });
+      }
+
+      async function openRazorpayCheckout(planName, amountInPaise) {
+        await ensureRazorpayScript();
+        if (!globalThis.Razorpay) throw new Error("Razorpay checkout is unavailable right now.");
+        const options = {
+          key: razorpayKey,
+          amount: amountInPaise,
+          currency: "INR",
+          name: "Northstone CRM",
+          description: `${planName} Subscription`,
+          prefill: {
+            name: "",
+            email: "",
+            contact: ""
+          },
+          theme: {
+            color: "#3B7DD8"
+          },
+          handler: function (response) {
+            alert("Payment successful. ID: " + response.razorpay_payment_id);
+          }
+        };
+        const rzp = new globalThis.Razorpay(options);
+        rzp.open();
       }
 
       function closeDrawer() {
@@ -962,13 +1406,50 @@ New sections added:
         });
       });
 
-      document.querySelectorAll(".plan-cta").forEach((link) => {
-        link.addEventListener("click", () => {
-          const plan = cleanText(link.getAttribute("data-plan"), 40);
-          const textarea = document.getElementById("contactMessage");
-          const planSelect = document.getElementById("contactPlan");
-          if (planSelect && plan) planSelect.value = plan;
-          if (textarea && plan) textarea.value = `I want to discuss the ${plan} plan for my real-estate business.`;
+      const enterpriseExtraIdsInput = document.getElementById("enterpriseExtraIds");
+      const builderExtraIdsInput = document.getElementById("builderExtraIds");
+      if (enterpriseExtraIdsInput) {
+        enterpriseExtraIdsInput.addEventListener("input", (event) => {
+          pricingState.enterpriseExtraIds = parseExtraIds(event.target.value);
+          event.target.value = String(pricingState.enterpriseExtraIds);
+          updateEstimatorUi();
+        });
+      }
+      if (builderExtraIdsInput) {
+        builderExtraIdsInput.addEventListener("input", (event) => {
+          pricingState.builderExtraIds = parseExtraIds(event.target.value);
+          event.target.value = String(pricingState.builderExtraIds);
+          updateEstimatorUi();
+        });
+      }
+      updateEstimatorUi();
+
+      document.querySelectorAll(".pricing-pay-btn").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const plan = cleanText(button.getAttribute("data-plan"), 40);
+          try {
+            const amountInPaise = plan === "Builder" ? builderMonthlyTotal() * 100 : amountMap[plan];
+            await openRazorpayCheckout(plan, amountInPaise);
+          } catch (error) {
+            alert(error instanceof Error ? error.message : "Checkout could not be opened right now.");
+          }
+        });
+      });
+
+      document.querySelectorAll(".marketing-pay-btn").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const addon = cleanText(button.getAttribute("data-addon"), 40);
+          try {
+            await openRazorpayCheckout(addon, amountMap[addon]);
+          } catch (error) {
+            alert(error instanceof Error ? error.message : "Checkout could not be opened right now.");
+          }
+        });
+      });
+
+      document.querySelectorAll(".pricing-enterprise-btn").forEach((button) => {
+        button.addEventListener("click", () => {
+          redirectEnterpriseInquiry();
         });
       });
 
