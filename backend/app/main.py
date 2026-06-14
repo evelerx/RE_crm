@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 from .routes import (
     activities,
     admin,
+    admin_marketing,
+    agency_auth,
+    agency_executive,
+    agency_manager,
     ai,
     auth,
     contacts,
@@ -23,6 +27,7 @@ from .routes import (
     insights,
     llm,
     meta,
+    marketing,
     next_actions,
     profile,
     public,
@@ -109,6 +114,12 @@ app.include_router(csvio.router, dependencies=deps)
 app.include_router(insights.router, dependencies=deps)
 app.include_router(enterprise.router, dependencies=deps)
 app.include_router(whatsapp.router, dependencies=deps)
+app.include_router(marketing.router, dependencies=deps)
+app.include_router(marketing.payments_router, dependencies=deps)
+app.include_router(admin_marketing.router, dependencies=deps)
+app.include_router(agency_auth.router, dependencies=deps)
+app.include_router(agency_manager.router, dependencies=deps)
+app.include_router(agency_executive.router, dependencies=deps)
 app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 

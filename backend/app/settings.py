@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     data_encryption_key: str = ""  # Fernet key (base64), optional but recommended
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_management_api_key: str = ""
+    agency_jwt_secret: str = "change-agency-jwt-secret"
     google_client_id: str = ""
     google_client_secret: str = ""
     microsoft_client_id: str = ""
@@ -48,6 +49,8 @@ class Settings(BaseSettings):
     formspree_endpoint: str = ""
     formspree_bearer_token: str = ""
     builder_sites_base_url: str = "https://northstonecrm.com/builders"
+    marketing_default_agency_email: str = ""
+    marketing_default_agency_name: str = "Northstone Marketing"
     whatsapp_token: str = ""
     whatsapp_phone_number_id: str = ""
     whatsapp_verify_token: str = ""

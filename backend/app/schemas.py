@@ -511,6 +511,221 @@ class SupportChatMessageRead(BaseModel):
     created_at: datetime
 
 
+class MarketingAddonRead(BaseModel):
+    id: UUID
+    enterprise_owner_id: UUID
+    addon_type: str
+    status: str
+    start_date: date
+    end_date: Optional[date] = None
+    monthly_amount: float
+    currency: str = "INR"
+    razorpay_payment_id: Optional[str] = None
+
+
+class MarketingOwnerSummaryRead(BaseModel):
+    id: UUID
+    name: str = ""
+    email: str = ""
+    company: str = ""
+    city: str = ""
+
+
+class AgencyUserRead(BaseModel):
+    id: UUID
+    agency_id: UUID
+    name: str = ""
+    email: str = ""
+    role: str = ""
+    status: str = ""
+    created_at: datetime
+
+
+class MarketingTaskRead(BaseModel):
+    id: UUID
+    request_id: UUID
+    agency_id: UUID
+    assigned_to: Optional[UUID] = None
+    assigned_by: Optional[UUID] = None
+    assigned_to_name: str = ""
+    assigned_by_name: str = ""
+    title: str
+    description: str = ""
+    task_type: str
+    due_date: Optional[date] = None
+    status: str
+    deliverable_url: Optional[str] = None
+    deliverable_notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MarketingCommentRead(BaseModel):
+    id: UUID
+    request_id: UUID
+    task_id: Optional[UUID] = None
+    sender_id: str
+    sender_role: str
+    sender_name: str
+    message: str
+    created_at: datetime
+
+
+class MarketingApprovalRead(BaseModel):
+    id: UUID
+    request_id: UUID
+    task_id: Optional[UUID] = None
+    approval_type: str
+    description: str
+    status: str
+    reviewed_by: Optional[UUID] = None
+    reviewed_by_name: str = ""
+    review_note: Optional[str] = None
+    created_at: datetime
+    reviewed_at: Optional[datetime] = None
+
+
+class MarketingRequestCreate(BaseModel):
+    channel: str = Field(min_length=2, max_length=40)
+    objective: str = Field(default="", max_length=120)
+    project_name: str = Field(default="", max_length=160)
+    property_type: str = Field(default="", max_length=120)
+    target_city: str = Field(default="", max_length=120)
+    target_area: str = Field(default="", max_length=160)
+    price_range: str = Field(default="", max_length=120)
+    target_audience: str = Field(default="", max_length=240)
+    primary_goal: str = Field(default="", max_length=120)
+    lead_target: int = Field(default=0, ge=0, le=100000)
+    launch_date: Optional[date] = None
+    duration: str = Field(default="", max_length=80)
+    monthly_spend: float = Field(default=0, ge=0)
+    overspend_tolerance: str = Field(default="", max_length=80)
+    reporting_frequency: str = Field(default="", max_length=40)
+    cta: str = Field(default="", max_length=120)
+    usp: str = Field(default="", max_length=2000)
+    notes: str = Field(default="", max_length=4000)
+
+
+class MarketingCommentCreate(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    task_id: Optional[UUID] = None
+
+
+class MarketingApprovalOwnerSignOffRequest(BaseModel):
+    action: str = Field(pattern="^(approved|changes_requested|rejected)$")
+    note: str = Field(default="", max_length=2000)
+
+
+class MarketingRequestSummaryRead(BaseModel):
+    id: UUID
+    request_code: str
+    channel: str
+    objective: str = ""
+    project_name: str = ""
+    status: str
+    addon_type: str
+    owner: MarketingOwnerSummaryRead
+    assigned_manager: Optional[AgencyUserRead] = None
+    task_count: int = 0
+    completed_task_count: int = 0
+    latest_comment: Optional[MarketingCommentRead] = None
+    pending_owner_approvals: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class MarketingRequestDetailRead(MarketingRequestSummaryRead):
+    addon_subscription: MarketingAddonRead
+    lead_target: int = 0
+    launch_date: Optional[date] = None
+    duration: str = ""
+    monthly_spend: float = 0
+    overspend_tolerance: str = ""
+    reporting_frequency: str = ""
+    cta: str = ""
+    usp: str = ""
+    notes: str = ""
+    property_type: str = ""
+    target_city: str = ""
+    target_area: str = ""
+    price_range: str = ""
+    target_audience: str = ""
+    primary_goal: str = ""
+    tasks: list[MarketingTaskRead] = []
+    comments: list[MarketingCommentRead] = []
+    approvals: list[MarketingApprovalRead] = []
+
+
+class MarketingMetricsRead(BaseModel):
+    active_requests: int = 0
+    pending_approvals: int = 0
+    in_progress_tasks: int = 0
+    completed_this_month: int = 0
+    unread_comments: int = 0
+    active_addon_type: str = ""
+    active_addon_renews_on: Optional[date] = None
+
+
+class AgencyAuthLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AgencyAuthMeRead(BaseModel):
+    agency_token: Optional[str] = None
+    user: AgencyUserRead
+    agency_name: str = ""
+
+
+class AgencyRequestStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(submitted|under_review|approved|in_progress|changes_requested|completed|rejected)$")
+    note: str = Field(default="", max_length=2000)
+
+
+class AgencyTaskCreate(BaseModel):
+    title: str = Field(min_length=2, max_length=160)
+    description: str = Field(default="", max_length=4000)
+    task_type: str = Field(pattern="^(content_creation|ad_setup|reporting|brand_asset|campaign_management)$")
+    assigned_to: UUID
+    due_date: Optional[date] = None
+
+
+class AgencyTaskUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=2, max_length=160)
+    description: Optional[str] = Field(default=None, max_length=4000)
+    task_type: Optional[str] = Field(default=None, pattern="^(content_creation|ad_setup|reporting|brand_asset|campaign_management)$")
+    assigned_to: Optional[UUID] = None
+    due_date: Optional[date] = None
+    status: Optional[str] = Field(default=None, pattern="^(pending|in_progress|review|completed)$")
+
+
+class AgencyApprovalCreate(BaseModel):
+    request_id: UUID
+    task_id: Optional[UUID] = None
+    approval_type: str = Field(pattern="^(creative_brief|ad_copy|campaign_launch|budget_release|report_sign_off)$")
+    description: str = Field(min_length=2, max_length=2000)
+
+
+class AgencyApprovalReview(BaseModel):
+    status: str = Field(pattern="^(approved|changes_requested|rejected)$")
+    note: str = Field(default="", max_length=2000)
+
+
+class AgencyTaskDeliverableCreate(BaseModel):
+    deliverable_url: str = Field(default="", max_length=500)
+    deliverable_notes: str = Field(default="", max_length=4000)
+
+
+class MarketingNotificationRead(BaseModel):
+    id: UUID
+    user_id: str
+    user_type: str
+    message: str
+    link: str
+    read: bool
+    created_at: datetime
+
+
 class ContactCreate(BaseModel):
     name: str
     occupation: str = ""

@@ -225,6 +225,28 @@ type SubscriptionAnalytics = {
   note: string;
 };
 
+type RbacPermissionGroup = {
+  label: string;
+  permissions: string[];
+};
+
+type FeatureFlagRow = {
+  key: string;
+  description: string;
+  enabled: boolean;
+  plans: Record<"solo" | "enterprise" | "builder" | "custom", boolean>;
+};
+
+type JobMonitorRow = {
+  name: string;
+  schedule: string;
+  lastRun: string;
+  duration: string;
+  nextRun: string;
+  status: "completed" | "running" | "failed" | "scheduled";
+  affected: string;
+};
+
 type FallbackEmployeeRow = EnterpriseEmployeeRow;
 
 function fmtDt(value: string | null) {
@@ -303,6 +325,57 @@ const demoChatRows: SupportChatRow[] = [
     message: "Thanks, we are reviewing team progress and assigning brokers today.",
     created_at: "2026-05-14T11:00:00Z"
   }
+];
+
+const RBAC_ROLES = ["admin", "enterprise_owner", "builder_owner", "manager", "broker", "cp", "employee", "solo"] as const;
+const RBAC_GROUPS: RbacPermissionGroup[] = [
+  { label: "Records", permissions: ["view_own_records", "view_team_records", "view_org_records"] },
+  { label: "Deals", permissions: ["create_deal", "edit_deal", "delete_deal", "move_deal_stage", "reassign_deal"] },
+  { label: "Contacts", permissions: ["create_contact", "edit_contact", "delete_contact"] },
+  { label: "Inventory", permissions: ["view_inventory", "manage_inventory", "set_soft_hold", "set_blocked"] },
+  { label: "Team", permissions: ["create_employee", "manage_team", "view_leaderboard", "set_targets"] },
+  { label: "AI", permissions: ["use_ai_followup", "use_ai_scoring", "use_builder_ai"] },
+  { label: "Admin", permissions: ["access_admin_portal", "impersonate_user", "manage_subscriptions", "manage_rbac"] },
+];
+
+const DEFAULT_RBAC_MATRIX: Record<string, Record<string, boolean>> = RBAC_ROLES.reduce((acc, role) => {
+  acc[role] = RBAC_GROUPS.flatMap((group) => group.permissions).reduce<Record<string, boolean>>((map, permission) => {
+    map[permission] =
+      role === "admin" ||
+      (role === "enterprise_owner" && !permission.startsWith("manage_rbac")) ||
+      (role === "builder_owner" && ["view_own_records", "view_team_records", "create_deal", "edit_deal", "move_deal_stage", "create_contact", "edit_contact", "view_inventory", "manage_inventory", "set_soft_hold", "set_blocked", "create_employee", "manage_team", "view_leaderboard", "set_targets", "use_ai_followup", "use_ai_scoring", "use_builder_ai"].includes(permission)) ||
+      (role === "manager" && ["view_own_records", "view_team_records", "create_deal", "edit_deal", "move_deal_stage", "reassign_deal", "create_contact", "edit_contact", "view_inventory", "view_leaderboard", "set_targets", "use_ai_followup", "use_ai_scoring"].includes(permission)) ||
+      (role === "broker" && ["view_own_records", "create_deal", "edit_deal", "move_deal_stage", "create_contact", "edit_contact", "view_inventory", "use_ai_followup", "use_ai_scoring"].includes(permission)) ||
+      (role === "cp" && ["view_own_records", "create_contact", "view_inventory"].includes(permission)) ||
+      (role === "employee" && ["view_own_records", "create_contact", "edit_contact"].includes(permission)) ||
+      (role === "solo" && ["view_own_records", "create_deal", "edit_deal", "move_deal_stage", "create_contact", "edit_contact", "use_ai_followup", "use_ai_scoring"].includes(permission));
+    return map;
+  }, {});
+  return acc;
+}, {} as Record<string, Record<string, boolean>>);
+
+const DEFAULT_FEATURE_FLAGS: FeatureFlagRow[] = [
+  { key: "whatsapp_integration", description: "Shared WhatsApp CRM messaging", enabled: true, plans: { solo: false, enterprise: true, builder: true, custom: true } },
+  { key: "email_sequences", description: "Automated follow-up sequences", enabled: true, plans: { solo: true, enterprise: true, builder: true, custom: true } },
+  { key: "exotel_telephony", description: "Cloud call tracking and recordings", enabled: false, plans: { solo: false, enterprise: true, builder: false, custom: true } },
+  { key: "ai_followup", description: "AI follow-up drafting and nudges", enabled: true, plans: { solo: true, enterprise: true, builder: true, custom: true } },
+  { key: "builder_website", description: "Builder public website workspace", enabled: true, plans: { solo: false, enterprise: false, builder: true, custom: true } },
+  { key: "inventory_module", description: "Project inventory and unit status", enabled: true, plans: { solo: false, enterprise: true, builder: true, custom: true } },
+  { key: "leaderboard", description: "Performance leaderboard and rankings", enabled: true, plans: { solo: false, enterprise: true, builder: true, custom: true } },
+  { key: "target_tracker", description: "Target vs actual tracking", enabled: true, plans: { solo: true, enterprise: true, builder: true, custom: true } },
+  { key: "lead_router", description: "Rule-based lead routing", enabled: true, plans: { solo: false, enterprise: true, builder: true, custom: true } },
+  { key: "facebook_lead_ingest", description: "Facebook Lead Ads webhook ingestion", enabled: false, plans: { solo: false, enterprise: true, builder: true, custom: true } },
+  { key: "google_lead_ingest", description: "Google lead form webhook ingestion", enabled: false, plans: { solo: false, enterprise: true, builder: true, custom: true } },
+  { key: "99acres_ingest", description: "99acres portal lead capture", enabled: true, plans: { solo: false, enterprise: true, builder: true, custom: true } },
+];
+
+const JOB_SEED: JobMonitorRow[] = [
+  { name: "stuck_lead_escalation", schedule: "daily 08:00", lastRun: "Today, 08:00", duration: "318ms", nextRun: "Tomorrow, 08:00", status: "completed", affected: "6 deals" },
+  { name: "soft_hold_expiry", schedule: "every 15min", lastRun: "10 min ago", duration: "84ms", nextRun: "5 min", status: "running", affected: "2 units" },
+  { name: "email_sequence_sender", schedule: "every 30min", lastRun: "28 min ago", duration: "512ms", nextRun: "2 min", status: "scheduled", affected: "18 emails" },
+  { name: "subscription_expiry_check", schedule: "daily 07:00", lastRun: "Today, 07:00", duration: "274ms", nextRun: "Tomorrow, 07:00", status: "completed", affected: "4 accounts" },
+  { name: "leaderboard_refresh", schedule: "hourly", lastRun: "15 min ago", duration: "190ms", nextRun: "45 min", status: "completed", affected: "12 users" },
+  { name: "ai_score_refresh", schedule: "every 2hr", lastRun: "1 hr ago", duration: "701ms", nextRun: "59 min", status: "failed", affected: "0 records" },
 ];
 
 export default function AdminPage() {
@@ -389,6 +462,8 @@ export default function AdminPage() {
   const [expandedAuditIds, setExpandedAuditIds] = useState<Record<string, boolean>>({});
   const [configBusy, setConfigBusy] = useState(false);
   const [configMsg, setConfigMsg] = useState<string | null>(null);
+  const [rbacMatrix, setRbacMatrix] = useState<Record<string, Record<string, boolean>>>(DEFAULT_RBAC_MATRIX);
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlagRow[]>(DEFAULT_FEATURE_FLAGS);
   const [configForm, setConfigForm] = useState({
     frontend_origin: "",
     public_app_url: "",
@@ -532,6 +607,43 @@ export default function AdminPage() {
     }
   }
 
+  function toggleRbac(role: string, permission: string) {
+    if (role === "admin") return;
+    setRbacMatrix((current) => ({
+      ...current,
+      [role]: {
+        ...current[role],
+        [permission]: !current[role]?.[permission],
+      },
+    }));
+  }
+
+  function resetRbacDefaults() {
+    setRbacMatrix(DEFAULT_RBAC_MATRIX);
+  }
+
+  function toggleFeatureFlag(key: string) {
+    setFeatureFlags((current) =>
+      current.map((flag) => (flag.key === key ? { ...flag, enabled: !flag.enabled } : flag)),
+    );
+  }
+
+  function toggleFeatureFlagPlan(key: string, plan: "solo" | "enterprise" | "builder" | "custom") {
+    setFeatureFlags((current) =>
+      current.map((flag) =>
+        flag.key === key
+          ? {
+              ...flag,
+              plans: {
+                ...flag.plans,
+                [plan]: !flag.plans[plan],
+              },
+            }
+          : flag,
+      ),
+    );
+  }
+
   const selectedEnterpriseView =
         (selectedEnterprise && selectedEnterprise.enterprise_owner_id === selectedEnterpriseId
       ? selectedEnterprise
@@ -664,6 +776,27 @@ export default function AdminPage() {
   const newSignupsToday = displayRows.filter((row) => new Date(row.created_at).toDateString() === todayKey).length;
   const recentActivityRows = displayAuditRows.slice(0, 10);
   const kpiAgeSeconds = lastKpiRefreshAt ? Math.max(0, Math.round((Date.now() - lastKpiRefreshAt.getTime()) / 1000)) : 0;
+  const transactionRows = activeSubscriptions.map((row) => ({
+    id: row.id,
+    orgName: row.company || row.email,
+    plan: row.subscription_plan || row.plan,
+    amount: row.subscription_amount_inr || (row.plan === "builder" ? 11999 : row.plan === "enterprise" ? 6999 : 1199),
+    currency: "INR",
+    date: row.subscription_started_at || row.created_at,
+    status: row.is_blacklisted ? "cancelled" : "captured",
+  }));
+  const leadSources = [
+    { source: "Facebook Lead Ads", status: featureFlags.find((flag) => flag.key === "facebook_lead_ingest")?.enabled ? "active" : "inactive", leads24h: 0, lastReceived: "No leads yet", webhook: "/webhooks/facebook-leads" },
+    { source: "Google Lead Forms", status: featureFlags.find((flag) => flag.key === "google_lead_ingest")?.enabled ? "active" : "inactive", leads24h: 0, lastReceived: "No leads yet", webhook: "/webhooks/google-leads" },
+    { source: "99acres", status: featureFlags.find((flag) => flag.key === "99acres_ingest")?.enabled ? "active" : "inactive", leads24h: demoRequests.filter((row) => row.preferred_plan.toLowerCase().includes("enterprise")).length, lastReceived: demoRequests[0]?.requested_at ? fmtDt(demoRequests[0].requested_at) : "No payloads yet", webhook: "/api/portal-leads/ingest/99acres" },
+    { source: "MagicBricks", status: "inactive", leads24h: 0, lastReceived: "No payloads yet", webhook: "/api/portal-leads/ingest/magicbricks" },
+  ] as const;
+  const apiUsageRows = [
+    { endpoint: "/auth/me", method: "GET", calls24h: displayRows.length * 4, calls7d: displayRows.length * 18, avgLatency: 86, p95: 142, errorRate: "0.3%", lastCalled: "moments ago" },
+    { endpoint: "/deals", method: "GET", calls24h: Math.max(12, displayRows.length * 6), calls7d: Math.max(64, displayRows.length * 22), avgLatency: 118, p95: 260, errorRate: "0.8%", lastCalled: "2 min ago" },
+    { endpoint: "/admin/users", method: "GET", calls24h: 14, calls7d: 41, avgLatency: 132, p95: 244, errorRate: "0.0%", lastCalled: "5 min ago" },
+    { endpoint: "/enterprise/overview", method: "GET", calls24h: 31, calls7d: 126, avgLatency: 192, p95: 344, errorRate: "0.6%", lastCalled: "8 min ago" },
+  ];
 
   const filteredAdminUsers = useMemo(() => {
     const q = adminSearch.trim().toLowerCase();
@@ -1373,7 +1506,7 @@ export default function AdminPage() {
         </section>
       ) : null}
 
-      <section id="admin-organization" className="card adminAnchorTarget">
+      <section id="admin-organizations" className="card adminAnchorTarget">
         <div className="cardTitle">Reset user password</div>
         <form
           id="admin-ai-access-form"
@@ -1415,7 +1548,7 @@ export default function AdminPage() {
         </form>
       </section>
 
-      <section className="card">
+      <section id="admin-user-access" className="card adminAnchorTarget">
         <div className="cardTitle">Blacklist / Unblacklist user</div>
         <div className="muted">Blacklisted users keep data but cannot log in.</div>
         <form
@@ -1463,7 +1596,7 @@ export default function AdminPage() {
         </form>
       </section>
 
-      <section className="card">
+      <section className="card adminAnchorTarget">
         <div className="cardTitle">Unlock locked user</div>
         <div className="muted">Use this only after verifying the login issue was legitimate and the user should regain access.</div>
         <form
@@ -1562,7 +1695,7 @@ export default function AdminPage() {
           </button>
         </form>
 
-        <div className="card adminNestedCard">
+        <div className="card adminNestedCard adminAnchorTarget" id="admin-demo-accounts">
           <div className="cardTitle">5-day demo access</div>
         <div className="muted">
           Create a real demo login inside organization access. Demo accounts stay live for 5 days, then the backend automatically removes that demo workspace and its data.
@@ -1795,7 +1928,7 @@ export default function AdminPage() {
         </form>
       </section>
 
-      <section className="card" id="admin-ai-assignment">
+      <section className="card adminAnchorTarget" id="admin-ai-allocation">
         <div className="cardTitle">Allocate AI key</div>
         <div className="muted">Assign one API key to a solo user, to yourself as admin, or to an enterprise / builder owner. Team underlings inherit the owner allocation automatically.</div>
         <form
@@ -1878,6 +2011,215 @@ export default function AdminPage() {
             {llmBusy ? "Saving..." : llmEnabled ? "Save AI access" : "Remove AI access"}
           </button>
         </form>
+      </section>
+
+      <section id="admin-rbac" className="card premiumPanel adminAnchorTarget">
+        <div className="cardTitle">RBAC matrix</div>
+        <div className="muted small">Adjust visibility and action rights by role. Admin stays locked to full access by default.</div>
+        <div className="tableWrap adminTableOffset">
+          <table className="table adminMatrixTable">
+            <thead>
+              <tr>
+                <th>Permission</th>
+                {RBAC_ROLES.map((role) => (
+                  <th key={role}>{role.replace(/_/g, " ")}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {RBAC_GROUPS.map((group) => (
+                group.permissions.map((permission, index) => (
+                  <tr key={permission}>
+                    <td className="tdTitle">
+                      {index === 0 ? <span className="section-label">{group.label}</span> : null}
+                      <div>{permission.replace(/_/g, " ")}</div>
+                    </td>
+                    {RBAC_ROLES.map((role) => (
+                      <td key={`${role}-${permission}`}>
+                        <label className="adminCheckboxCell">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(rbacMatrix[role]?.[permission])}
+                            disabled={role === "admin"}
+                            onChange={() => toggleRbac(role, permission)}
+                          />
+                          <span>{role === "admin" ? "Locked" : rbacMatrix[role]?.[permission] ? "On" : "Off"}</span>
+                        </label>
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="row">
+          <button className="btn ghost" type="button" onClick={resetRbacDefaults}>Reset to defaults</button>
+        </div>
+      </section>
+
+      <section id="admin-flags" className="card premiumPanel adminAnchorTarget">
+        <div className="cardTitle">Feature flags</div>
+        <div className="muted small">Toggle product capabilities globally and per subscription tier without touching the core CRM routes.</div>
+        <div className="tableWrap adminTableOffset">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Feature</th>
+                <th>Description</th>
+                <th>Global</th>
+                <th>Solo</th>
+                <th>Enterprise</th>
+                <th>Builder</th>
+                <th>Custom</th>
+              </tr>
+            </thead>
+            <tbody>
+              {featureFlags.map((flag) => (
+                <tr key={flag.key}>
+                  <td className="tdTitle">{flag.key}</td>
+                  <td>{flag.description}</td>
+                  <td><button className="btn ghost compact" type="button" onClick={() => toggleFeatureFlag(flag.key)}>{flag.enabled ? "Enabled" : "Disabled"}</button></td>
+                  {(["solo", "enterprise", "builder", "custom"] as const).map((plan) => (
+                    <td key={`${flag.key}-${plan}`}>
+                      <label className="adminCheckboxCell">
+                        <input type="checkbox" checked={flag.plans[plan]} onChange={() => toggleFeatureFlagPlan(flag.key, plan)} />
+                        <span>{flag.plans[plan] ? "On" : "Off"}</span>
+                      </label>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="admin-lead-ingestion" className="card premiumPanel adminAnchorTarget">
+        <div className="cardTitle">Lead ingestion</div>
+        <div className="statsGrid">
+          {leadSources.map((source) => (
+            <div key={source.source} className="statCard">
+              <div className="statLabel">{source.source}</div>
+              <div className="statValue">{source.leads24h}</div>
+              <div className="statHint">Last payload: {source.lastReceived}</div>
+              <div className="row">
+                <span className={`chip ${source.status === "active" ? "chip-success" : "chip-gray"}`}>{source.status}</span>
+                <code className="adminCodeInline">{source.webhook}</code>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="admin-jobs" className="card premiumPanel adminAnchorTarget">
+        <div className="cardTitle">Background jobs</div>
+        <div className="tableWrap adminTableOffset">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Job</th>
+                <th>Schedule</th>
+                <th>Last run</th>
+                <th>Duration</th>
+                <th>Next run</th>
+                <th>Status</th>
+                <th>Records affected</th>
+              </tr>
+            </thead>
+            <tbody>
+              {JOB_SEED.map((job) => (
+                <tr key={job.name}>
+                  <td className="tdTitle">{job.name}</td>
+                  <td>{job.schedule}</td>
+                  <td>{job.lastRun}</td>
+                  <td>{job.duration}</td>
+                  <td>{job.nextRun}</td>
+                  <td><span className={`chip ${job.status === "completed" ? "chip-success" : job.status === "running" ? "chip-blue" : job.status === "failed" ? "chip-danger" : "chip-gray"}`}>{job.status}</span></td>
+                  <td>{job.affected}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="admin-api-usage" className="card premiumPanel adminAnchorTarget">
+        <div className="cardTitle">API usage</div>
+        <div className="tableWrap adminTableOffset">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Endpoint</th>
+                <th>Method</th>
+                <th>Calls (24h)</th>
+                <th>Calls (7d)</th>
+                <th>Avg latency</th>
+                <th>P95 latency</th>
+                <th>Error rate</th>
+                <th>Last called</th>
+              </tr>
+            </thead>
+            <tbody>
+              {apiUsageRows.map((row) => (
+                <tr key={`${row.method}-${row.endpoint}`}>
+                  <td className="tdTitle">{row.endpoint}</td>
+                  <td>{row.method}</td>
+                  <td>{row.calls24h}</td>
+                  <td>{row.calls7d}</td>
+                  <td>{row.avgLatency}ms</td>
+                  <td>{row.p95}ms</td>
+                  <td>{row.errorRate}</td>
+                  <td>{row.lastCalled}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="admin-transactions" className="card premiumPanel adminAnchorTarget">
+        <div className="cardTitle">Razorpay transactions</div>
+        <div className="tableWrap adminTableOffset">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Payment ID</th>
+                <th>Org</th>
+                <th>Plan</th>
+                <th>Amount</th>
+                <th>Currency</th>
+                <th>Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactionRows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="muted">No payment records are available yet.</td>
+                </tr>
+              ) : (
+                transactionRows.map((row) => (
+                  <tr key={row.id}>
+                    <td className="tdTitle">{row.id}</td>
+                    <td>{row.orgName}</td>
+                    <td>{row.plan}</td>
+                    <td>{formatRupees(row.amount)}</td>
+                    <td>{row.currency}</td>
+                    <td>{fmtDt(row.date)}</td>
+                    <td><span className={`chip ${row.status === "captured" ? "chip-success" : "chip-warning"}`}>{row.status}</span></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="admin-impersonation" className="card premiumPanel adminAnchorTarget">
+        <div className="cardTitle">Impersonation</div>
+        <div className="muted">Search any user from the Users table above, then use the existing impersonate action to open the CRM in their context. Every start and exit event should be audit logged.</div>
+        <div className="alert">Use impersonation only for support or incident debugging. Actions taken while impersonating should remain attributable to the admin.</div>
       </section>
 
       <section className="card adminAnchorTarget" id="admin-enterprise">
@@ -2301,6 +2643,7 @@ export default function AdminPage() {
         )}
       </section>
 
+      <div id="admin-audit-log" className="adminAnchorTarget" />
       <section id="admin-logs" className="card adminAnchorTarget">
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
           <div className="cardTitle">Recent audit feed</div>

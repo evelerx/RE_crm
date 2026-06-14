@@ -1,176 +1,97 @@
-// MODIFIED: Phase 5 — Added admin inactivity timeout — Clears admin sessions after 30 minutes without activity.
+// MODIFIED: Parts 2-6 — Wired the shared CRM/admin shells and expanded workspace routes — Surfaces the new layout and page structure without changing existing business logic.
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+
 import { api } from "./api/client";
 import { clearSession, getEmail, getToken } from "./auth";
 import TutorialBubble from "./components/TutorialBubble";
+import AdminShell from "./components/layout/AdminShell";
+import AppShell from "./components/layout/AppShell";
+import AccountPage from "./pages/AccountPage";
 import AdminPage from "./pages/AdminPage";
 import { AdminOwnerContactsPage, AdminOwnerDealsPage, AdminOwnerPipelinePage } from "./pages/AdminWorkspacePages";
-import AccountPage from "./pages/AccountPage";
 import AppsPage from "./pages/AppsPage";
 import BuilderPublicPage from "./pages/BuilderPublicPage";
 import CalculatorPage from "./pages/CalculatorPage";
+import CallsPage from "./pages/CallsPage";
 import ContactsPage from "./pages/ContactsPage";
 import DealDetailPage from "./pages/DealDetailPage";
 import DealsGridPage from "./pages/DealsGridPage";
 import EnterprisePage from "./pages/EnterprisePage";
 import InsightsPage from "./pages/InsightsPage";
+import LeaderboardPage from "./pages/LeaderboardPage";
 import LoginPage from "./pages/LoginPage";
 import PipelinePage from "./pages/PipelinePage";
+import PlaceholderWorkspacePage from "./pages/PlaceholderWorkspacePage";
+import PropertiesPage from "./pages/PropertiesPage";
+import SequencesPage from "./pages/SequencesPage";
 import SettingsPage from "./pages/SettingsPage";
+import TargetsPage from "./pages/TargetsPage";
 import TodayPage from "./pages/TodayPage";
 
-function TopBar({
-  isAdmin,
-  enterpriseBadge,
-  onLogout,
-  loginHref
-}: {
-  isAdmin: boolean;
-  enterpriseBadge: string | null;
-  onLogout?: () => void;
-  loginHref?: string;
-}) {
-  const email = getEmail();
-  const isPreview = Boolean(loginHref && !onLogout);
+type MeResponse = {
+  email: string;
+  plan: string;
+  is_admin: boolean;
+  full_name?: string | null;
+  enterprise_owner_id?: string | null;
+  enterprise_company_name?: string;
+  enterprise_member_role?: string;
+  rera_completed?: boolean;
+};
+
+function CrmRoutes({ isAdmin }: { isAdmin: boolean }) {
   return (
-    <header className="topbar">
-      <div className="brand">
-        <div className="logo">
-          <img src="/northstone-logo-icon.png" alt="Northstone logo" className="logoMark" />
-        </div>
-        <div className="brandMeta">
-          <div className="brandTitle">Northstone</div>
-          <div className="brandSub">
-            Pipeline | Grid | ROI
-          </div>
-          {isAdmin || enterpriseBadge ? (
-            <div className="brandBadges">
-              {isAdmin ? <div className="pill adminPill">Admin</div> : null}
-              {enterpriseBadge ? <div className="pill enterprisePill">{enterpriseBadge}</div> : null}
-            </div>
-          ) : null}
-        </div>
-      </div>
-      <nav className="navDesktop">
-        <>
-          <NavLink to="/today" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-            Today
-          </NavLink>
-          <NavLink to="/" end className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-            Pipeline
-          </NavLink>
-          <NavLink to="/deals" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-            Deals
-          </NavLink>
-          <NavLink to="/contacts" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-            Contacts
-          </NavLink>
-          <NavLink to="/calc" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-            ROI
-          </NavLink>
-          <NavLink to="/insights" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-            Insights
-          </NavLink>
-          <NavLink to="/enterprise" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-            Enterprise
-          </NavLink>
-        </>
-        <NavLink to="/account" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-          Account
-        </NavLink>
-        <NavLink to="/settings" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-          Settings
-        </NavLink>
-        <NavLink to="/apps" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-          Apps
-        </NavLink>
-        {isAdmin ? (
-          <NavLink to="/admin" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
-            Admin
-          </NavLink>
-        ) : null}
-        {onLogout ? (
-          <button className="navA" onClick={onLogout} type="button" title={email ? `Logged in as ${email}` : "Logout"}>
-            Logout
-          </button>
-        ) : (
-          <NavLink to={loginHref || "/login"} className={({ isActive }) => (isActive || isPreview ? "navA active" : "navA")}>
-            Login
-          </NavLink>
-        )}
-      </nav>
-      <div className="navMobile">
-        <>
-          <NavLink to="/today" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-            Today
-          </NavLink>
-          <NavLink to="/" end className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-            Pipeline
-          </NavLink>
-          <NavLink to="/deals" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-            Deals
-          </NavLink>
-          <NavLink to="/contacts" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-            Contacts
-          </NavLink>
-          <NavLink to="/calc" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-            ROI
-          </NavLink>
-          <NavLink to="/insights" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-            Insights
-          </NavLink>
-          <NavLink to="/enterprise" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-            Enterprise
-          </NavLink>
-        </>
-        <NavLink to="/account" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-          Account
-        </NavLink>
-        <NavLink to="/settings" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-          Settings
-        </NavLink>
-        <NavLink to="/apps" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-          Apps
-        </NavLink>
-        {isAdmin ? (
-          <NavLink to="/admin" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
-            Admin
-          </NavLink>
-        ) : null}
-        {onLogout ? (
-          <button className="btn ghost" onClick={onLogout} type="button" title={email ? `Logged in as ${email}` : "Logout"}>
-            Logout
-          </button>
-        ) : (
-          <NavLink to={loginHref || "/login"} className={({ isActive }) => (isActive || isPreview ? "btn ghost active" : "btn ghost")}>
-            Login
-          </NavLink>
-        )}
-      </div>
-    </header>
+    <Routes>
+      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/today" element={<TodayPage />} />
+      <Route path="/" element={isAdmin ? <AdminOwnerPipelinePage /> : <PipelinePage />} />
+      <Route path="/deals" element={isAdmin ? <AdminOwnerDealsPage /> : <DealsGridPage />} />
+      <Route path="/deals/:dealId" element={<DealDetailPage />} />
+      <Route path="/contacts" element={isAdmin ? <AdminOwnerContactsPage /> : <ContactsPage />} />
+      <Route path="/properties" element={<PropertiesPage />} />
+      <Route
+        path="/whatsapp"
+        element={
+          <PlaceholderWorkspacePage
+            title="WhatsApp Inbox"
+            description="Conversation routing and native WhatsApp threads will live here. The shell and route are ready so the channel can be styled and integrated without breaking the CRM frame."
+            bullets={["Unread conversation queue", "Thread preview with quick actions", "Status and delivery tracking"]}
+          />
+        }
+      />
+      <Route
+        path="/inbox"
+        element={
+          <PlaceholderWorkspacePage
+            title="Unified Inbox"
+            description="Bring email, portal leads, and channel replies into one operator queue. This placeholder keeps the navigation and layout structure intact."
+            bullets={["Recent activity stream", "Assignment filters", "Escalation and follow-up actions"]}
+          />
+        }
+      />
+      <Route path="/calls" element={<CallsPage />} />
+      <Route path="/calc" element={<CalculatorPage />} />
+      <Route path="/insights" element={<InsightsPage />} />
+      <Route path="/leaderboard" element={<LeaderboardPage />} />
+      <Route path="/targets" element={<TargetsPage />} />
+      <Route path="/sequences" element={<SequencesPage />} />
+      <Route path="/account" element={<AccountPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/apps" element={<AppsPage />} />
+      <Route path="/enterprise" element={<EnterprisePage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
-function BottomNav() {
+function AdminRoutes({ isAdmin }: { isAdmin: boolean }) {
   return (
-    <nav className="bottomNav">
-      <NavLink to="/today" className={({ isActive }) => (isActive ? "bn active" : "bn")}>
-        Today
-      </NavLink>
-      <NavLink to="/" end className={({ isActive }) => (isActive ? "bn active" : "bn")}>
-        Pipeline
-      </NavLink>
-      <NavLink to="/deals" className={({ isActive }) => (isActive ? "bn active" : "bn")}>
-        Deals
-      </NavLink>
-      <NavLink to="/contacts" className={({ isActive }) => (isActive ? "bn active" : "bn")}>
-        Contacts
-      </NavLink>
-      <NavLink to="/calc" className={({ isActive }) => (isActive ? "bn active" : "bn")}>
-        ROI
-      </NavLink>
-    </nav>
+    <Routes>
+      <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/" replace />} />
+      <Route path="/admin/*" element={isAdmin ? <AdminPage /> : <Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/admin" replace />} />
+    </Routes>
   );
 }
 
@@ -178,6 +99,8 @@ export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getToken()));
   const [isAdmin, setIsAdmin] = useState(false);
   const [enterpriseBadge, setEnterpriseBadge] = useState<string | null>(null);
+  const [userName, setUserName] = useState("Northstone user");
+  const [userRole, setUserRole] = useState("CRM access");
   const [reraCompleted, setReraCompleted] = useState(true);
   const adminIdleTimerRef = useRef<number | null>(null);
   const navigate = useNavigate();
@@ -189,6 +112,8 @@ export default function App() {
         setAuthed(false);
         setIsAdmin(false);
         setEnterpriseBadge(null);
+        setUserName("Northstone user");
+        setUserRole("CRM access");
         setReraCompleted(true);
       }
     }
@@ -200,50 +125,59 @@ export default function App() {
     if (!authed) {
       setIsAdmin(false);
       setEnterpriseBadge(null);
+      setUserName("Northstone user");
+      setUserRole("CRM access");
       setReraCompleted(true);
       return;
     }
+
     let cancelled = false;
+
     (async () => {
       try {
-        const me = await api<{
-          email: string;
-          plan: string;
-          is_admin: boolean;
-          enterprise_owner_id?: string | null;
-          enterprise_company_name?: string;
-          enterprise_member_role?: string;
-          rera_completed?: boolean;
-        }>("/auth/me");
-        if (!cancelled) {
-          setIsAdmin(Boolean(me.is_admin));
-          const plan = (me.plan || "free").toLowerCase();
-          const ownerMode = plan === "enterprise" || plan === "builder";
-          const memberRole = (me.enterprise_member_role || "").toLowerCase();
-          setEnterpriseBadge(
-            me.enterprise_company_name?.trim() ||
-              (
-                plan === "builder"
-                  ? "Builder"
-                  : ownerMode
-                    ? "Enterprise"
-                    : memberRole === "broker"
-                      ? "Broker"
-                      : memberRole === "cp"
-                        ? "CP"
-                        : null
-              )
-          );
-          setReraCompleted(Boolean(me.is_admin || me.rera_completed));
-        }
+        const me = await api<MeResponse>("/auth/me");
+        if (cancelled) return;
+
+        const plan = (me.plan || "free").toLowerCase();
+        const memberRole = (me.enterprise_member_role || "").toLowerCase();
+        const ownerMode = plan === "enterprise" || plan === "builder";
+        const derivedBadge =
+          me.enterprise_company_name?.trim() ||
+          (plan === "builder"
+            ? "Builder"
+            : ownerMode
+              ? "Enterprise"
+              : memberRole === "broker"
+                ? "Broker"
+                : memberRole === "cp"
+                  ? "CP"
+                  : null);
+
+        setIsAdmin(Boolean(me.is_admin));
+        setEnterpriseBadge(derivedBadge);
+        setUserName(me.full_name?.trim() || getEmail() || me.email || "Northstone user");
+        setUserRole(
+          me.is_admin
+            ? "Admin"
+            : plan === "builder"
+              ? "Builder owner"
+              : plan === "enterprise"
+                ? memberRole
+                  ? memberRole.replace(/_/g, " ")
+                  : "Enterprise owner"
+                : "Solo closer"
+        );
+        setReraCompleted(Boolean(me.is_admin || me.rera_completed));
       } catch {
-        if (!cancelled) {
-          setIsAdmin(false);
-          setEnterpriseBadge(null);
-          setReraCompleted(true);
-        }
+        if (cancelled) return;
+        setIsAdmin(false);
+        setEnterpriseBadge(null);
+        setUserName(getEmail() || "Northstone user");
+        setUserRole("CRM access");
+        setReraCompleted(true);
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -254,6 +188,8 @@ export default function App() {
     setAuthed(false);
     setIsAdmin(false);
     setEnterpriseBadge(null);
+    setUserName("Northstone user");
+    setUserRole("CRM access");
     setReraCompleted(true);
     navigate("/login");
   }
@@ -266,23 +202,32 @@ export default function App() {
       }
       return;
     }
+
     const resetAdminIdleTimer = () => {
-      if (adminIdleTimerRef.current) window.clearTimeout(adminIdleTimerRef.current);
+      if (adminIdleTimerRef.current) {
+        window.clearTimeout(adminIdleTimerRef.current);
+      }
       adminIdleTimerRef.current = window.setTimeout(() => {
         clearSession();
         setAuthed(false);
         setIsAdmin(false);
         setEnterpriseBadge(null);
+        setUserName("Northstone user");
+        setUserRole("CRM access");
         setReraCompleted(true);
         navigate("/login");
       }, 30 * 60 * 1000);
     };
+
     const events: Array<keyof WindowEventMap> = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
     events.forEach((eventName) => window.addEventListener(eventName, resetAdminIdleTimer, { passive: true }));
     resetAdminIdleTimer();
+
     return () => {
       events.forEach((eventName) => window.removeEventListener(eventName, resetAdminIdleTimer));
-      if (adminIdleTimerRef.current) window.clearTimeout(adminIdleTimerRef.current);
+      if (adminIdleTimerRef.current) {
+        window.clearTimeout(adminIdleTimerRef.current);
+      }
       adminIdleTimerRef.current = null;
     };
   }, [authed, isAdmin, navigate]);
@@ -301,39 +246,27 @@ export default function App() {
     );
   }
 
-  const showBottomNav = !isAdmin && !location.pathname.startsWith("/enterprise") && !location.pathname.startsWith("/admin");
+  const isOwnerLike = isAdmin || Boolean(enterpriseBadge && ["Enterprise", "Builder"].includes(enterpriseBadge));
+  const isAdminRoute = location.pathname.startsWith("/admin");
+
+  if (isAdminRoute) {
+    return (
+      <AdminShell onLogout={handleLogout}>
+        <AdminRoutes isAdmin={isAdmin} />
+      </AdminShell>
+    );
+  }
 
   return (
-    <div className="appShell">
-      <TopBar
-        isAdmin={isAdmin}
-        enterpriseBadge={enterpriseBadge}
-        onLogout={handleLogout}
-      />
-      <main className="content">
-        <Routes>
-          <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="/today" element={<TodayPage />} />
-          <Route path="/" element={isAdmin ? <AdminOwnerPipelinePage /> : <PipelinePage />} />
-          <Route path="/deals" element={isAdmin ? <AdminOwnerDealsPage /> : <DealsGridPage />} />
-          <Route path="/deals/:dealId" element={<DealDetailPage />} />
-          <Route path="/contacts" element={isAdmin ? <AdminOwnerContactsPage /> : <ContactsPage />} />
-          <Route path="/calc" element={<CalculatorPage />} />
-          <Route path="/insights" element={<InsightsPage />} />
-          <Route path="/account" element={<AccountPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/apps" element={<AppsPage />} />
-          <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/" replace />} />
-          <Route path="/enterprise" element={<EnterprisePage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
-      <TutorialBubble
-        isAdmin={isAdmin}
-        reraCompleted={reraCompleted || isAdmin}
-        email={getEmail() || ""}
-      />
-      {showBottomNav ? <BottomNav /> : null}
-    </div>
+    <AppShell
+      isAdmin={isAdmin}
+      isOwnerLike={isOwnerLike}
+      userName={userName}
+      userRole={isAdmin ? "Admin" : enterpriseBadge ? `${enterpriseBadge} workspace` : userRole}
+      onLogout={handleLogout}
+    >
+      <CrmRoutes isAdmin={isAdmin} />
+      <TutorialBubble isAdmin={isAdmin} reraCompleted={reraCompleted || isAdmin} email={getEmail() || ""} />
+    </AppShell>
   );
 }

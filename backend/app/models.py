@@ -287,3 +287,117 @@ class AppIntegrationConnection(SQLModel, table=True):
     last_error: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingAddonSubscription(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    enterprise_owner_id: UUID = Field(foreign_key="user.id", index=True, unique=True)
+    addon_type: str = Field(default="growth", index=True)
+    status: str = Field(default="active", index=True)
+    start_date: date = Field(default_factory=date.today, index=True)
+    end_date: Optional[date] = Field(default=None, index=True)
+    monthly_amount: float = 18000
+    currency: str = "INR"
+    razorpay_payment_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingAgency(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    name: str
+    email: str = Field(index=True, unique=True)
+    password_hash: str = ""
+    status: str = Field(default="active", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class AgencyUser(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    agency_id: UUID = Field(foreign_key="marketingagency.id", index=True)
+    name: str = ""
+    email: str = Field(index=True, unique=True)
+    password_hash: str = ""
+    role: str = Field(default="marketing_executive", index=True)
+    status: str = Field(default="active", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingRequest(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    request_code: str = Field(index=True, unique=True)
+    enterprise_owner_id: UUID = Field(foreign_key="user.id", index=True)
+    addon_subscription_id: UUID = Field(foreign_key="marketingaddonsubscription.id", index=True)
+    channel: str = Field(default="Meta", index=True)
+    objective: str = ""
+    project_name: str = ""
+    property_type: str = ""
+    target_city: str = ""
+    target_area: str = ""
+    price_range: str = ""
+    target_audience: str = ""
+    primary_goal: str = ""
+    lead_target: int = 0
+    launch_date: Optional[date] = None
+    duration: str = ""
+    monthly_spend: float = 0
+    overspend_tolerance: str = ""
+    reporting_frequency: str = ""
+    cta: str = ""
+    usp: str = ""
+    notes: str = ""
+    status: str = Field(default="submitted", index=True)
+    assigned_manager_id: Optional[UUID] = Field(default=None, foreign_key="agencyuser.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingTask(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    request_id: UUID = Field(foreign_key="marketingrequest.id", index=True)
+    agency_id: UUID = Field(foreign_key="marketingagency.id", index=True)
+    assigned_to: Optional[UUID] = Field(default=None, foreign_key="agencyuser.id", index=True)
+    assigned_by: Optional[UUID] = Field(default=None, foreign_key="agencyuser.id", index=True)
+    title: str = ""
+    description: str = ""
+    task_type: str = Field(default="campaign_management", index=True)
+    due_date: Optional[date] = None
+    status: str = Field(default="pending", index=True)
+    deliverable_url: Optional[str] = None
+    deliverable_notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingComment(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    request_id: UUID = Field(foreign_key="marketingrequest.id", index=True)
+    task_id: Optional[UUID] = Field(default=None, foreign_key="marketingtask.id", index=True)
+    sender_id: str = Field(index=True)
+    sender_role: str = Field(default="owner", index=True)
+    sender_name: str = ""
+    message: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingApproval(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    request_id: UUID = Field(foreign_key="marketingrequest.id", index=True)
+    task_id: Optional[UUID] = Field(default=None, foreign_key="marketingtask.id", index=True)
+    approval_type: str = Field(default="creative_brief", index=True)
+    description: str = ""
+    status: str = Field(default="pending", index=True)
+    reviewed_by: Optional[UUID] = Field(default=None, foreign_key="agencyuser.id", index=True)
+    review_note: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    reviewed_at: Optional[datetime] = None
+
+
+class MarketingNotification(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    user_id: str = Field(index=True)
+    user_type: str = Field(default="crm", index=True)
+    message: str = ""
+    link: str = ""
+    read: bool = Field(default=False, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
