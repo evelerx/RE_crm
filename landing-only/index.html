@@ -309,9 +309,7 @@ New sections added:
     .avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--brand); color: #fff; font-weight: 900; }
 
     .pricing-dark {
-      background:
-        radial-gradient(circle at top left, rgba(18, 87, 214, 0.08), transparent 24rem),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(238, 244, 255, 0.54) 100%);
+      background: transparent;
       color: var(--ink);
     }
     .pricing-dark .section-head h2,
@@ -359,12 +357,11 @@ New sections added:
       padding: 28px;
       border-radius: 28px;
       border: 1px solid #d7dfec;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 248, 255, 0.96) 100%);
+      background: rgba(255, 255, 255, 0.9);
       box-shadow: 0 18px 46px rgba(16, 24, 40, 0.06);
     }
     .plan-card.popular {
       border: 2px solid #3b7dd8;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(238, 244, 255, 1) 100%);
       box-shadow: 0 18px 40px rgba(59, 125, 216, 0.14);
     }
     .popular-badge {
@@ -390,19 +387,13 @@ New sections added:
     .plan-subnote {
       margin: 0;
     }
-    .plan-subtitle {
-      color: #344054;
-    }
-    .plan-subnote {
-      color: #475467;
-    }
     .plan-allocation {
       display: grid;
       gap: 8px;
       padding: 18px;
       border-radius: 20px;
       border: 1px solid #d7dfec;
-      background: rgba(238, 244, 255, 0.78);
+      background: #f7f9fc;
     }
     .plan-allocation strong {
       font-size: 0.92rem;
@@ -449,7 +440,7 @@ New sections added:
       padding: 24px;
       border: 1px solid #d7dfec;
       border-radius: 28px;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 248, 255, 0.96) 100%);
+      background: rgba(255, 255, 255, 0.9);
       display: grid;
       gap: 22px;
       box-shadow: 0 18px 46px rgba(16, 24, 40, 0.06);
@@ -465,7 +456,7 @@ New sections added:
       padding: 18px;
       border-radius: 20px;
       border: 1px solid #d7dfec;
-      background: rgba(238, 244, 255, 0.78);
+      background: #f7f9fc;
     }
     .estimator-item input {
       width: 100%;
@@ -1020,6 +1011,60 @@ New sections added:
       </div>
     </section>
 
+    <section class="section marketing-section" id="marketing-addons">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Marketing Add-ons</span>
+          <h2>Add managed marketing on top of your CRM plan.</h2>
+          <p class="lead">These add-ons are billed separately and can be attached to the CRM plan that fits your team structure.</p>
+        </div>
+        <div class="marketing-grid">
+          <article class="marketing-card">
+            <span class="marketing-tag">↗ Growth</span>
+            <h3>Growth Marketing</h3>
+            <div class="marketing-price">₹18,000/month</div>
+            <p class="marketing-note">Billed as ₹54,000 · 3-month mandate</p>
+            <ul>
+              <li><span class="good">✓</span><span>21 videos + 21 posters + festival posts</span></li>
+              <li><span class="good">✓</span><span>Social media management + strategy</span></li>
+              <li><span class="good">✓</span><span>2 influencer videos</span></li>
+              <li><span class="good">✓</span><span>Meta ads setup</span></li>
+              <li><span class="good">✓</span><span>Monthly performance report</span></li>
+            </ul>
+            <button class="btn btn-ghost marketing-pay-btn" type="button" data-addon="Growth Marketing">Add to plan ↗</button>
+          </article>
+          <article class="marketing-card recommended">
+            <span class="marketing-tag">⚡ Recommended</span>
+            <h3>Scale Marketing</h3>
+            <div class="marketing-price">₹25,000/month</div>
+            <p class="marketing-note">Billed as ₹75,000 · 3-month mandate</p>
+            <ul>
+              <li><span class="good">✓</span><span>24 videos + 24 posters + festival posts</span></li>
+              <li><span class="good">✓</span><span>Social media management + strategy</span></li>
+              <li><span class="good">✓</span><span>3 influencer videos</span></li>
+              <li><span class="good">✓</span><span>Meta ads setup + ₹3,000 ad run credit</span></li>
+              <li><span class="good">✓</span><span>Monthly performance report + CRM attribution</span></li>
+            </ul>
+            <button class="btn btn-primary marketing-pay-btn" type="button" data-addon="Scale Marketing">Add to plan ↗</button>
+          </article>
+          <article class="marketing-card">
+            <span class="marketing-tag">◯ AI Branding · 1 month</span>
+            <h3>AI Brand Launch</h3>
+            <div class="marketing-price">₹16,000/month</div>
+            <p class="marketing-note">Billed as ₹16,000 · 1-month only</p>
+            <ul>
+              <li><span class="good">✓</span><span>Social media management + strategy</span></li>
+              <li><span class="good">✓</span><span>AI video + AI-generated brand images</span></li>
+              <li><span class="good">✓</span><span>AI influencer branding (1 video)</span></li>
+              <li><span class="good">✓</span><span>Meta ads setup</span></li>
+              <li><span class="good">✓</span><span>Brand asset handoff report</span></li>
+            </ul>
+            <button class="btn btn-ghost marketing-pay-btn" type="button" data-addon="AI Brand Launch">Add to plan ↗</button>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <section class="section" id="addons">
       <div class="container">
         <div class="addon-header">
@@ -1042,7 +1087,7 @@ New sections added:
               <li><span class="good">✓</span><span>Meta ads setup</span></li>
               <li><span class="good">✓</span><span>Monthly performance report</span></li>
             </ul>
-            <button class="btn btn-secondary marketing-pay-btn" type="button" data-addon="Growth Marketing">Add to plan ↗</button>
+            <a class="btn btn-secondary plan-cta" href="#contact" data-plan="Growth Marketing Add-on">Add to plan ↗</a>
           </article>
           <article class="card price-card addon-featured">
             <span class="addon-tag addon-tag-recommended">⚡ Recommended</span>
@@ -1057,7 +1102,7 @@ New sections added:
               <li><span class="good">✓</span><span>Meta ads setup + ₹3,000 ad run credit</span></li>
               <li><span class="good">✓</span><span>Monthly performance report + CRM attribution</span></li>
             </ul>
-            <button class="btn btn-primary marketing-pay-btn" type="button" data-addon="Scale Marketing">Add to plan ↗</button>
+            <a class="btn btn-primary plan-cta" href="#contact" data-plan="Scale Marketing Add-on">Add to plan ↗</a>
           </article>
           <article class="card price-card">
             <span class="addon-tag">⬡ AI Branding &nbsp;<small class="addon-tag-month">1 month</small></span>
@@ -1072,7 +1117,7 @@ New sections added:
               <li><span class="good">✓</span><span>Meta ads setup</span></li>
               <li><span class="good">✓</span><span>Brand asset handoff report</span></li>
             </ul>
-            <button class="btn btn-secondary marketing-pay-btn" type="button" data-addon="AI Brand Launch">Add to plan ↗</button>
+            <a class="btn btn-secondary plan-cta" href="#contact" data-plan="AI Brand Launch Add-on">Add to plan ↗</a>
           </article>
         </div>
         <p class="addon-note"><b>Growth &amp; Scale require a 3-month commitment.</b> AI Brand Launch is a 1-month sprint — billed once at checkout. Growth and Scale billed upfront quarterly. All add-ons can be renewed or cancelled at end of each cycle.</p>
