@@ -8,7 +8,7 @@
   "background_color": "#0b1220",
   "theme_color": "#0b1220",
   "icons": [
-    { "src": "/northstone-logo-icon.png", "sizes": "400x360", "type": "image/png", "purpose": "any" },
-    { "src": "/northstone-logo-icon.png", "sizes": "400x360", "type": "image/png", "purpose": "maskable" }
+    { "src": "/northstone-logo-icon.png", "sizes": "400x400", "type": "image/png", "purpose": "any" },
+    { "src": "/northstone-logo-icon.png", "sizes": "400x400", "type": "image/png", "purpose": "maskable" }
   ]
 }
