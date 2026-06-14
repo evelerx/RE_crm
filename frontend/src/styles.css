@@ -2157,32 +2157,1602 @@ textarea.textarea {
     width: 100%;
   }
 }
+/* MODIFIED: Marketing Portal + toast styles — supports the new request flow, approvals, campaign drawer, and global notifications. */
+.toastStack {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1200;
+  display: grid;
+  gap: 12px;
+}
 
-/* Skeleton shimmer loading states */
-@keyframes shimmer {
-  0%   { background-position: 200% 0; }
+.toastCard {
+  min-width: 240px;
+  max-width: 360px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+  text-align: left;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.35);
+  animation: toastSlideIn 220ms ease;
+}
+
+.toastCard.success { background: #144d32; }
+.toastCard.error { background: #5e1f2e; }
+.toastCard.warning { background: #70511b; }
+.toastCard.info { background: #1d365f; }
+
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.marketingQuickNav,
+.marketingMetricsGrid,
+.marketingRequestGrid,
+.marketingAssetGrid,
+.marketingAssetReviewGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.marketingQuickNav {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin-bottom: 18px;
+}
+
+.marketingMetricsGrid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-bottom: 18px;
+}
+
+.marketingMetricCard,
+.marketingRequestCard,
+.marketingDetailCard,
+.marketingProgressCard,
+.marketingErrorCard,
+.marketingEmptyState,
+.marketingAssetZone,
+.marketingAssetReviewCard,
+.marketingCommentBubble,
+.marketingDrawerPanel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(14, 24, 43, 0.9);
+}
+
+.marketingMetricCard {
+  padding: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.marketingMetricCard span,
+.marketingCommentMeta,
+.marketingMetaRow,
+.marketingAssetZone span,
+.marketingAssetError,
+.marketingAssetSuccess {
+  font-size: 12px;
+  color: rgba(216, 226, 240, 0.72);
+}
+
+.marketingMetricCard b,
+.marketingRequestTitle {
+  font-size: 20px;
+  color: #fff;
+}
+
+.marketingRequestGrid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin-top: 14px;
+}
+
+.marketingRequestCard {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  text-align: left;
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.marketingRequestCard.active,
+.marketingRequestCard:hover {
+  border-color: rgba(110, 162, 255, 0.8);
+  transform: translateY(-2px);
+}
+
+.marketingMetaRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.marketingDetailCard {
+  margin-top: 18px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.marketingNotes {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #dce5f4;
+}
+
+.marketingSkeletonList {
+  display: grid;
+  gap: 12px;
+}
+
+.marketingSkeletonRow,
+.marketingSkeletonCard {
+  min-height: 72px;
+  border-radius: 18px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+  background-size: 200% 100%;
+  animation: marketingPulse 1.2s infinite;
+}
+
+.marketingSkeletonCard { min-height: 120px; }
+
+@keyframes marketingPulse {
+  0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
 
-.skeletonBar {
-  height: 13px;
-  border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.04) 0%,
-    rgba(255, 255, 255, 0.09) 50%,
-    rgba(255, 255, 255, 0.04) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
+.marketingErrorCard,
+.marketingEmptyState {
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
 }
 
-.skeletonCard {
-  border: 1px solid var(--border);
-  background: rgba(18, 26, 45, 0.84);
-  border-radius: 14px;
+.marketingEmptyIcon {
+  font-size: 22px;
+  color: #8eb5ff;
+}
+
+.marketingWizard {
+  display: grid;
+  gap: 16px;
+}
+
+.marketingWizard.shake {
+  animation: marketingShake 260ms ease-in-out;
+}
+
+@keyframes marketingShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+.marketingWizardSteps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.marketingWizardStep {
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  text-align: center;
+  font-size: 12px;
+  color: rgba(216, 226, 240, 0.75);
+}
+
+.marketingWizardStep.active {
+  border-color: rgba(110, 162, 255, 0.9);
+  color: #fff;
+}
+
+.fieldError input,
+.fieldError select,
+.fieldError textarea {
+  border-color: #d86b7b !important;
+  box-shadow: 0 0 0 1px rgba(216, 107, 123, 0.4);
+}
+
+.marketingBudgetStep {
+  display: grid;
+  gap: 16px;
+}
+
+.marketingBudgetValue {
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.marketingAssetGrid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.marketingAssetZone {
+  padding: 16px;
+  min-height: 140px;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.marketingAssetZone.done {
+  border-color: rgba(69, 196, 123, 0.8);
+}
+
+.marketingAssetZone.error {
+  border-color: rgba(216, 107, 123, 0.9);
+}
+
+.marketingInlineProgress,
+.marketingProgressTrack,
+.marketingFunnelBar {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+}
+
+.marketingInlineProgress { height: 8px; }
+.marketingProgressTrack,
+.marketingFunnelBar { height: 10px; }
+
+.marketingInlineProgress > div,
+.marketingProgressFill,
+.marketingFunnelBar > div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #5f90ff, #67d5ba);
+}
+
+.marketingAssetReviewGrid {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.marketingAssetReviewCard {
   padding: 14px;
+  display: grid;
+  gap: 8px;
+  color: #fff;
+  text-decoration: none;
+}
+
+.marketingCommentsThread {
+  display: grid;
+  gap: 10px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.marketingCommentsThread.compact {
+  max-height: 180px;
+}
+
+.marketingCommentBubble {
+  padding: 12px 14px;
+  max-width: 88%;
+}
+
+.marketingCommentBubble.outbound {
+  justify-self: end;
+  background: rgba(43, 83, 165, 0.35);
+}
+
+.marketingCommentBubble.inbound {
+  justify-self: start;
+  background: rgba(255,255,255,0.04);
+}
+
+.marketingCommentBubble.sending {
+  opacity: 0.6;
+}
+
+.marketingCommentComposer {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.marketingDrawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 480px;
+  max-width: 100%;
+  height: 100vh;
+  background: #0D1B2A;
+  border-left: 0.5px solid rgba(51, 78, 104, 0.25);
+  transform: translateX(100%);
+  transition: transform 300ms ease;
+  z-index: 50;
+  overflow-y: auto;
+}
+
+.marketingDrawer.open {
+  transform: translateX(0);
+}
+
+.marketingDrawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 49;
+}
+
+.marketingDrawerPanel {
+  width: 100%;
+  min-height: 100%;
+  padding: 22px;
+  overflow: auto;
+  display: grid;
+  gap: 16px;
+  border-radius: 0;
+}
+
+.marketingFunnelList {
+  display: grid;
+  gap: 12px;
+}
+
+.marketingFunnelRow {
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.statusBadge.success { background: rgba(70, 197, 124, 0.18); color: #98f2b9; }
+.statusBadge.warning { background: rgba(220, 177, 83, 0.18); color: #ffd38a; }
+.statusBadge.error { background: rgba(216, 107, 123, 0.18); color: #ffb2bd; }
+.statusBadge.info { background: rgba(110, 162, 255, 0.18); color: #8eb5ff; }
+
+.clickableRow {
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .marketingWizardSteps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .marketingDrawerPanel {
+    width: 100%;
+  }
+
+  .toastStack {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .toastCard {
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+  }
+}
+.marketingStandaloneApp {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  background: #0d1b2a;
+}
+
+.marketingStandaloneContent {
+  min-width: 0;
   display: flex;
   flex-direction: column;
+}
+
+.marketingStandaloneSidebar {
+  background: rgba(0, 0, 0, 0.25);
+  border-right: 0.5px solid rgba(51, 78, 104, 0.25);
+  padding: 20px 0;
+  min-height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+.marketingStandaloneBrand {
+  display: flex;
+  align-items: center;
   gap: 10px;
+  padding: 0 20px 18px;
+  border-bottom: 0.5px solid rgba(51, 78, 104, 0.25);
+}
+
+.marketingStandaloneBrandMark {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: rgba(30, 127, 217, 0.16);
+  color: #60a5fa;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.marketingStandaloneBrandTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f0f4f8;
+}
+
+.marketingStandaloneBrandSub,
+.marketingStandaloneSectionLabel {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.marketingStandaloneSectionLabel {
+  padding: 16px 20px 8px;
+}
+
+.marketingStandaloneNav {
+  display: flex;
+  flex-direction: column;
+}
+
+.marketingStandaloneNavItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  padding: 10px 20px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.marketingStandaloneNavItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.marketingStandaloneNavItem.active {
+  border-left-color: #1e7fd9;
+  background: rgba(30, 127, 217, 0.14);
+  color: #dcecff;
+}
+
+.marketingStandaloneCount {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  padding: 0 6px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 11px;
+  background: rgba(30, 127, 217, 0.15);
+  color: #8bc2ff;
+  border: 0.5px solid rgba(30, 127, 217, 0.35);
+}
+
+.marketingStandaloneTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 0.5px solid rgba(51, 78, 104, 0.25);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.marketingStandaloneTopBarTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f0f4f8;
+}
+
+.marketingApprovalList {
+  display: grid;
+  gap: 12px;
+}
+
+.marketingApprovalCard {
+  border: 0.5px solid rgba(51, 78, 104, 0.25);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.marketingApprovalTitle {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 960px) {
+  .marketingStandaloneApp {
+    grid-template-columns: 1fr;
+  }
+
+  .marketingStandaloneSidebar {
+    position: static;
+    min-height: auto;
+  }
+
+  .marketingStandaloneNav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 8px 12px 0;
+    gap: 8px;
+  }
+
+  .marketingStandaloneNavItem {
+    width: auto;
+    border-left-width: 0;
+    border-radius: 999px;
+    border: 0.5px solid rgba(51, 78, 104, 0.25);
+    padding: 8px 12px;
+  }
+}
+
+.marketingPromptMain {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.marketingPromptOverviewGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+  gap: 1rem;
+}
+
+.marketingPromptRightStack {
+  display: grid;
+  gap: 1rem;
+}
+
+.marketingPromptPanel {
+  border: 0.5px solid rgba(51, 78, 104, 0.25);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1rem;
+}
+
+.marketingPromptPanel.soft {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.marketingPromptPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 0.9rem;
+}
+
+.marketingPromptLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.marketingPromptPanelTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f0f4f8;
+}
+
+.marketingPromptDivider {
+  height: 1px;
+  background: rgba(51, 78, 104, 0.25);
+  margin: 0.4rem 0;
+}
+
+.marketingPromptStatsList {
+  display: grid;
+  gap: 10px;
+}
+
+.marketingPromptStatsList > div,
+.marketingPromptBudgetSummary > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.marketingPromptStatsList span,
+.marketingPromptBudgetSummary span,
+.marketingPromptMessageMeta {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.marketingPromptStatsList b,
+.marketingPromptBudgetSummary b {
+  font-size: 13px;
+  color: #f0f4f8;
+}
+
+.successText {
+  color: #4ade80;
+}
+
+.marketingPromptPhases {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.marketingPromptPhase {
+  border: 0.5px solid rgba(51, 78, 104, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px 8px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  cursor: default;
+}
+
+.marketingPromptPhase.complete {
+  background: rgba(30, 127, 217, 0.14);
+  color: #8bc2ff;
+}
+
+.marketingPromptPhase.current {
+  background: rgba(30, 127, 217, 0.22);
+  color: #f0f4f8;
+  font-weight: 600;
+}
+
+.marketingPromptPhase.future {
+  opacity: 0.9;
+}
+
+.marketingPromptFunnel {
+  display: grid;
+  gap: 12px;
+}
+
+.marketingPromptFunnelRow {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.marketingPromptFunnelRow span {
+  font-size: 13px;
+  color: #f0f4f8;
+}
+
+.marketingPromptFunnelBar {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.marketingPromptFunnelFill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.marketingPromptThread {
+  display: grid;
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.marketingPromptMessage {
+  max-width: 88%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.marketingPromptMessage.team {
+  justify-self: start;
+  background: rgba(30, 127, 217, 0.14);
+  color: #f0f4f8;
+}
+
+.marketingPromptMessage.owner {
+  justify-self: end;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f0f4f8;
+}
+
+.marketingPromptComposer {
+  display: grid;
+  gap: 12px;
+}
+
+.marketingPromptWizard {
+  display: grid;
+  gap: 1rem;
+}
+
+.marketingPromptWizardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.marketingPromptWizardMeta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.marketingPromptStepBar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.marketingPromptStep {
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 0.5px solid rgba(51, 78, 104, 0.25);
+  background: rgba(255, 255, 255, 0.03);
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.marketingPromptStep.active {
+  border-color: rgba(30, 127, 217, 0.45);
+  background: rgba(30, 127, 217, 0.15);
+  color: #f0f4f8;
+}
+
+.marketingPromptStep.done {
+  border-color: rgba(74, 222, 128, 0.4);
+  background: rgba(74, 222, 128, 0.12);
+  color: #bbf7d0;
+}
+
+.marketingPromptFormGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.marketingPromptFormStack {
+  display: grid;
+  gap: 12px;
+}
+
+.marketingPromptAssetGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.marketingPromptAssetCard {
+  min-height: 138px;
+  border: 0.5px solid rgba(51, 78, 104, 0.25);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 16px;
+}
+
+.marketingPromptAssetCard span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.marketingPromptAssetIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: rgba(30, 127, 217, 0.16);
+  color: #8bc2ff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.marketingPromptBudgetSummary {
+  display: grid;
+  gap: 10px;
+  border: 0.5px solid rgba(51, 78, 104, 0.25);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 14px;
+}
+
+.marketingPromptWizardActions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.marketingChipGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.marketingChip {
+  font-size: 12px;
+  padding: 4px 14px;
+  border-radius: 20px;
+  border: 0.5px solid rgba(51, 78, 104, 0.25);
+  color: rgba(255, 255, 255, 0.45);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.marketingChip:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.marketingChip.selected {
+  background: rgba(30, 127, 217, 0.15);
+  color: #60a5fa;
+  border-color: rgba(96, 165, 250, 0.4);
+}
+
+.inputError {
+  border-color: rgba(239, 68, 68, 0.7) !important;
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.shake {
+  animation: shake 0.35s ease;
+}
+
+.marketingPromptFullSpan {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1024px) {
+  .marketingPromptOverviewGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .marketingPromptPhases {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .marketingPromptMain {
+    padding: 1rem;
+  }
+
+  .marketingPromptFormGrid,
+  .marketingPromptAssetGrid,
+  .marketingPromptStepBar {
+    grid-template-columns: 1fr;
+  }
+
+  .marketingPromptWizardHeader,
+  .marketingPromptWizardActions {
+    flex-direction: column;
+  }
+
+  .marketingPromptWizardActions .btn {
+    width: 100%;
+  }
+
+  .marketingPromptFunnelRow {
+    grid-template-columns: 1fr;
+  }
+
+  .marketingPromptFullSpan {
+    grid-column: auto;
+  }
+}
+
+/* MODIFIED: Agency workspace preview — internal command-center layout, tables, drawers, workload, SLA, and performance dashboard styles — keeps the new agency UI visually separate from owner views. */
+.agencyShell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  background:
+    radial-gradient(880px 520px at 10% -6%, rgba(95, 135, 198, 0.1), transparent 62%),
+    linear-gradient(180deg, #0a111a 0%, #0d1b2a 100%);
+}
+
+.agencyShellSidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 18px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(6, 12, 20, 0.76);
+  backdrop-filter: blur(12px);
+}
+
+.agencyBrand,
+.agencySidebarProfile,
+.agencyTopBarActions,
+.agencyTeamCardTop,
+.agencyDrawerHeader,
+.agencyBulkBar,
+.agencyBulkBarActions,
+.agencyFilterBar,
+.agencyToggleRow,
+.agencyChipRow,
+.agencyModalActions,
+.agencyTaskCardTop,
+.agencyTaskCardBottom,
+.agencyAccountFooter,
+.agencyAccountFooterMeta,
+.agencyTeamCardActions,
+.agencyListRow,
+.agencySlaBreachedRow,
+.agencySlaActions,
+.agencyUtilizationMeta,
+.agencySidebarNavLabel,
+.agencyStatsGrid,
+.agencyAccountCardChips {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.agencyBrandMark,
+.agencySidebarAvatar,
+.agencyAccountAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: #eef4fb;
+  background: linear-gradient(180deg, rgba(95, 135, 198, 0.95), rgba(58, 96, 152, 0.92));
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+}
+
+.agencyBrandTitle,
+.agencyPageTitle {
+  margin: 0;
+  color: #f3f6fb;
+  font-weight: 820;
+}
+
+.agencyBrandSub,
+.agencySidebarProfileRole,
+.agencyPageSubtitle,
+.agencyMutedTiny,
+.agencyPageEyebrow,
+.agencySidebarSectionLabel,
+.agencyTableWrap + .agencyEmptyState {
+  color: rgba(214, 225, 240, 0.64);
+}
+
+.agencyBrandSub,
+.agencySidebarSectionLabel,
+.agencyPageEyebrow,
+.agencyMutedTiny {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agencySidebarNav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agencySidebarNavItem {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: transparent;
+  color: rgba(235, 241, 249, 0.84);
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+}
+
+.agencySidebarNavItem:hover,
+.agencySidebarNavItem.active {
+  border-color: rgba(95, 135, 198, 0.28);
+  background: rgba(95, 135, 198, 0.12);
+  transform: translateX(2px);
+}
+
+.agencySidebarIcon,
+.agencySidebarCount,
+.agencyBadge,
+.agencyMiniPill,
+.agencyHealthBadge,
+.agencySlaPill,
+.agencyCountdown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.agencySidebarIcon {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.agencySidebarCount {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  color: #d9e8ff;
+  background: rgba(95, 135, 198, 0.16);
+  border: 1px solid rgba(95, 135, 198, 0.3);
+}
+
+.agencySidebarCount.alert {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.32);
+  color: #ffc9c9;
+}
+
+.agencySidebarFooter {
+  margin-top: auto;
+  display: grid;
+  gap: 14px;
+}
+
+.agencyOwnerBackLink {
+  color: #9fc2ff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.agencyContentShell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.agencyTopBar {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 14, 24, 0.76);
+  backdrop-filter: blur(14px);
+}
+
+.agencyPageTitle {
+  font-size: clamp(2rem, 3vw, 2.75rem);
+  letter-spacing: -0.03em;
+}
+
+.agencyPageSubtitle {
+  margin: 6px 0 0;
+  max-width: 720px;
+  line-height: 1.65;
+  font-size: 15px;
+}
+
+.agencyTopBarActions {
+  width: min(440px, 100%);
+}
+
+.agencySearchInput {
+  min-width: 240px;
+}
+
+.agencyMain {
+  flex: 1;
+  padding: 24px;
+  display: grid;
+  gap: 18px;
+  overflow: auto;
+}
+
+.agencyViewStack,
+.agencyPerformanceStack,
+.agencyDrawerSection,
+.agencyNotesThread,
+.agencyNotesList,
+.agencySlaTracker,
+.agencyLoadingState,
+.agencyTeamCard,
+.agencyPanel,
+.agencyInnerCard {
+  display: grid;
+  gap: 14px;
+}
+
+.agencyLoadingState,
+.agencyPanel,
+.agencyBulkBar,
+.agencySlaBreachedBlock,
+.agencyAccountCard,
+.agencyTeamCard,
+.agencyInnerCard,
+.agencyDrawerPanelShell {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  background: rgba(17, 25, 39, 0.82);
+}
+
+.agencyLoadingState,
+.agencyPanel,
+.agencyBulkBar,
+.agencySlaBreachedBlock,
+.agencyTeamCard,
+.agencyInnerCard,
+.agencyDrawerPanelShell {
+  padding: 18px;
+}
+
+.agencyFilterBar {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.agencyToggleRow {
+  flex-wrap: wrap;
+  color: rgba(230, 238, 248, 0.82);
+  font-size: 13px;
+}
+
+.agencyTableWrap {
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  background: rgba(11, 18, 30, 0.72);
+}
+
+.agencyTable {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.agencyTable th,
+.agencyTable td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: left;
+  vertical-align: top;
+}
+
+.agencyTable th {
+  color: rgba(195, 209, 228, 0.84);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.agencyTablePrimary {
+  font-weight: 700;
+  color: #f3f7fc;
+}
+
+.agencyDangerText {
+  color: #ffb7b7;
+  font-weight: 700;
+}
+
+.agencyBadge.low,
+.agencyMiniPill,
+.agencySlaPill.on_track,
+.agencyCountdown.healthy,
+.agencyHealthBadge.healthy {
+  color: #c8f4e7;
+  background: rgba(77, 160, 138, 0.16);
+  border: 1px solid rgba(77, 160, 138, 0.28);
+}
+
+.agencyBadge.medium,
+.agencySlaPill.at_risk,
+.agencyCountdown.risk,
+.agencyHealthBadge.risk {
+  color: #ffe3a9;
+  background: rgba(202, 164, 104, 0.16);
+  border: 1px solid rgba(202, 164, 104, 0.28);
+}
+
+.agencyBadge.high,
+.agencyBadge.critical,
+.agencySlaPill.breached,
+.agencyCountdown.critical,
+.agencyHealthBadge.critical {
+  color: #ffc9c9;
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+}
+
+.agencyBadge.high {
+  color: #ffd8a2;
+  background: rgba(251, 146, 60, 0.16);
+  border-color: rgba(251, 146, 60, 0.28);
+}
+
+.agencyMiniPill {
+  padding: 5px 9px;
+}
+
+.agencyHealthBadge,
+.agencyCountdown,
+.agencyBadge {
+  padding: 5px 10px;
+}
+
+.agencyAccountGrid,
+.agencyTeamGrid,
+.agencyChartsGrid,
+.agencyKpiGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.agencyAccountGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.agencyTeamGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.agencyKpiGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.agencyChartsGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.agencyAccountCard {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  border-left: 4px solid transparent;
+}
+
+.agencyAccountCard.healthy { border-left-color: #4ade80; }
+.agencyAccountCard.risk { border-left-color: #facc15; }
+.agencyAccountCard.critical { border-left-color: #f87171; }
+
+.agencyAccountCardTop,
+.agencyTeamCardTop {
+  align-items: flex-start;
+}
+
+.agencyAccountStats,
+.agencyTeamStats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agencyAccountStats span,
+.agencyTeamStats span,
+.agencyKpiCard span,
+.agencyStatMini span {
+  display: block;
+  font-size: 11px;
+  color: rgba(214, 225, 240, 0.64);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.agencyAccountStats b,
+.agencyTeamStats b,
+.agencyKpiCard b,
+.agencyStatMini b {
+  font-size: 16px;
+  color: #f4f7fb;
+}
+
+.agencyUtilization {
+  display: grid;
+  gap: 8px;
+}
+
+.agencyUtilizationTrack {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.agencyUtilizationFill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.agencyUtilizationFill.healthy { background: linear-gradient(90deg, #4da08a, #6fd6ba); }
+.agencyUtilizationFill.risk { background: linear-gradient(90deg, #caa468, #facc15); }
+.agencyUtilizationFill.critical { background: linear-gradient(90deg, #e06464, #f87171); }
+
+.agencyUtilizationMeta {
+  justify-content: space-between;
+  color: rgba(225, 233, 244, 0.82);
+  font-size: 13px;
+}
+
+.agencyUtilizationMeta b.healthy { color: #8fe0c8; }
+.agencyUtilizationMeta b.risk { color: #ffd888; }
+.agencyUtilizationMeta b.critical { color: #ffb1b1; }
+
+.agencyPanelTitle,
+.agencySubPanelTitle {
+  font-weight: 800;
+  color: #f3f7fc;
+}
+
+.agencySubPanelTitle { font-size: 13px; color: #b8cae2; }
+
+.agencyChartArea {
+  min-height: 240px;
+}
+
+.agencyDualLists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.agencyListRow,
+.agencyTeamAccountRow {
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.agencyTeamAccountMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agencyKanban {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(260px, 1fr));
+  gap: 14px;
+  overflow-x: auto;
+}
+
+.agencyKanbanColumn {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(17, 25, 39, 0.72);
+  min-height: 320px;
+}
+
+.agencyKanbanHeader {
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.agencyKanbanBody {
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.agencyTaskCard {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 17, 29, 0.82);
+  display: grid;
+  gap: 10px;
+  cursor: grab;
+}
+
+.agencyTaskCard.critical { border-left: 4px solid #f87171; }
+.agencyTaskCard.high { border-left: 4px solid #fb923c; }
+.agencyTaskCard.medium { border-left: 4px solid #facc15; }
+.agencyTaskCard.low { border-left: 4px solid #5f87c6; }
+
+.agencySlaBreachedBlock {
+  border-color: rgba(239, 68, 68, 0.26);
+  background: rgba(127, 29, 29, 0.16);
+}
+
+.agencySlaBreachedRow {
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.agencyModalStack {
+  display: grid;
+  gap: 14px;
+}
+
+.agencyDrawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(680px, 100%);
+  height: 100vh;
+  z-index: 60;
+  transform: translateX(100%);
+  transition: transform 0.24s ease;
+}
+
+.agencyDrawer.open {
+  transform: translateX(0);
+}
+
+.agencyDrawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.52);
+  z-index: 59;
+}
+
+.agencyDrawerPanelShell {
+  height: 100%;
+  overflow: auto;
+  padding: 20px;
+  border-radius: 0;
+  background: rgba(10, 16, 27, 0.98);
+}
+
+.agencyTabStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.agencyTabButton {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(230, 238, 248, 0.86);
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.agencyTabButton.active {
+  border-color: rgba(95, 135, 198, 0.32);
+  background: rgba(95, 135, 198, 0.16);
+}
+
+.agencyNoteCard {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.agencyNoteMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 6px;
+  color: rgba(214, 225, 240, 0.64);
+  font-size: 12px;
+}
+
+.agencyStatMini {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+@media (max-width: 1200px) {
+  .agencyAccountGrid,
+  .agencyKpiGrid,
+  .agencyChartsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .agencyShell {
+    grid-template-columns: 1fr;
+  }
+
+  .agencyShellSidebar {
+    position: static;
+    height: auto;
+  }
+
+  .agencySidebarNav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agencyTopBar,
+  .agencyFilterBar,
+  .agencyBulkBar,
+  .agencyDrawerHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .agencyTopBarActions {
+    width: 100%;
+  }
+
+  .agencyKanban {
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .agencyMain,
+  .agencyTopBar {
+    padding: 16px;
+  }
+
+  .agencySidebarNav,
+  .agencyAccountGrid,
+  .agencyTeamGrid,
+  .agencyKpiGrid,
+  .agencyChartsGrid,
+  .agencyDualLists,
+  .agencyKanban {
+    grid-template-columns: 1fr;
+  }
+
+  .agencyAccountStats,
+  .agencyTeamStats,
+  .agencyStatsGrid {
+    grid-template-columns: 1fr;
+  }
 }

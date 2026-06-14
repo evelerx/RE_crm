@@ -287,3 +287,105 @@ class AppIntegrationConnection(SQLModel, table=True):
     last_error: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingRequest(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    owner_id: UUID = Field(foreign_key="user.id", index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    created_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    channel: str = Field(default="Meta", index=True, max_length=50)
+    objective: str = Field(default="", max_length=100)
+    project_name: str = Field(default="", max_length=255)
+    property_type: str = Field(default="", max_length=100)
+    target_city: str = Field(default="", max_length=100)
+    target_area: str = Field(default="", max_length=255)
+    price_range: str = Field(default="", max_length=100)
+    target_audience: str = ""
+    primary_goal: str = Field(default="", max_length=100)
+    lead_target: int = 0
+    launch_date: Optional[date] = None
+    duration: str = Field(default="", max_length=50)
+    notes: str = ""
+    monthly_spend: int = 0
+    service_fee: int = 18000
+    cta: str = Field(default="", max_length=100)
+    status: str = Field(default="New", index=True, max_length=50)
+    assigned_manager_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingCampaign(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    request_id: UUID = Field(foreign_key="marketingrequest.id", index=True)
+    owner_id: UUID = Field(foreign_key="user.id", index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    created_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    name: str = Field(default="", max_length=255)
+    channel: str = Field(default="Meta", index=True, max_length=50)
+    budget: int = 0
+    spend: int = 0
+    leads: int = 0
+    qualified_leads: int = 0
+    calls_made: int = 0
+    site_visits: int = 0
+    deals_created: int = 0
+    status: str = Field(default="Scheduled", index=True, max_length=50)
+    platform_campaign_id: str = Field(default="", max_length=255)
+    launch_date: Optional[date] = None
+    end_date: Optional[date] = None
+    budget_approved: bool = False
+    pause_reason: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingApproval(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    request_id: UUID = Field(foreign_key="marketingrequest.id", index=True)
+    campaign_id: Optional[UUID] = Field(default=None, foreign_key="marketingcampaign.id", index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    type: str = Field(default="budget", max_length=100)
+    title: str = Field(default="", max_length=255)
+    description: str = ""
+    status: str = Field(default="Pending", index=True, max_length=50)
+    requested_by: UUID = Field(foreign_key="user.id", index=True)
+    reviewed_by: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    reviewed_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingAsset(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    request_id: UUID = Field(foreign_key="marketingrequest.id", index=True)
+    campaign_id: Optional[UUID] = Field(default=None, foreign_key="marketingcampaign.id", index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    asset_type: str = Field(default="image", max_length=50)
+    file_name: str = Field(default="", max_length=255)
+    file_url: str = ""
+    file_size: int = 0
+    status: str = Field(default="Pending creative", index=True, max_length=50)
+    uploaded_by: UUID = Field(foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingComment(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    request_id: UUID = Field(foreign_key="marketingrequest.id", index=True)
+    campaign_id: Optional[UUID] = Field(default=None, foreign_key="marketingcampaign.id", index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    sender_id: UUID = Field(foreign_key="user.id", index=True)
+    message: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingBudgetLog(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    campaign_id: UUID = Field(foreign_key="marketingcampaign.id", index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    amount: int = 0
+    type: str = Field(default="approved", max_length=50)
+    note: str = ""
+    logged_by: UUID = Field(foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)

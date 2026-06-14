@@ -511,6 +511,213 @@ class SupportChatMessageRead(BaseModel):
     created_at: datetime
 
 
+class MarketingRequestCreate(BaseModel):
+    channel: str = Field(min_length=1, max_length=50)
+    objective: str = Field(min_length=1, max_length=100)
+    project_name: str = Field(min_length=1, max_length=255)
+    property_type: str = Field(default="", max_length=100)
+    target_city: str = Field(min_length=1, max_length=100)
+    target_area: str = Field(default="", max_length=255)
+    price_range: str = Field(default="", max_length=100)
+    target_audience: str = ""
+    primary_goal: str = Field(min_length=1, max_length=100)
+    lead_target: int = 0
+    launch_date: Optional[date] = None
+    duration: str = Field(default="", max_length=50)
+    notes: str = ""
+    monthly_spend: int = Field(ge=0)
+    service_fee: int = Field(default=18000, ge=0)
+    cta: str = Field(default="", max_length=100)
+    assigned_manager_id: Optional[UUID] = None
+
+
+class MarketingRequestUpdate(BaseModel):
+    channel: Optional[str] = Field(default=None, max_length=50)
+    objective: Optional[str] = Field(default=None, max_length=100)
+    project_name: Optional[str] = Field(default=None, max_length=255)
+    property_type: Optional[str] = Field(default=None, max_length=100)
+    target_city: Optional[str] = Field(default=None, max_length=100)
+    target_area: Optional[str] = Field(default=None, max_length=255)
+    price_range: Optional[str] = Field(default=None, max_length=100)
+    target_audience: Optional[str] = None
+    primary_goal: Optional[str] = Field(default=None, max_length=100)
+    lead_target: Optional[int] = None
+    launch_date: Optional[date] = None
+    duration: Optional[str] = Field(default=None, max_length=50)
+    notes: Optional[str] = None
+    monthly_spend: Optional[int] = Field(default=None, ge=0)
+    service_fee: Optional[int] = Field(default=None, ge=0)
+    cta: Optional[str] = Field(default=None, max_length=100)
+    status: Optional[str] = Field(default=None, max_length=50)
+    assigned_manager_id: Optional[UUID] = None
+
+
+class MarketingCampaignCreate(BaseModel):
+    request_id: UUID
+    name: str = Field(min_length=1, max_length=255)
+    channel: str = Field(min_length=1, max_length=50)
+    budget: int = Field(ge=0)
+    launch_date: Optional[date] = None
+    end_date: Optional[date] = None
+
+
+class MarketingCampaignUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=255)
+    channel: Optional[str] = Field(default=None, max_length=50)
+    budget: Optional[int] = Field(default=None, ge=0)
+    spend: Optional[int] = Field(default=None, ge=0)
+    leads: Optional[int] = Field(default=None, ge=0)
+    qualified_leads: Optional[int] = Field(default=None, ge=0)
+    calls_made: Optional[int] = Field(default=None, ge=0)
+    site_visits: Optional[int] = Field(default=None, ge=0)
+    deals_created: Optional[int] = Field(default=None, ge=0)
+    status: Optional[str] = Field(default=None, max_length=50)
+    platform_campaign_id: Optional[str] = Field(default=None, max_length=255)
+    launch_date: Optional[date] = None
+    end_date: Optional[date] = None
+    pause_reason: Optional[str] = None
+
+
+class MarketingApprovalAction(BaseModel):
+    reason: str = ""
+
+
+class MarketingCommentCreate(BaseModel):
+    message: str = Field(min_length=1, max_length=10000)
+
+
+class MarketingRequestRead(BaseModel):
+    id: UUID
+    owner_id: UUID
+    enterprise_owner_id: Optional[UUID] = None
+    channel: str
+    objective: str
+    project_name: str
+    property_type: str = ""
+    target_city: str = ""
+    target_area: str = ""
+    price_range: str = ""
+    target_audience: str = ""
+    primary_goal: str = ""
+    lead_target: int = 0
+    launch_date: Optional[date] = None
+    duration: str = ""
+    notes: str = ""
+    monthly_spend: int = 0
+    service_fee: int = 18000
+    cta: str = ""
+    status: str
+    assigned_manager_id: Optional[UUID] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MarketingCampaignRead(BaseModel):
+    id: UUID
+    request_id: UUID
+    owner_id: UUID
+    channel: str
+    name: str
+    budget: int
+    spend: int
+    leads: int
+    qualified_leads: int
+    calls_made: int
+    site_visits: int
+    deals_created: int
+    status: str
+    platform_campaign_id: str = ""
+    launch_date: Optional[date] = None
+    end_date: Optional[date] = None
+    budget_approved: bool = False
+    pause_reason: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+
+class MarketingApprovalRead(BaseModel):
+    id: UUID
+    request_id: UUID
+    campaign_id: Optional[UUID] = None
+    type: str
+    title: str
+    description: str = ""
+    status: str
+    requested_by: UUID
+    reviewed_by: Optional[UUID] = None
+    reviewed_at: Optional[datetime] = None
+    created_at: datetime
+
+
+class MarketingAssetRead(BaseModel):
+    id: UUID
+    request_id: UUID
+    campaign_id: Optional[UUID] = None
+    asset_type: str
+    file_name: str
+    file_url: str
+    file_size: int
+    status: str
+    uploaded_by: UUID
+    created_at: datetime
+
+
+class MarketingBudgetLogRead(BaseModel):
+    id: UUID
+    campaign_id: UUID
+    amount: int
+    type: str
+    note: str = ""
+    logged_by: UUID
+    created_at: datetime
+
+
+class MarketingCommentRead(BaseModel):
+    id: UUID
+    request_id: UUID
+    campaign_id: Optional[UUID] = None
+    sender_id: UUID
+    sender_name: str = ""
+    sender_role: str = ""
+    message: str
+    created_at: datetime
+
+
+class MarketingRequestDetailRead(MarketingRequestRead):
+    campaigns: list[MarketingCampaignRead] = []
+    approvals: list[MarketingApprovalRead] = []
+    comments: list[MarketingCommentRead] = []
+    assets: list[MarketingAssetRead] = []
+
+
+class MarketingRequestsPage(BaseModel):
+    items: list[MarketingRequestRead]
+    page: int
+    limit: int
+    total: int
+
+
+class MarketingOverviewMetricsRead(BaseModel):
+    total_spend: int = 0
+    total_leads: int = 0
+    avg_cpl: float = 0
+    total_deals: int = 0
+    spend_delta_pct: float = 0
+    leads_this_week: int = 0
+
+
+class MarketingFunnelMetricsRead(BaseModel):
+    leads: int = 0
+    qualified_leads: int = 0
+    calls_made: int = 0
+    site_visits: int = 0
+    deals_created: int = 0
+    avg_deal_value: int = 82_000_000
+    revenue_influenced: int = 0
+    roi_multiple: int = 0
+    budget_logs: list[MarketingBudgetLogRead] = []
+
+
 class ContactCreate(BaseModel):
     name: str
     occupation: str = ""

@@ -22,6 +22,7 @@ from .routes import (
     integrations,
     insights,
     llm,
+    marketing,
     meta,
     next_actions,
     profile,
@@ -108,6 +109,7 @@ app.include_router(next_actions.router, dependencies=deps)
 app.include_router(csvio.router, dependencies=deps)
 app.include_router(insights.router, dependencies=deps)
 app.include_router(enterprise.router, dependencies=deps)
+app.include_router(marketing.router, dependencies=deps)
 app.include_router(whatsapp.router, dependencies=deps)
 app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 

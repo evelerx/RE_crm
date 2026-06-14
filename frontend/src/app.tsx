@@ -7,6 +7,7 @@ import TutorialBubble from "./components/TutorialBubble";
 import AdminPage from "./pages/AdminPage";
 import { AdminOwnerContactsPage, AdminOwnerDealsPage, AdminOwnerPipelinePage } from "./pages/AdminWorkspacePages";
 import AccountPage from "./pages/AccountPage";
+import AgencyWorkspace from "./pages/AgencyWorkspace";
 import AppsPage from "./pages/AppsPage";
 import BuilderPublicPage from "./pages/BuilderPublicPage";
 import CalculatorPage from "./pages/CalculatorPage";
@@ -16,6 +17,8 @@ import DealsGridPage from "./pages/DealsGridPage";
 import EnterprisePage from "./pages/EnterprisePage";
 import InsightsPage from "./pages/InsightsPage";
 import LoginPage from "./pages/LoginPage";
+import MarketingPortalPage from "./pages/MarketingPortal";
+import MarketingPromptPreviewPage from "./pages/MarketingPromptPreviewPage";
 import PipelinePage from "./pages/PipelinePage";
 import SettingsPage from "./pages/SettingsPage";
 import TodayPage from "./pages/TodayPage";
@@ -75,6 +78,9 @@ function TopBar({
           <NavLink to="/enterprise" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
             Enterprise
           </NavLink>
+          <NavLink to="/marketing" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
+            Marketing
+          </NavLink>
         </>
         <NavLink to="/account" className={({ isActive }) => (isActive ? "navA active" : "navA")}>
           Account
@@ -122,6 +128,9 @@ function TopBar({
           </NavLink>
           <NavLink to="/enterprise" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
             Enterprise
+          </NavLink>
+          <NavLink to="/marketing" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
+            Marketing
           </NavLink>
         </>
         <NavLink to="/account" className={({ isActive }) => (isActive ? "btn ghost active" : "btn ghost")}>
@@ -290,6 +299,12 @@ export default function App() {
   if (location.pathname.startsWith("/builders/")) {
     return <BuilderPublicPage />;
   }
+  if (location.pathname === "/agency-preview") {
+    return <AgencyWorkspace />;
+  }
+  if (location.pathname === "/marketing-preview") {
+    return <MarketingPromptPreviewPage />;
+  }
 
   if (!authed) {
     return (
@@ -320,6 +335,7 @@ export default function App() {
           <Route path="/contacts" element={isAdmin ? <AdminOwnerContactsPage /> : <ContactsPage />} />
           <Route path="/calc" element={<CalculatorPage />} />
           <Route path="/insights" element={<InsightsPage />} />
+          <Route path="/marketing" element={<MarketingPortalPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/apps" element={<AppsPage />} />
