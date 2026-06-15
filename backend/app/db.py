@@ -48,6 +48,9 @@ def _resolve_database_url() -> str:
         url = "postgresql+psycopg://" + url[len("postgresql://") :]
 
     if not url.startswith("sqlite:///"):
+        if "pooler.supabase.com" in url and "sslmode=" not in url:
+            joiner = "&" if "?" in url else "?"
+            url = f"{url}{joiner}sslmode=require"
         return url
 
     base = app_base_dir()

@@ -1,12 +1,20 @@
 from fastapi import APIRouter
 
+from ..db import DATABASE_URL
+from .. import runtime_state
+
 
 router = APIRouter()
 
 
 @router.get("/health")
 def health():
-    return {"ok": True}
+    is_supabase = "pooler.supabase.com" in DATABASE_URL
+    return {
+        "ok": runtime_state.startup_error is None,
+        "startup_error": runtime_state.startup_error,
+        "database_backend": "supabase_pooler" if is_supabase else ("sqlite" if DATABASE_URL.startswith("sqlite") else "postgres"),
+    }
 
 
 @router.get("/push/firebase-config")

@@ -33,6 +33,7 @@ from .routes import (
     public,
     whatsapp,
 )
+from . import runtime_state
 from .settings import settings
 
 
@@ -101,7 +102,12 @@ def _startup():
             "SECURITY: JWT_SECRET is using the insecure default 'change-me'. "
             "Set a strong random JWT_SECRET in backend/.env before deploying."
         )
-    init_db()
+    try:
+        init_db()
+        runtime_state.startup_error = None
+    except Exception as exc:
+        runtime_state.startup_error = str(exc)
+        logger.exception("Startup database initialization failed; API will stay up for diagnostics.")
 
 
 app.include_router(meta.router)

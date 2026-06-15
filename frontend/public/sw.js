@@ -1,5 +1,5 @@
-/* global self, caches, fetch */
-const CACHE_NAME = "northstone-shell-v2";
+/* global self, caches, fetch, Response */
+const CACHE_NAME = "northstone-shell-v3";
 const SHELL_URLS = ["/", "/manifest.webmanifest", "/northstone-logo-icon.png"];
 
 self.addEventListener("install", (event) => {
@@ -29,6 +29,14 @@ self.addEventListener("fetch", (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => undefined);
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(async () => {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        return new Response("Offline", {
+          status: 503,
+          statusText: "Offline",
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
+      })
   );
 });
