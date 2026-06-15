@@ -725,6 +725,9 @@ class MarketingNotificationRead(BaseModel):
     read: bool
     created_at: datetime
 
+    class Config:
+        from_attributes = True
+
 
 class ContactCreate(BaseModel):
     name: str

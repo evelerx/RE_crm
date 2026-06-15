@@ -29,6 +29,7 @@ from ..schemas import (
     MarketingApprovalRead,
     MarketingCommentCreate,
     MarketingCommentRead,
+    MarketingNotificationRead,
     MarketingRequestDetailRead,
     MarketingRequestSummaryRead,
     MarketingTaskRead,
