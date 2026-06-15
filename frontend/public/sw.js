@@ -1,4 +1,5 @@
-const CACHE_NAME = "northstone-shell-v1";
+/* global self, caches, fetch */
+const CACHE_NAME = "northstone-shell-v2";
 const SHELL_URLS = ["/", "/manifest.webmanifest", "/northstone-logo-icon.png"];
 
 self.addEventListener("install", (event) => {
@@ -10,7 +11,11 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((key) => key.startsWith("northstone-shell-") && key !== CACHE_NAME).map((key) => caches.delete(key)))
+      )
   );
   self.clients.claim();
 });

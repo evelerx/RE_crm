@@ -1351,17 +1351,112 @@ textarea.textarea {
   display: grid;
   place-items: center;
   padding: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(73, 129, 255, 0.12), transparent 28%),
+    radial-gradient(circle at top right, rgba(73, 129, 255, 0.08), transparent 24%),
+    linear-gradient(180deg, #eef4ff 0%, #f7faff 52%, #eef3fb 100%);
 }
 
 .loginCard {
   width: min(520px, 100%);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: rgba(18, 26, 45, 0.88);
-  padding: 18px;
+  border: 1px solid rgba(51, 108, 233, 0.22);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 249, 255, 0.98));
+  box-shadow:
+    0 18px 48px rgba(57, 92, 156, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  padding: 22px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  color: #10203d;
+}
+
+.loginCard .brandTitle,
+.loginCard label,
+.loginCard .cardTitle {
+  color: #10203d;
+}
+
+.loginCard .brandSub,
+.loginCard .muted,
+.loginCard .small {
+  color: #506483;
+}
+
+.loginCard .card {
+  border: 1px solid rgba(51, 108, 233, 0.24);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(247, 250, 255, 0.98), rgba(237, 244, 255, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.loginCard input,
+.loginCard select,
+.loginCard textarea {
+  border: 1px solid rgba(104, 140, 214, 0.36);
+  background: rgba(255, 255, 255, 0.98);
+  color: #10203d;
+  border-radius: 16px;
+}
+
+.loginCard input::placeholder,
+.loginCard textarea::placeholder {
+  color: #8b9ab2;
+}
+
+.loginCard input:focus,
+.loginCard select:focus,
+.loginCard textarea:focus {
+  border-color: rgba(37, 99, 235, 0.56);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+  background: #ffffff;
+}
+
+.loginCard .btn {
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: linear-gradient(180deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.18);
+}
+
+.loginCard .btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #2d6af0, #2155de);
+  border-color: rgba(37, 99, 235, 0.34);
+}
+
+.loginCard .btn.ghost {
+  background: rgba(255, 255, 255, 0.92);
+  color: #1d4fbe;
+  border-color: rgba(37, 99, 235, 0.2);
+  box-shadow: none;
+}
+
+.loginCard .btn.ghost:hover:not(:disabled) {
+  background: rgba(235, 242, 255, 0.98);
+}
+
+.loginCard .btn:disabled {
+  background: linear-gradient(180deg, #d7deec, #cbd5e4);
+  color: #60718b;
+  border-color: rgba(110, 130, 170, 0.2);
+  box-shadow: none;
+}
+
+.loginCard .alert {
+  border-radius: 18px;
+  border: 1px solid rgba(213, 81, 81, 0.32);
+  background: rgba(255, 241, 241, 0.95);
+  color: #6f2231;
+}
+
+.loginCard .alert.ok {
+  border-color: rgba(20, 153, 115, 0.28);
+  background: rgba(236, 253, 245, 0.96);
+  color: #16624b;
 }
 
 .small {
@@ -1372,7 +1467,7 @@ textarea.textarea {
 .linkBtn {
   border: none;
   background: transparent;
-  color: rgba(138, 180, 255, 0.95);
+  color: #1f5de0;
   font-weight: 800;
   cursor: pointer;
   padding: 6px 0;
