@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   api,
+  getWhatsAppConfigStatus,
   getWhatsAppConversation,
   listWhatsAppInbox,
   sendWhatsAppMessage,
+  type WhatsAppConfigStatusRead,
   type WhatsAppConversationRead,
   type WhatsAppConversationSummaryRead,
 } from "../api/client";
@@ -33,9 +35,20 @@ export default function WhatsAppPage() {
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [whatsAppConfig, setWhatsAppConfig] = useState<WhatsAppConfigStatusRead | null>(null);
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  async function loadConfigStatus() {
+    try {
+      const config = await getWhatsAppConfigStatus();
+      setWhatsAppConfig(config);
+    } catch (e) {
+      setWhatsAppConfig(null);
+      setError(e instanceof Error ? e.message : "Failed to load WhatsApp configuration status");
+    }
+  }
 
   async function loadInbox(preferredContactId?: string | null) {
     setLoadingInbox(true);
@@ -74,6 +87,7 @@ export default function WhatsAppPage() {
 
   useEffect(() => {
     void loadInbox();
+    void loadConfigStatus();
     const timer = window.setInterval(() => {
       void loadInbox(selectedContactId);
     }, 30000);
@@ -144,7 +158,7 @@ export default function WhatsAppPage() {
   );
 
   async function handleSend() {
-    if (!selectedContactId || !draft.trim()) return;
+    if (!selectedContactId || !draft.trim() || whatsAppConfig?.configured === false) return;
     setSending(true);
     try {
       await sendWhatsAppMessage(selectedContactId, draft.trim());
@@ -170,17 +184,20 @@ export default function WhatsAppPage() {
         </button>
       </div>
 
+      {whatsAppConfig?.configured === false ? (
+        <div className="alert">
+          {whatsAppConfig.detail} Add these variables on the backend service and redeploy:{" "}
+          <strong>{whatsAppConfig.missing_fields.join(", ")}</strong>
+        </div>
+      ) : null}
+
       {error ? <div className="alert">{error}</div> : null}
 
       <div className="whatsappLayout">
         <aside className="whatsappSidebar">
           <div className="sectionTitle">Conversations</div>
           <div className="row" style={{ marginTop: 12, marginBottom: 12 }}>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search contacts"
-            />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search contacts" />
             <button className="btn ghost" type="button" onClick={() => setCreateOpen(true)}>
               + Add contact
             </button>
@@ -255,16 +272,34 @@ export default function WhatsAppPage() {
                 <textarea
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Type a WhatsApp message..."
+                  placeholder={
+                    whatsAppConfig?.configured === false
+                      ? "WhatsApp Cloud API is not configured on the backend yet."
+                      : "Type a WhatsApp message..."
+                  }
                   rows={3}
+                  disabled={whatsAppConfig?.configured === false}
                 />
                 <div className="whatsappComposerActions">
-                  <button className="btn" type="button" disabled={sending || !draft.trim()} onClick={() => void handleSend()}>
+                  <button
+                    className="btn"
+                    type="button"
+                    disabled={sending || !draft.trim() || whatsAppConfig?.configured === false}
+                    onClick={() => void handleSend()}
+                    title={whatsAppConfig?.configured === false ? whatsAppConfig.detail : undefined}
+                  >
                     {sending ? "Sending..." : "Send"}
                   </button>
                 </div>
+                {whatsAppConfig?.configured === false ? (
+                  <div className="muted whatsappTiny">
+                    Live outbound WhatsApp sending stays disabled until the backend gets valid Meta Cloud API credentials.
+                  </div>
+                ) : null}
                 {!selectedSummary.contact_phone ? (
-                  <div className="muted whatsappTiny">Add a phone number to this contact before sending outbound WhatsApp messages.</div>
+                  <div className="muted whatsappTiny">
+                    Add a phone number to this contact before sending outbound WhatsApp messages.
+                  </div>
                 ) : null}
               </div>
             </>
@@ -342,7 +377,12 @@ function CreateWhatsAppContactForm({ onCreate }: { onCreate: (payload: ContactCr
       </label>
       <label>
         Notes
-        <textarea className="textarea" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Context for the first conversation" />
+        <textarea
+          className="textarea"
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          placeholder="Context for the first conversation"
+        />
       </label>
       <div className="row right">
         <button className="btn" type="submit" disabled={!canSubmit}>

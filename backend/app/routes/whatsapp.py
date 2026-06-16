@@ -16,6 +16,7 @@ from ..db import get_session
 from ..enterprise_scope import assign_enterprise_fields, user_can_access_record
 from ..models import Contact, Deal, User, WhatsAppMessage
 from ..schemas import (
+    WhatsAppConfigStatusRead,
     WhatsAppConversationRead,
     WhatsAppConversationSummaryRead,
     WhatsAppMediaSendResponse,
@@ -47,8 +48,42 @@ def _normalize_phone(value: str | None) -> str:
 def _ensure_whatsapp_credentials() -> None:
     """Fail fast when the WhatsApp Cloud API is not configured on the backend."""
 
-    if not settings.whatsapp_token or not settings.whatsapp_phone_number_id:
-        raise HTTPException(status_code=503, detail="WhatsApp Cloud API credentials are not configured.")
+    missing_fields = _missing_whatsapp_fields()
+    if missing_fields:
+        raise HTTPException(
+            status_code=503,
+            detail=f"WhatsApp Cloud API credentials are not configured. Missing: {', '.join(missing_fields)}.",
+        )
+
+
+def _missing_whatsapp_fields() -> list[str]:
+    missing_fields: list[str] = []
+    if not settings.whatsapp_token:
+        missing_fields.append("WHATSAPP_TOKEN")
+    if not settings.whatsapp_phone_number_id:
+        missing_fields.append("WHATSAPP_PHONE_NUMBER_ID")
+    return missing_fields
+
+
+@router.get("/config-status", response_model=WhatsAppConfigStatusRead)
+def get_whatsapp_config_status(
+    user: User = Depends(get_current_user),
+) -> WhatsAppConfigStatusRead:
+    """Return whether live WhatsApp sending is configured for the current workspace."""
+
+    del user
+    missing_fields = _missing_whatsapp_fields()
+    if missing_fields:
+        return WhatsAppConfigStatusRead(
+            configured=False,
+            missing_fields=missing_fields,
+            detail=f"WhatsApp Cloud API credentials are not configured. Missing: {', '.join(missing_fields)}.",
+        )
+    return WhatsAppConfigStatusRead(
+        configured=True,
+        missing_fields=[],
+        detail="WhatsApp Cloud API is configured.",
+    )
 
 
 def _save_message_record(session: Session, message: WhatsAppMessage) -> WhatsAppMessage:

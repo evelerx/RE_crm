@@ -14,8 +14,11 @@ from ..auth import get_current_user
 from ..db import get_session
 from ..marketing_support import (
     addon_price_map,
+    allowed_marketing_addons_for_plan,
     ensure_marketing_agency,
     latest_comment_for_request,
+    log_marketing_activity,
+    managed_marketing_allowed_for_plan,
     next_marketing_request_code,
     notify_agency_managers,
     profile_summary,
@@ -31,6 +34,7 @@ from ..marketing_support import (
 )
 from ..models import AgencyUser, MarketingAddonSubscription, MarketingApproval, MarketingComment, MarketingRequest, MarketingTask, User
 from ..schemas import (
+    MarketingActivityLogRead,
     MarketingAddonRead,
     MarketingApprovalOwnerSignOffRequest,
     MarketingApprovalRead,
@@ -39,6 +43,7 @@ from ..schemas import (
     MarketingMetricsRead,
     MarketingNotificationRead,
     MarketingOwnerSummaryRead,
+    MarketingWorkspaceAccessRead,
     MarketingRequestCreate,
     MarketingRequestDetailRead,
     MarketingRequestSummaryRead,
@@ -51,8 +56,52 @@ router = APIRouter(prefix="/marketing", tags=["marketing"])
 payments_router = APIRouter(prefix="/payments", tags=["marketing-payments"])
 
 
+@router.get("/workspace", response_model=MarketingWorkspaceAccessRead)
+def marketing_workspace_access(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> MarketingWorkspaceAccessRead:
+    """Return the current user's marketing role and gated access state."""
+
+    owner_id = _scope_owner_id(current_user)
+    addon = session.exec(
+        select(MarketingAddonSubscription)
+        .where(MarketingAddonSubscription.enterprise_owner_id == owner_id)
+        .order_by(MarketingAddonSubscription.created_at.desc())
+    ).first()
+    subscription_plan = _effective_subscription_plan(current_user)
+    allowed_addons = allowed_marketing_addons_for_plan(subscription_plan)
+    managed_allowed = managed_marketing_allowed_for_plan(subscription_plan)
+    is_admin = (settings.admin_email or "").strip().lower() == (current_user.email or "").strip().lower()
+    upgrade_required = not bool(allowed_addons)
+    upgrade_message = (
+        "Upgrade to Enterprise or Builder to unlock marketing requests."
+        if upgrade_required
+        else ("Managed Marketing requires Enterprise or Builder access." if not managed_allowed else None)
+    )
+
+    return MarketingWorkspaceAccessRead(
+        role="admin" if is_admin else "subscriber",
+        subscription_plan=subscription_plan,
+        crm_plan=(current_user.plan or "free"),
+        active_addon_type=addon.addon_type if addon else None,
+        active_addon_status=addon.status if addon else "",
+        request_allowed=bool(allowed_addons),
+        managed_marketing_allowed=managed_allowed,
+        allowed_addons=allowed_addons,
+        upgrade_required=upgrade_required,
+        upgrade_message=upgrade_message,
+    )
+
+
 def _scope_owner_id(user: User) -> UUID:
     return getattr(user, "enterprise_owner_id", None) or user.id
+
+
+def _effective_subscription_plan(user: User) -> str:
+    """Return the commercial plan label used for marketing gating decisions."""
+
+    return ((user.plan or "").strip() or (user.subscription_plan or "").strip() or "free").lower()
 
 
 def _serialize_comment(row: MarketingComment) -> MarketingCommentRead:
@@ -308,6 +357,14 @@ def create_marketing_request(
     session.add(row)
     session.commit()
     session.refresh(row)
+    log_marketing_activity(
+        session,
+        request_id=row.id,
+        actor_id=str(current_user.id),
+        actor_role="subscriber",
+        message=f"Request {row.request_code} submitted",
+        detail=f"channel={row.channel}; objective={row.objective}; addon={addon.addon_type}",
+    )
     log_audit_event(
         session,
         actor=current_user,
@@ -364,6 +421,14 @@ def owner_marketing_comment(
     session.add(comment)
     session.commit()
     session.refresh(comment)
+    log_marketing_activity(
+        session,
+        request_id=row.id,
+        actor_id=str(current_user.id),
+        actor_role="subscriber",
+        message=f"Subscriber commented on {row.request_code}",
+        detail=payload.message.strip(),
+    )
     if row.assigned_manager_id:
         push_marketing_notification(
             session,
@@ -415,6 +480,14 @@ def owner_sign_off(
     session.add(request_row)
     session.commit()
     session.refresh(approval)
+    log_marketing_activity(
+        session,
+        request_id=request_row.id,
+        actor_id=str(current_user.id),
+        actor_role="subscriber",
+        message=f"Owner marked approval as {payload.action.replace('_', ' ')}",
+        detail=payload.note.strip(),
+    )
     if request_row.assigned_manager_id:
         push_marketing_notification(
             session,
@@ -449,6 +522,27 @@ def owner_marketing_notifications(
         .limit(20)
     ).all()
     return [MarketingNotificationRead(**row.model_dump()) for row in rows]
+
+
+@router.get("/requests/{request_id}/activity", response_model=list[MarketingActivityLogRead])
+def owner_marketing_activity(
+    request_id: UUID,
+    addon: MarketingAddonSubscription = Depends(require_marketing_addon),
+    session: Session = Depends(get_session),
+) -> list[MarketingActivityLogRead]:
+    """Return the marketing activity log for one owner-visible request."""
+
+    from ..models import MarketingActivityLog
+
+    row = session.get(MarketingRequest, request_id)
+    if not row or row.enterprise_owner_id != addon.enterprise_owner_id:
+        raise HTTPException(status_code=404, detail="Marketing request not found")
+    activity = session.exec(
+        select(MarketingActivityLog)
+        .where(MarketingActivityLog.request_id == row.id)
+        .order_by(MarketingActivityLog.created_at.desc())
+    ).all()
+    return [MarketingActivityLogRead.model_validate(item) for item in activity]
 
 
 @router.patch("/notifications/{notification_id}/read")

@@ -401,3 +401,39 @@ class MarketingNotification(SQLModel, table=True):
     link: str = ""
     read: bool = Field(default=False, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingAccount(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    platform: str = Field(default="meta_ads", index=True)
+    account_name: str = ""
+    external_account_id: str = Field(default="", index=True)
+    status: str = Field(default="available", index=True)
+    allotted_to_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    notes: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class MarketingAccountAllotment(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    account_id: UUID = Field(foreign_key="marketingaccount.id", index=True)
+    enterprise_owner_id: UUID = Field(foreign_key="user.id", index=True)
+    subscription_plan: str = ""
+    addon_type: str = ""
+    action: str = Field(default="allotted", index=True)
+    allotted_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    revoked_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    notes: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    revoked_at: Optional[datetime] = None
+
+
+class MarketingActivityLog(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    request_id: UUID = Field(foreign_key="marketingrequest.id", index=True)
+    actor_id: str = Field(index=True)
+    actor_role: str = Field(default="subscriber", index=True)
+    message: str = ""
+    detail: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)

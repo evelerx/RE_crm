@@ -107,6 +107,12 @@ export type WhatsAppConversation = {
   messages: WhatsAppMessage[];
 };
 
+export type WhatsAppConfigStatus = {
+  configured: boolean;
+  missing_fields: string[];
+  detail: string;
+};
+
 export type DealClosureEvent = {
   id: string;
   deal_id: string;

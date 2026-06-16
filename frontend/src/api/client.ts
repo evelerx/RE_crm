@@ -210,6 +210,7 @@ export type WhatsAppMediaSendResponse = {
 export type WhatsAppMessageRead = import("./types").WhatsAppMessage;
 export type WhatsAppConversationSummaryRead = import("./types").WhatsAppConversationSummary;
 export type WhatsAppConversationRead = import("./types").WhatsAppConversation;
+export type WhatsAppConfigStatusRead = import("./types").WhatsAppConfigStatus;
 
 export async function sendWhatsAppMessage(contactId: string, message: string) {
   return api<WhatsAppMessageRead>("/whatsapp/send", {
@@ -228,6 +229,10 @@ export async function listWhatsAppInbox() {
 
 export async function getWhatsAppConversation(contactId: string) {
   return api<WhatsAppConversationRead>(`/whatsapp/conversation/${contactId}`);
+}
+
+export async function getWhatsAppConfigStatus() {
+  return api<WhatsAppConfigStatusRead>("/whatsapp/config-status");
 }
 
 export async function sendWhatsAppMedia(contactId: string, caption: string, file: File) {

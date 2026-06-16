@@ -14,6 +14,8 @@ from .auth import get_current_user, hash_password, normalize_email, verify_passw
 from .db import get_session
 from .models import (
     AgencyUser,
+    MarketingAccount,
+    MarketingActivityLog,
     MarketingAddonSubscription,
     MarketingAgency,
     MarketingApproval,
@@ -270,3 +272,62 @@ def authenticate_agency_user(session: Session, email: str, password: str) -> Age
 def unresolved_owner_approvals(approvals: Iterable[MarketingApproval]) -> int:
     """Count approvals still waiting on owner action."""
     return len([item for item in approvals if item.approval_type == "report_sign_off" and item.status == "pending"])
+
+
+def allowed_marketing_addons_for_plan(plan: str) -> list[str]:
+    """Return addon options a CRM plan is allowed to purchase/use."""
+
+    normalized = (plan or "free").strip().lower()
+    if normalized == "builder":
+        return ["growth", "scale", "ai_brand"]
+    if normalized == "enterprise":
+        return ["growth", "scale"]
+    return []
+
+
+def managed_marketing_allowed_for_plan(plan: str) -> bool:
+    """Return whether the plan can request fully managed marketing."""
+
+    return "scale" in allowed_marketing_addons_for_plan(plan)
+
+
+def log_marketing_activity(
+    session: Session,
+    *,
+    request_id: UUID,
+    actor_id: str,
+    actor_role: str,
+    message: str,
+    detail: str = "",
+) -> MarketingActivityLog:
+    """Persist a marketing workflow activity entry for timeline/audit visibility."""
+
+    row = MarketingActivityLog(
+        request_id=request_id,
+        actor_id=actor_id,
+        actor_role=actor_role,
+        message=message[:240],
+        detail=detail[:2000],
+        created_at=utc_now_naive(),
+    )
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def ensure_marketing_account_seed(session: Session) -> None:
+    """Create a few starter marketing accounts so the admin panel is immediately usable."""
+
+    existing = session.exec(select(MarketingAccount)).all()
+    if existing:
+        return
+
+    seeds = [
+        MarketingAccount(platform="meta_ads", account_name="Meta West Zone", external_account_id="META-001", status="available"),
+        MarketingAccount(platform="google_ads", account_name="Google Prime Search", external_account_id="GOOGLE-001", status="available"),
+        MarketingAccount(platform="hotstar", account_name="Hotstar Premium Reach", external_account_id="HOTSTAR-001", status="available"),
+    ]
+    for row in seeds:
+        session.add(row)
+    session.commit()

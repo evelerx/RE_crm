@@ -729,6 +729,81 @@ class MarketingNotificationRead(BaseModel):
         from_attributes = True
 
 
+class MarketingActivityLogRead(BaseModel):
+    id: UUID
+    request_id: UUID
+    actor_id: str
+    actor_role: str
+    message: str
+    detail: str = ""
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MarketingWorkspaceAccessRead(BaseModel):
+    role: str
+    subscription_plan: str
+    crm_plan: str
+    active_addon_type: Optional[str] = None
+    active_addon_status: str = ""
+    request_allowed: bool = False
+    managed_marketing_allowed: bool = False
+    allowed_addons: list[str] = []
+    upgrade_required: bool = False
+    upgrade_message: Optional[str] = None
+
+
+class MarketingAccountRead(BaseModel):
+    id: UUID
+    platform: str
+    account_name: str
+    external_account_id: str
+    status: str
+    allotted_to_owner_id: Optional[UUID] = None
+    allotted_to_owner_name: str = ""
+    allotted_to_owner_email: str = ""
+    allotted_to_company: str = ""
+    notes: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+
+class MarketingAccountCreate(BaseModel):
+    platform: str = Field(min_length=2, max_length=80)
+    account_name: str = Field(min_length=2, max_length=160)
+    external_account_id: str = Field(default="", max_length=160)
+    notes: str = Field(default="", max_length=2000)
+
+
+class MarketingAccountAllotRequest(BaseModel):
+    enterprise_owner_id: UUID
+    notes: str = Field(default="", max_length=2000)
+
+
+class MarketingAccountRevokeRequest(BaseModel):
+    notes: str = Field(default="", max_length=2000)
+
+
+class MarketingAccountAllotmentRead(BaseModel):
+    id: UUID
+    account_id: UUID
+    account_name: str = ""
+    platform: str = ""
+    enterprise_owner_id: UUID
+    owner_name: str = ""
+    owner_email: str = ""
+    subscription_plan: str = ""
+    addon_type: str = ""
+    action: str
+    allotted_by_user_id: Optional[UUID] = None
+    revoked_by_user_id: Optional[UUID] = None
+    notes: str = ""
+    created_at: datetime
+    revoked_at: Optional[datetime] = None
+
+
 class ContactCreate(BaseModel):
     name: str
     occupation: str = ""
@@ -895,6 +970,12 @@ class WhatsAppConversationRead(BaseModel):
     contact_phone: Optional[str] = None
     contact_email: Optional[str] = None
     messages: list[WhatsAppMessageRead]
+
+
+class WhatsAppConfigStatusRead(BaseModel):
+    configured: bool
+    missing_fields: list[str] = Field(default_factory=list)
+    detail: str
 
 
 class ActivityCreate(BaseModel):
