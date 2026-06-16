@@ -467,6 +467,7 @@ def bulk_stage(
     deals = session.exec(stmt).all()
     now = datetime.utcnow()
     updated = 0
+    display_name: str | None = None
     for d in deals:
         if d.stage != payload.stage:
             previous_stage = d.stage
@@ -484,6 +485,22 @@ def bulk_stage(
             d.stage = payload.stage
             d.status = "closed" if payload.stage == "closed" else "lost" if payload.stage == "lost" else "open"
             d.updated_at = now
+            if payload.stage == "closed" and previous_stage != "closed":
+                if display_name is None:
+                    display_name = _closing_display_name(session, user)
+                d.closed_by_user_id = user.id
+                d.closed_by_user_name = display_name
+                d.closed_at = now
+                session.add(
+                    DealClosureEvent(
+                        deal_id=d.id,
+                        deal_title=d.title,
+                        property_name=_property_name(d),
+                        closed_by_name=display_name,
+                        closed_at=now,
+                        enterprise_owner_id=_scope_owner_id(user),
+                    )
+                )
             session.add(d)
             log_audit_event(
                 session,
@@ -718,6 +735,21 @@ def update_deal(
         setattr(deal, key, value)
     if "stage" in data and data["stage"] is not None:
         deal.status = "closed" if deal.stage == "closed" else "lost" if deal.stage == "lost" else "open"
+    if data.get("stage") == "closed" and old_stage != "closed":
+        display_name = _closing_display_name(session, user)
+        deal.closed_by_user_id = user.id
+        deal.closed_by_user_name = display_name
+        deal.closed_at = now
+        session.add(
+            DealClosureEvent(
+                deal_id=deal.id,
+                deal_title=deal.title,
+                property_name=_property_name(deal),
+                closed_by_name=display_name,
+                closed_at=now,
+                enterprise_owner_id=_scope_owner_id(user),
+            )
+        )
     deal.updated_at = now
 
     session.add(deal)

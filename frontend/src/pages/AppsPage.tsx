@@ -160,9 +160,8 @@ const adPlatforms = [
 const appTabs = [
   { key: "communication", label: "Communication", iconUrl: "https://img.icons8.com/color/48/gmail-new.png" },
   { key: "meetings", label: "Meetings", iconUrl: "https://img.icons8.com/color/48/google-meet.png" },
-  { key: "calendar", label: "Calendar", iconUrl: "https://img.icons8.com/color/48/google-calendar--v2.png" },
+  { key: "calendar", label: "App", iconUrl: "https://img.icons8.com/color/48/google-calendar--v2.png" },
   { key: "ads", label: "Ads", iconUrl: "https://img.icons8.com/color/48/google-ads.png" },
-  { key: "coming_soon", label: "Coming soon", iconUrl: "https://img.icons8.com/color/48/clock--v1.png" }
 ] as const;
 
 const comingSoonApps: Array<{
@@ -329,9 +328,7 @@ export default function AppsPage() {
   const microsoftPrimary = providerByKey.get("outlook");
   const visibleProviderCards = providerCards.filter((provider) => provider.tab === selectedTab);
   const visibleAdPlatforms = adPlatforms.filter((platform) => platform.tab === selectedTab);
-  const visibleComingSoonApps = comingSoonApps.filter(
-    (app) => app.tab === selectedTab || selectedTab === "coming_soon"
-  );
+  const visibleComingSoonApps = comingSoonApps.filter((app) => app.tab === selectedTab);
 
   async function connectGoogle() {
     setGoogleBusy(true);
@@ -594,15 +591,11 @@ export default function AppsPage() {
                     : selectedTab === "meetings"
                       ? "Meeting platforms for walkthroughs, sales calls, investor reviews, and partner coordination."
                       : selectedTab === "calendar"
-                        ? "Scheduling tools for visits, callbacks, launch planning, and client review slots."
-                      : selectedTab === "ads"
-                        ? "Campaign launch surfaces for buyer demand, project awareness, and broker-led marketing."
-                        : "The next integrations already discussed and partially prepared, held here until their provider setup is ready."}
+                        ? "Calendar and scheduling tools for visits, callbacks, launch planning, and client review slots."
+                        : "Campaign launch surfaces for buyer demand, project awareness, and broker-led marketing."}
                 </div>
               </div>
-              <div className="pill enterprisePill">
-                {selectedTab === "coming_soon" ? "Roadmap" : "Apps"}
-              </div>
+              <div className="pill enterprisePill">Apps</div>
             </div>
           </div>
 

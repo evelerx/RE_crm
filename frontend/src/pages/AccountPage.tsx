@@ -3,11 +3,22 @@ import { Link } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import type { Profile } from "../api/types";
 
+function validatePhone(phone: string): string | null {
+  const v = phone.trim().replace(/\s+/g, "");
+  if (!v) return null;
+  const digits = v.startsWith("+91") ? v.slice(3) : v.startsWith("91") && v.length === 12 ? v.slice(2) : v;
+  if (!/^[6-9]\d{9}$/.test(digits)) return "Enter a valid 10-digit Indian mobile number (starts with 6–9).";
+  return null;
+}
+
 function validateGstin(gstin: string): string | null {
   const v = gstin.trim().toUpperCase();
   if (!v) return null;
+  if (v.length !== 15) return "GSTIN must be exactly 15 characters.";
   const re = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
-  if (!re.test(v)) return "GSTIN format looks invalid.";
+  if (!re.test(v)) return "GSTIN format invalid — expected: 2-digit state · 10-char PAN · entity · Z · check digit.";
+  const stateCode = parseInt(v.slice(0, 2), 10);
+  if (stateCode < 1 || stateCode > 38) return "GSTIN state code looks invalid.";
   return null;
 }
 
@@ -15,8 +26,10 @@ function validateRera(rera: string): string | null {
   const v = rera.trim().toUpperCase();
   if (!v) return null;
   if (v.length < 8) return "RERA ID looks too short.";
-  if (!/^[A-Z0-9/-]+$/.test(v)) return "RERA ID contains invalid characters.";
-  return null;
+  if (!/^[A-Z0-9/\-]+$/.test(v)) return "RERA ID contains invalid characters (only A-Z, 0-9, / and - allowed).";
+  if (/^(RC\/REP\/HARERA|RERA\/GGN|RERA\/GURUGRAM|RERA\/FARIDABAD|RERA\/SONIPAT|HARERA)/i.test(v)) return null;
+  if (/^[A-Z]{2,6}\/[A-Z0-9]{1,8}\/[A-Z0-9\-\/]{4,}$/i.test(v)) return null;
+  return "Haryana RERA IDs typically start with RC/REP/HARERA/... or RERA/GGN/... — please verify your ID.";
 }
 
 type MeState = {
@@ -325,11 +338,13 @@ export default function AccountPage() {
             <div className="grid2">
               <label>
                 Phone
-                <input value={profile.phone ?? ""} onChange={(e) => setProfile({ ...profile, phone: e.target.value || null })} />
+                <input value={profile.phone ?? ""} onChange={(e) => setProfile({ ...profile, phone: e.target.value || null })} placeholder="+91 98765 43210" />
+                {(() => { const w = validatePhone(profile.phone ?? ""); return w ? <div className="muted small">{w}</div> : null; })()}
               </label>
               <label>
                 WhatsApp
-                <input value={profile.whatsapp ?? ""} onChange={(e) => setProfile({ ...profile, whatsapp: e.target.value || null })} />
+                <input value={profile.whatsapp ?? ""} onChange={(e) => setProfile({ ...profile, whatsapp: e.target.value || null })} placeholder="+91 98765 43210" />
+                {(() => { const w = validatePhone(profile.whatsapp ?? ""); return w ? <div className="muted small">{w}</div> : null; })()}
               </label>
             </div>
             <div className="grid2">
