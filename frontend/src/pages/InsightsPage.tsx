@@ -36,6 +36,41 @@ function money(v: number | null) {
   return `Rs ${Math.round(v).toLocaleString()}`;
 }
 
+function safeNumber(value: number | null | undefined) {
+  return value == null || Number.isNaN(value) ? 0 : value;
+}
+
+function sanitizeSummary(input: InsightsSummary): InsightsSummary {
+  return {
+    ...input,
+    total_deals: safeNumber(input.total_deals),
+    closed_deals: safeNumber(input.closed_deals),
+    lost_deals: safeNumber(input.lost_deals),
+    win_rate: safeNumber(input.win_rate),
+    stuck_deals: safeNumber(input.stuck_deals),
+    overdue_reminders: safeNumber(input.overdue_reminders),
+    upcoming_reminders_3d: safeNumber(input.upcoming_reminders_3d),
+    activities_7d: safeNumber(input.activities_7d),
+    completed_activities_7d: safeNumber(input.completed_activities_7d),
+    followup_completion_rate_7d: safeNumber(input.followup_completion_rate_7d),
+    open_pipeline_value: safeNumber(input.open_pipeline_value),
+    weighted_open_pipeline_value: safeNumber(input.weighted_open_pipeline_value),
+    avg_close_probability_open: safeNumber(input.avg_close_probability_open),
+    lead_to_close_rate: safeNumber(input.lead_to_close_rate),
+    visit_to_negotiation_rate: safeNumber(input.visit_to_negotiation_rate),
+    transitions_window_days: safeNumber(input.transitions_window_days),
+    top_transitions: (input.top_transitions || []).map((row) => ({ ...row, count: safeNumber(row.count) })),
+    team_breakdown: (input.team_breakdown || []).map((row) => ({
+      ...row,
+      deals: safeNumber(row.deals),
+      closed_deals: safeNumber(row.closed_deals),
+      activities_7d: safeNumber(row.activities_7d),
+      open_pipeline_value: safeNumber(row.open_pipeline_value),
+    })),
+    recent_audit: input.recent_audit || [],
+  };
+}
+
 export default function InsightsPage() {
   const [summary, setSummary] = useState<InsightsSummary | null>(null);
   const [stages, setStages] = useState<StageSummary[]>([]);
@@ -50,8 +85,8 @@ export default function InsightsPage() {
         api<InsightsSummary>("/insights/summary?stuck_days=7&window_days=30"),
         api<StageSummary[]>("/deals/stages/summary")
       ]);
-      setSummary(s);
-      setStages(st);
+      setSummary(sanitizeSummary(s));
+      setStages((st || []).map((row) => ({ ...row, count: safeNumber(row.count) })));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load insights");
     } finally {
@@ -76,6 +111,17 @@ export default function InsightsPage() {
       </div>
 
       {error ? <div className="alert">{error}</div> : null}
+      {error && !loading ? (
+        <div className="card">
+          <div className="cardTitle">Unable to load insights — check your data connection.</div>
+          <div className="muted">The charts have been paused until the connection responds again.</div>
+          <div className="row" style={{ marginTop: 12 }}>
+            <button className="btn" type="button" onClick={() => void load()}>
+              Retry
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -247,9 +293,12 @@ export default function InsightsPage() {
             )}
           </section>
         </div>
-      ) : (
-        <div className="muted">Loading...</div>
-      )}
+      ) : !loading && !error ? (
+        <div className="card">
+          <div className="cardTitle">Not enough data yet — add at least 5 deals to see insights</div>
+          <div className="muted">Once pipeline, activity, and stage history build up, the charts will render here automatically.</div>
+        </div>
+      ) : null}
     </div>
   );
 }

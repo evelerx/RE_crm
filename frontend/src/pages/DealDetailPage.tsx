@@ -1,21 +1,33 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   API_BASE_URL,
   ApiError,
   api,
   closeDeal,
   deleteDealImage,
+  listDealWhatsAppMessages,
   listDealImages,
+  sendWhatsAppMessage,
   sendWhatsAppMedia,
   setPrimaryDealImage,
   uploadDealImages,
 } from "../api/client";
-import type { Activity, Contact, Deal, DealImage } from "../api/types";
+import type { Activity, Contact, Deal, DealImage, WhatsAppMessage } from "../api/types";
 
 type DealScoreResponse = { deal_id: string; close_probability: number; risk_flags: string[]; rationale: string[] };
 type FollowupResponse = { deal_id: string; message: string };
 type LlmFollowupResponse = { deal_id: string; message: string };
+type DealDetailTab = "overview" | "activities" | "whatsapp" | "documents" | "intelligence" | "history";
+
+const DEAL_DETAIL_TABS: Array<{ key: DealDetailTab; label: string }> = [
+  { key: "overview", label: "Overview" },
+  { key: "activities", label: "Activities" },
+  { key: "whatsapp", label: "WhatsApp" },
+  { key: "documents", label: "Documents" },
+  { key: "intelligence", label: "Intelligence" },
+  { key: "history", label: "History" },
+];
 
 function normalizeWhatsAppNumber(value: string | null | undefined) {
   const digits = (value || "").replace(/\D+/g, "");
@@ -62,9 +74,44 @@ function relativeTime(value: string | null | undefined) {
   return `${days}d ago`;
 }
 
+function formatThreadTime(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  const weekday = date.toLocaleDateString(undefined, { weekday: "short" });
+  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return sameDay ? `Today ${time}` : `${weekday} ${time}`;
+}
+
+function activityPriority(activity: Activity) {
+  if (activity.completed) return 3;
+  if (activity.due_at) {
+    const dueAt = new Date(activity.due_at);
+    const now = new Date();
+    if (dueAt.getTime() < now.getTime()) return 0;
+    if (dueAt.toDateString() === now.toDateString()) return 1;
+  }
+  return 2;
+}
+
+function mergeMessages(existing: WhatsAppMessage[], incoming: WhatsAppMessage[]) {
+  const byKey = new Map<string, WhatsAppMessage>();
+  [...existing, ...incoming].forEach((message) => {
+    const key = message.wa_message_id || message.id;
+    const current = byKey.get(key);
+    if (!current || new Date(message.timestamp).getTime() >= new Date(current.timestamp).getTime()) {
+      byKey.set(key, message);
+    }
+  });
+  return Array.from(byKey.values()).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+}
+
 export default function DealDetailPage() {
   const { dealId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [deal, setDeal] = useState<Deal | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +120,10 @@ export default function DealDetailPage() {
   const [score, setScore] = useState<DealScoreResponse | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [dealImages, setDealImages] = useState<DealImage[]>([]);
+  const [whatsAppMessages, setWhatsAppMessages] = useState<WhatsAppMessage[]>([]);
   const [whatsAppContactId, setWhatsAppContactId] = useState("");
+  const [whatsAppThreadUnavailable, setWhatsAppThreadUnavailable] = useState(false);
+  const [whatsAppThreadLoading, setWhatsAppThreadLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [notesBusy, setNotesBusy] = useState(false);
   const [followupBusy, setFollowupBusy] = useState(false);
@@ -92,6 +142,11 @@ export default function DealDetailPage() {
   const [imageBusy, setImageBusy] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const whatsAppThreadRef = useRef<HTMLDivElement | null>(null);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [titleBusy, setTitleBusy] = useState(false);
+  const [stageBusy, setStageBusy] = useState(false);
   const [editPayload, setEditPayload] = useState({
     contact_id: "",
     visit_date: "",
@@ -104,6 +159,16 @@ export default function DealDetailPage() {
     liquidity_days_est: "",
     risk_flags: ""
   });
+  const activeTab = (searchParams.get("tab") as DealDetailTab | null) || "overview";
+
+  const setActiveTab = useCallback(
+    (tab: DealDetailTab) => {
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", tab);
+      setSearchParams(next, { replace: false });
+    },
+    [searchParams, setSearchParams],
+  );
 
   const load = useCallback(async () => {
     if (!dealId) return;
@@ -116,6 +181,7 @@ export default function DealDetailPage() {
         listDealImages(dealId),
       ]);
       setDeal(d);
+      setTitleDraft(d.title);
       setNoteDraft(d.notes ?? "");
       setClosureNote(d.closure_note ?? "");
       setDealImages(imageRows);
@@ -138,6 +204,8 @@ export default function DealDetailPage() {
         "";
       setWhatsAppContactId(preferredContactId);
       setActivities(a);
+      setWhatsAppMessages([]);
+      setWhatsAppThreadUnavailable(false);
       setSuccessMessage(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deal");
@@ -147,6 +215,44 @@ export default function DealDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const sortedActivities = useMemo(
+    () => [...activities].sort((left, right) => activityPriority(left) - activityPriority(right) || new Date(right.created_at).getTime() - new Date(left.created_at).getTime()),
+    [activities],
+  );
+
+  const fetchWhatsAppMessages = useCallback(async () => {
+    if (!dealId) return;
+    setWhatsAppThreadLoading(true);
+    try {
+      const rows = await listDealWhatsAppMessages(dealId);
+      setWhatsAppThreadUnavailable(false);
+      setWhatsAppMessages((prev) => mergeMessages(prev, rows));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        setWhatsAppThreadUnavailable(true);
+        setWhatsAppMessages([]);
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Could not load WhatsApp messages");
+    } finally {
+      setWhatsAppThreadLoading(false);
+    }
+  }, [dealId]);
+
+  useEffect(() => {
+    if (activeTab !== "whatsapp") return;
+    void fetchWhatsAppMessages();
+    const timer = window.setInterval(() => {
+      void fetchWhatsAppMessages();
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [activeTab, fetchWhatsAppMessages]);
+
+  useEffect(() => {
+    if (!whatsAppThreadRef.current) return;
+    whatsAppThreadRef.current.scrollTop = whatsAppThreadRef.current.scrollHeight;
+  }, [whatsAppMessages]);
 
   async function saveNotes() {
     if (!dealId) return;
@@ -255,28 +361,41 @@ export default function DealDetailPage() {
     setAttachmentError(null);
     setSuccessMessage(null);
 
-    if (!attachmentFile) {
-      try {
-        openWhatsApp(followupDraft.trim(), whatsAppPhone);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "WhatsApp send failed");
-      }
-      return;
-    }
-
     if (!whatsAppContactId) {
-      setAttachmentError("Choose a contact before sending an attachment.");
+      setAttachmentError("Choose a contact before sending on WhatsApp.");
       return;
     }
 
     setWhatsAppSending(true);
     try {
-      await sendWhatsAppMedia(whatsAppContactId, followupDraft.trim(), attachmentFile);
+      if (!attachmentFile) {
+        const sent = await sendWhatsAppMessage(whatsAppContactId, followupDraft.trim());
+        setWhatsAppMessages((prev) => mergeMessages(prev, [sent]));
+      } else {
+        const mediaResponse = await sendWhatsAppMedia(whatsAppContactId, followupDraft.trim(), attachmentFile);
+        setWhatsAppMessages((prev) =>
+          mergeMessages(prev, [
+            {
+              id: mediaResponse.wa_message_id || `${Date.now()}`,
+              contact_id: mediaResponse.contact_id,
+              direction: "outbound",
+              message_body: followupDraft.trim() || `[media] ${attachmentFile.name}`,
+              timestamp: new Date().toISOString(),
+              status: (mediaResponse.status as WhatsAppMessage["status"]) || "sent",
+              wa_message_id: mediaResponse.wa_message_id || null,
+            },
+          ]),
+        );
+      }
       setFollowupDraft("");
       setAttachmentFile(null);
       setAttachmentPreviewUrl("");
       setSuccessMessage("Sent");
-      await addActivity({ kind: "whatsapp", summary: `WhatsApp media follow-up sent${attachmentFile.name ? `: ${attachmentFile.name}` : ""}` });
+      await addActivity({
+        kind: "whatsapp",
+        summary: `WhatsApp follow-up sent${attachmentFile?.name ? `: ${attachmentFile.name}` : ""}`,
+        due_at: null,
+      });
     } catch (e) {
       setAttachmentError(e instanceof Error ? e.message : "WhatsApp media send failed");
     } finally {
@@ -354,6 +473,50 @@ export default function DealDetailPage() {
     setEditing(false);
   }
 
+  async function saveDealTitle() {
+    if (!dealId || !deal) return;
+    const nextTitle = titleDraft.trim();
+    if (!nextTitle || nextTitle === deal.title) {
+      setTitleDraft(deal.title);
+      setTitleEditing(false);
+      return;
+    }
+    setTitleBusy(true);
+    setError(null);
+    try {
+      const updated = await api<Deal>(`/deals/${dealId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title: nextTitle }),
+      });
+      setDeal(updated);
+      setTitleDraft(updated.title);
+      setTitleEditing(false);
+      setSuccessMessage("Deal title updated");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update deal title");
+    } finally {
+      setTitleBusy(false);
+    }
+  }
+
+  async function updateStage(nextStage: string) {
+    if (!dealId || !deal || nextStage === deal.stage) return;
+    setStageBusy(true);
+    setError(null);
+    try {
+      const updated = await api<Deal>(`/deals/${dealId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ stage: nextStage }),
+      });
+      setDeal(updated);
+      setSuccessMessage(`Stage moved to ${updated.stage}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update stage");
+    } finally {
+      setStageBusy(false);
+    }
+  }
+
   async function deleteDeal() {
     if (!dealId || !deal) return;
     const confirmed = window.confirm(`Delete deal "${deal.title}"? This cannot be undone.`);
@@ -401,19 +564,88 @@ export default function DealDetailPage() {
           setAttachmentFile(file);
         }}
       />
-      <div className="pageHeader">
-        <div>
-          <div className="h1">{deal?.title ?? "Deal"}</div>
+      <div className="dealHeaderBar">
+        <button className="btn ghost" onClick={() => navigate("/deals")} type="button">
+          Back
+        </button>
+        <div className="dealHeaderIdentity">
+          {titleEditing ? (
+            <input
+              className="input dealTitleInput"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={() => void saveDealTitle()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void saveDealTitle();
+                }
+                if (e.key === "Escape") {
+                  setTitleDraft(deal?.title || "");
+                  setTitleEditing(false);
+                }
+              }}
+              disabled={titleBusy}
+              autoFocus
+            />
+          ) : (
+            <button className="dealTitleButton" type="button" onClick={() => setTitleEditing(true)}>
+              {deal?.title ?? "Deal"}
+            </button>
+          )}
           <div className="muted">
-            {deal ? `${deal.asset_type} | ${deal.stage} | ${deal.area}${deal.city ? `, ${deal.city}` : ""}` : "Loading deal..."}
+            {deal ? `${deal.asset_type} | ${deal.area}${deal.city ? `, ${deal.city}` : ""}` : "Loading deal..."}
+          </div>
+          <div className="dealHeaderContact">
+            <span>Contact:</span>
+            <strong>{whatsAppContact?.name || contacts.find((contact) => contact.id === deal?.contact_id)?.name || "Unlinked"}</strong>
+            {normalizeWhatsAppNumber(whatsAppPhone) ? (
+              <button
+                className="btn ghost compact"
+                type="button"
+                onClick={() => {
+                  try {
+                    openWhatsApp(followupDraft.trim() || "Hello from Northstone", whatsAppPhone);
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : "Could not open WhatsApp");
+                  }
+                }}
+              >
+                WhatsApp
+              </button>
+            ) : null}
           </div>
         </div>
-        <button className="btn ghost" onClick={() => void load()} type="button">
-          Refresh
-        </button>
-        <button className="btn ghost" onClick={() => void deleteDeal()} disabled={deleteBusy} type="button">
-          {deleteBusy ? "Deleting..." : "Delete deal"}
-        </button>
+        <div className="dealHeaderActions">
+          <select className="input compactSelect" value={deal?.stage || ""} onChange={(e) => void updateStage(e.target.value)} disabled={!deal || stageBusy}>
+            <option value="new_lead">New lead</option>
+            <option value="qualified">Qualified</option>
+            <option value="active">Active</option>
+            <option value="closed">Closed</option>
+            <option value="lost">Lost</option>
+          </select>
+          <button className={`scorePill ${score?.close_probability != null ? (score.close_probability >= 80 ? "hot" : score.close_probability >= 50 ? "warm" : "cold") : "neutral"}`} type="button" onClick={() => setActiveTab("intelligence")}>
+            Score {score?.close_probability ?? deal?.close_probability ?? "--"}
+          </button>
+          <button className="btn ghost" onClick={() => void load()} type="button">
+            Refresh
+          </button>
+          <button className="btn ghost" onClick={() => void deleteDeal()} disabled={deleteBusy} type="button">
+            {deleteBusy ? "Deleting..." : "Delete"}
+          </button>
+        </div>
+      </div>
+      <div className="dealTabs" role="tablist" aria-label="Deal details tabs">
+        {DEAL_DETAIL_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            className={`dealTab${activeTab === tab.key ? " active" : ""}`}
+            onClick={() => setActiveTab(tab.key)}
+            type="button"
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
       {error ? <div className="alert">{error}</div> : null}
       {successMessage ? <div className="alert ok">{successMessage}</div> : null}
@@ -432,6 +664,7 @@ export default function DealDetailPage() {
 
       {deal ? (
         <div className="detailGrid">
+          {(activeTab === "overview" || activeTab === "intelligence") ? (
           <section className="card premiumPanel">
             <div className="cardTitle">Deal Snapshot</div>
             <div className="kv">
@@ -462,8 +695,9 @@ export default function DealDetailPage() {
               </button>
             </div>
           </section>
+          ) : null}
 
-          {editing ? (
+          {editing && activeTab === "overview" ? (
             <section className="card">
               <div className="cardTitle">Edit Snapshot</div>
               <div className="form">
@@ -577,6 +811,7 @@ export default function DealDetailPage() {
             </section>
           ) : null}
 
+          {activeTab === "overview" ? (
           <section className="card">
             <div className="cardTitle">Notes</div>
             <textarea className="textarea" value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} />
@@ -586,7 +821,9 @@ export default function DealDetailPage() {
               </button>
             </div>
           </section>
+          ) : null}
 
+          {activeTab === "history" ? (
           <section className="card">
             <div className="cardTitle">Closure</div>
             {deal.status === "closed" ? (
@@ -624,7 +861,9 @@ export default function DealDetailPage() {
               </div>
             )}
           </section>
+          ) : null}
 
+          {activeTab === "documents" ? (
           <section className="card">
             <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
               <div className="cardTitle">Images</div>
@@ -651,7 +890,9 @@ export default function DealDetailPage() {
               {dealImages.length === 0 ? <div className="muted">No property images yet.</div> : null}
             </div>
           </section>
+          ) : null}
 
+          {activeTab === "whatsapp" ? (
           <section className="card">
             <div className="cardTitle">AI Follow-up</div>
             <div className="muted">Generate a client-ready follow-up, send it to WhatsApp, or log it back into activity history.</div>
@@ -699,6 +940,36 @@ export default function DealDetailPage() {
               </div>
             ) : null}
             {attachmentError ? <div className="muted small">{attachmentError}</div> : null}
+            <div className="chatThreadShell">
+              <div className="chatThreadHeader">
+                <div>
+                  <strong>WhatsApp thread</strong>
+                  <div className="muted small">Inbound on the left, outbound on the right.</div>
+                </div>
+                {whatsAppThreadLoading ? <div className="muted small">Refreshing…</div> : null}
+              </div>
+              <div className="chatList threaded" ref={whatsAppThreadRef}>
+                {whatsAppThreadUnavailable ? (
+                  <div className="muted small">WhatsApp messages will appear here once the integration is active.</div>
+                ) : whatsAppMessages.length === 0 ? (
+                  <div className="muted small">No WhatsApp messages yet for this deal.</div>
+                ) : (
+                  whatsAppMessages.map((message) => (
+                    <div
+                      key={message.wa_message_id || message.id}
+                      className={`chatBubble ${message.direction === "outbound" ? "chatBubbleAdmin outbound" : "inbound"}`}
+                    >
+                      <div className="chatMeta">
+                        <span>{message.direction === "outbound" ? "You" : whatsAppContact?.name || "Contact"}</span>
+                        <span>{formatThreadTime(message.timestamp)}</span>
+                        {message.direction === "outbound" ? <span>{message.status}</span> : null}
+                      </div>
+                      <div>{message.message_body}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
             <div className="row">
               <button
                 className="btn"
@@ -739,7 +1010,7 @@ export default function DealDetailPage() {
               <button
                 className="btn ghost"
                 type="button"
-                disabled={!followupDraft.trim() || !canSendWhatsApp || whatsAppSending}
+                disabled={!followupDraft.trim() || !whatsAppContactId || whatsAppSending || (!attachmentFile && !canSendWhatsApp)}
                 onClick={() => void sendWhatsAppFollowup()}
               >
                 {whatsAppSending ? "Sending..." : "Send on WhatsApp"}
@@ -760,7 +1031,9 @@ export default function DealDetailPage() {
               <div className="muted small">Choose a contact with a valid phone or WhatsApp number before sending.</div>
             ) : null}
           </section>
+          ) : null}
 
+          {activeTab === "intelligence" ? (
           <section className="card">
             <div className="cardTitle">Deal Score</div>
             <div className="row">
@@ -770,7 +1043,7 @@ export default function DealDetailPage() {
                   setScoreBusy(true);
                   setError(null);
                   try {
-                    const resp = await api<DealScoreResponse>(`/ai/deal-score/${deal.id}`, { method: "POST" });
+                    const resp = await api<DealScoreResponse>(`/deals/${deal.id}/score`, { method: "POST" });
                     setScore(resp);
                     setDeal((prev) =>
                       prev
@@ -808,27 +1081,40 @@ export default function DealDetailPage() {
               <div className="muted">No score has been generated yet.</div>
             )}
           </section>
+          ) : null}
 
+          {activeTab === "activities" ? (
           <section className="card">
             <div className="cardTitle">Activities</div>
             <ActivityComposer onAdd={addActivity} />
             <div className="list">
-              {activities.map((a) => (
-                <div key={a.id} className="listItem">
-                  <div className="muted">
-                    {a.kind} | {new Date(a.created_at).toLocaleString()}
+              {sortedActivities.map((a) => {
+                const priority = activityPriority(a);
+                const toneClass =
+                  priority === 0 ? "activityItem overdue" : priority === 1 ? "activityItem dueToday" : a.completed ? "activityItem completed" : "activityItem pending";
+                const badgeLabel =
+                  priority === 0 ? "OVERDUE" : priority === 1 ? "DUE TODAY" : a.completed ? "COMPLETED" : "PENDING";
+                return (
+                <div key={a.id} className={`listItem ${toneClass}`}>
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
+                    <div className="muted">
+                      {a.kind} | {new Date(a.created_at).toLocaleString()}
+                      {a.due_at ? ` | due ${formatThreadTime(a.due_at)}` : ""}
+                    </div>
+                    <span className={`activityBadge ${priority === 0 ? "overdue" : priority === 1 ? "today" : a.completed ? "completed" : "pending"}`}>{badgeLabel}</span>
                   </div>
                   <div className="row">
-                    <div className="grow">{a.summary || "-"}</div>
+                    <div className={`grow ${a.completed ? "activitySummaryDone" : ""}`}>{a.summary || "-"}</div>
                     <button className={a.completed ? "btn ghost" : "btn"} onClick={() => void toggleActivityDone(a)} type="button">
                       {a.completed ? "Completed" : "Mark done"}
                     </button>
                   </div>
                 </div>
-              ))}
+              )})}
               {activities.length === 0 ? <div className="muted">No activities recorded yet.</div> : null}
             </div>
           </section>
+          ) : null}
         </div>
       ) : null}
     </div>

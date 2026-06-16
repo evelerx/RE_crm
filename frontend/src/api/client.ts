@@ -207,6 +207,29 @@ export type WhatsAppMediaSendResponse = {
   wa_message_id: string;
 };
 
+export type WhatsAppMessageRead = import("./types").WhatsAppMessage;
+export type WhatsAppConversationSummaryRead = import("./types").WhatsAppConversationSummary;
+export type WhatsAppConversationRead = import("./types").WhatsAppConversation;
+
+export async function sendWhatsAppMessage(contactId: string, message: string) {
+  return api<WhatsAppMessageRead>("/whatsapp/send", {
+    method: "POST",
+    body: JSON.stringify({ contact_id: contactId, message }),
+  });
+}
+
+export async function listDealWhatsAppMessages(dealId: string) {
+  return api<WhatsAppMessageRead[]>(`/whatsapp/messages/${dealId}`);
+}
+
+export async function listWhatsAppInbox() {
+  return api<WhatsAppConversationSummaryRead[]>("/whatsapp/inbox");
+}
+
+export async function getWhatsAppConversation(contactId: string) {
+  return api<WhatsAppConversationRead>(`/whatsapp/conversation/${contactId}`);
+}
+
 export async function sendWhatsAppMedia(contactId: string, caption: string, file: File) {
   const formData = new FormData();
   formData.append("contact_id", contactId);

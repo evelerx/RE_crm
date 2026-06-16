@@ -39,18 +39,22 @@ export function crmNavGroups(options: { isAdmin: boolean; isOwnerLike: boolean }
         { label: "AI Workbench", to: "/enterprise#ai-workbench", icon: "AI" },
         { label: "Lead Scoring", to: "/enterprise#ai-deal-intelligence", icon: "LS" },
         { label: "Leaderboard", to: "/leaderboard", icon: "LB" },
-        { label: "ROI Insights", to: "/enterprise#ai-market-insights", icon: "RI" },
+        { label: "ROI Insights", to: "/insights", icon: "RI" },
+        { label: "ROI Calculator", to: "/calc", icon: "RC" },
       ],
     },
   ];
 
   if (options.isOwnerLike) {
     groups.push({
-      label: "Team",
+      label: "Enterprise",
       items: [
         { label: "Team IDs", to: "/enterprise", icon: "TM" },
         { label: "AI Docs", to: "/enterprise#ai-builder-documents", icon: "DC" },
         { label: "Builder Site", to: "/enterprise#ai-builder-website", icon: "WB" },
+        { label: "Automations", to: "/automations", icon: "AT" },
+        { label: "Webhooks", to: "/webhooks", icon: "WH" },
+        { label: "Inventory", to: "/inventory", icon: "IV" },
         { label: "Targets", to: "/targets", icon: "TG" },
         { label: "Sequences", to: "/sequences", icon: "SQ" },
       ],
@@ -75,7 +79,7 @@ export const adminNavGroups: NavGroup[] = [
   {
     label: "Tenants",
     items: [
-      { label: "Organizations", to: "/admin#admin-organizations", icon: "OG" },
+      { label: "Organizations", to: "/admin#admin-organization", icon: "OG" },
       { label: "User Accounts", to: "/admin#admin-users", icon: "US" },
     ],
   },
@@ -85,6 +89,7 @@ export const adminNavGroups: NavGroup[] = [
       { label: "Subscriptions", to: "/admin#admin-subscriptions", icon: "SB" },
       { label: "Razorpay Txns", to: "/admin#admin-transactions", icon: "TX" },
       { label: "Demo Accounts", to: "/admin#admin-demo-accounts", icon: "DM" },
+      { label: "Revenue", to: "/admin#admin-revenue", icon: "RV" },
     ],
   },
   {
@@ -93,6 +98,8 @@ export const adminNavGroups: NavGroup[] = [
       { label: "RBAC Matrix", to: "/admin#admin-rbac", icon: "RB" },
       { label: "Feature Flags", to: "/admin#admin-flags", icon: "FF" },
       { label: "AI Allocation", to: "/admin#admin-ai-allocation", icon: "AI" },
+      { label: "CRM Settings", to: "/admin#admin-settings", icon: "CS" },
+      { label: "Compliance", to: "/admin#admin-compliance", icon: "CM" },
     ],
   },
   {
@@ -102,6 +109,7 @@ export const adminNavGroups: NavGroup[] = [
       { label: "Background Jobs", to: "/admin#admin-jobs", icon: "JB" },
       { label: "API Usage", to: "/admin#admin-api-usage", icon: "AP" },
       { label: "Webhook Logs", to: "/admin#admin-logs", icon: "WL" },
+      { label: "Enterprise", to: "/admin#admin-enterprise", icon: "EN" },
     ],
   },
   {
@@ -132,9 +140,14 @@ export function routeTitle(pathname: string) {
   if (pathname.startsWith("/inbox")) return "Inbox";
   if (pathname.startsWith("/calls")) return "Calls";
   if (pathname.startsWith("/leaderboard")) return "Leaderboard";
+  if (pathname.startsWith("/calc")) return "ROI Calculator";
   if (pathname.startsWith("/targets")) return "Targets";
   if (pathname.startsWith("/sequences")) return "Sequences";
   if (pathname.startsWith("/enterprise")) return "Enterprise";
+  if (pathname.startsWith("/automations")) return "Automations";
+  if (pathname.startsWith("/webhooks")) return "Webhooks";
+  if (pathname.startsWith("/inventory")) return "Inventory";
+  if (pathname.startsWith("/integrations")) return "Integrations";
   if (pathname.startsWith("/insights")) return "ROI Insights";
   if (pathname.startsWith("/apps")) return "Apps";
   if (pathname.startsWith("/settings")) return "Settings";
@@ -151,8 +164,13 @@ export function routeBreadcrumb(pathname: string) {
   if (pathname.startsWith("/inbox")) return "Channels / Inbox";
   if (pathname.startsWith("/calls")) return "Channels / Calls";
   if (pathname.startsWith("/leaderboard")) return "Intelligence / Leaderboard";
+  if (pathname.startsWith("/calc")) return "Intelligence / ROI Calculator";
   if (pathname.startsWith("/targets")) return "Team / Targets";
   if (pathname.startsWith("/sequences")) return "Team / Sequences";
   if (pathname.startsWith("/insights")) return "Intelligence / ROI Insights";
+  if (pathname.startsWith("/automations")) return "Enterprise / Automations";
+  if (pathname.startsWith("/webhooks")) return "Enterprise / Webhooks";
+  if (pathname.startsWith("/inventory")) return "Enterprise / Inventory";
+  if (pathname.startsWith("/integrations")) return "Settings / Integrations";
   return "Workspace / Dashboard";
 }

@@ -3,6 +3,20 @@ import { api, apiBlob, apiForm } from "../api/client";
 import type { Contact, ContactCreate } from "../api/types";
 import Modal from "../components/Modal";
 
+type CsvFailedRow = {
+  row_number: number;
+  column_name: string;
+  error_reason: string;
+  row: Record<string, string>;
+};
+
+type CsvImportResponse = {
+  created: number;
+  success_count: number;
+  failed_count: number;
+  failed_rows: CsvFailedRow[];
+};
+
 function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -19,6 +33,24 @@ export default function ContactsPage() {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [importSummary, setImportSummary] = useState<CsvImportResponse | null>(null);
+
+  function downloadFailedRowsCsv(rows: CsvFailedRow[]) {
+    const headers = ["row_number", "column_name", "error_reason"];
+    const dynamicHeaders = Array.from(new Set(rows.flatMap((item) => Object.keys(item.row || {}))));
+    const csv = [
+      [...headers, ...dynamicHeaders].join(","),
+      ...rows.map((item) =>
+        [
+          item.row_number,
+          item.column_name,
+          JSON.stringify(item.error_reason),
+          ...dynamicHeaders.map((key) => JSON.stringify(item.row?.[key] ?? "")),
+        ].join(","),
+      ),
+    ].join("\n");
+    downloadBlob("failed_rows.csv", new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  }
 
   async function load() {
     setError(null);
@@ -73,7 +105,8 @@ export default function ContactsPage() {
                 try {
                   const fd = new FormData();
                   fd.append("file", file);
-                  await apiForm<{ created: number }>("/csv/import/contacts", fd);
+                  const result = await apiForm<CsvImportResponse>("/csv/import/contacts", fd);
+                  setImportSummary(result);
                   await load();
                 } catch (err) {
                   setError(err instanceof Error ? err.message : "Import failed");
@@ -89,6 +122,26 @@ export default function ContactsPage() {
         </div>
       </div>
       {error ? <div className="alert">{error}</div> : null}
+      {importSummary ? (
+        <div className={importSummary.failed_count > 0 ? "alert" : "alert ok"}>
+          Imported {importSummary.success_count} records. {importSummary.failed_count} rows failed
+          {importSummary.failed_count > 0 ? " — see details below." : "."}
+          {importSummary.failed_count > 0 ? (
+            <div style={{ marginTop: 12 }}>
+              <button className="btn ghost" type="button" onClick={() => downloadFailedRowsCsv(importSummary.failed_rows)}>
+                Download failed_rows.csv
+              </button>
+              <div className="list" style={{ marginTop: 10 }}>
+                {importSummary.failed_rows.map((row) => (
+                  <div key={`${row.row_number}-${row.column_name}`} className="listItem">
+                    Row {row.row_number} · {row.column_name} · {row.error_reason}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <div className="tableWrap">
         <table className="table">
           <thead>

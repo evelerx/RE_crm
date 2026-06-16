@@ -860,6 +860,43 @@ class WhatsAppMediaSendResponse(BaseModel):
     wa_message_id: str = ""
 
 
+class WhatsAppMessageSendRequest(BaseModel):
+    contact_id: UUID
+    message: str = Field(min_length=1, max_length=4096)
+
+
+class WhatsAppMessageRead(BaseModel):
+    id: UUID
+    contact_id: UUID
+    direction: str
+    message_body: str
+    timestamp: datetime
+    status: str
+    wa_message_id: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class WhatsAppConversationSummaryRead(BaseModel):
+    contact_id: UUID
+    contact_name: str
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    latest_message: str
+    latest_direction: str
+    latest_status: str
+    latest_timestamp: Optional[datetime] = None
+    message_count: int
+
+
+class WhatsAppConversationRead(BaseModel):
+    contact_id: UUID
+    contact_name: str
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    messages: list[WhatsAppMessageRead]
+
+
 class ActivityCreate(BaseModel):
     deal_id: Optional[UUID] = None
     contact_id: Optional[UUID] = None

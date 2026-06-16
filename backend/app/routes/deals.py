@@ -27,6 +27,7 @@ from ..schemas import (
     DealPriorityDashboardRead,
     DealPriorityItem,
     DealRead,
+    DealScoreResponse,
     DealUpdate,
     StageSummary,
 )
@@ -110,6 +111,71 @@ def _recommend_ad_action(lead_source: str, engagement: int, deal: Deal) -> str:
     if deal.asset_type in {"residential", "commercial"}:
         return "Proven segment - scale spend with a focused audience"
     return "Test a small retargeting budget before scaling"
+
+
+def _score_single_deal(session: Session, deal: Deal) -> DealScoreResponse:
+    now = datetime.utcnow()
+    activities = session.exec(select(Activity).where(Activity.deal_id == deal.id)).all()
+    latest_activity = max([a.created_at for a in activities], default=deal.last_activity_at or deal.updated_at)
+    days_since_activity = _days_between(now, deal.last_activity_at or latest_activity, deal.updated_at)
+    overdue_count = len([a for a in activities if not a.completed and a.due_at and a.due_at < now])
+    engagement = _engagement_score(activities, deal)
+
+    max_value = float(deal.ticket_size or deal.customer_budget or 0) or 1.0
+    value = float(deal.ticket_size or deal.customer_budget or 0)
+    lead_source = _infer_lead_source(deal)
+
+    last_stage_event = session.exec(
+        select(DealStageEvent)
+        .where(DealStageEvent.deal_id == deal.id)
+        .order_by(col(DealStageEvent.created_at).desc())
+        .limit(1)
+    ).first()
+    days_in_stage = _days_between(now, last_stage_event.created_at if last_stage_event else None, deal.updated_at or deal.created_at)
+
+    score = 45
+    score += round((value / max_value) * 25)
+    score += round(float(deal.close_probability or 35) * 0.2)
+    score += min(15, round(engagement * 0.15))
+    score += 6 if lead_source == "paid_ads" else 3 if lead_source in {"organic", "referral"} else 0
+    if days_in_stage > 14:
+        score -= 18
+    elif days_in_stage > 10:
+        score -= 10
+    if days_since_activity >= 7:
+        score -= 15
+    elif days_since_activity >= 5:
+        score -= 8
+    score -= overdue_count * 5
+    score = max(0, min(100, score))
+
+    risk_flags: list[str] = []
+    if overdue_count:
+        risk_flags.append(f"{overdue_count} overdue task{'s' if overdue_count != 1 else ''}")
+    if days_since_activity >= 7:
+        risk_flags.append("No activity in 7+ days")
+    if days_in_stage > 14:
+        risk_flags.append("Stalled in current stage")
+    if (deal.close_probability or 0) < 40:
+        risk_flags.append("Low close probability")
+
+    rationale = [
+        f"Deal value contributes {round((value / max_value) * 25)} points.",
+        f"Engagement score contributes {min(15, round(engagement * 0.15))} points.",
+        f"Lead source '{lead_source}' adjusted the score.",
+    ]
+    if days_since_activity >= 5:
+        rationale.append(f"Last activity was {days_since_activity} days ago.")
+    if days_in_stage > 10:
+        rationale.append(f"Deal has stayed in stage '{deal.stage}' for {days_in_stage} days.")
+
+    deal.close_probability = score
+    deal.risk_flags = ", ".join(risk_flags)
+    deal.updated_at = now
+    session.add(deal)
+    session.commit()
+    session.refresh(deal)
+    return DealScoreResponse(deal_id=deal.id, close_probability=score, risk_flags=risk_flags, rationale=rationale)
 
 
 def _property_name(deal: Deal) -> str:
@@ -342,6 +408,20 @@ def deal_priority_dashboard(
     needs_time.sort(key=lambda item: (item.urgency != "urgent", -item.deal_value, -item.score, -item.days_since_last_activity))
     ad_budget.sort(key=lambda item: (-item.deal_value, -item.engagement_score, -item.score))
     return DealPriorityDashboardRead(last_updated_at=now, needs_time=needs_time, ad_budget=ad_budget)
+
+
+@router.post("/{deal_id}/score", response_model=DealScoreResponse)
+def score_deal_direct(
+    deal_id: UUID,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Regenerate and persist a score for a single deal from the deals namespace."""
+
+    deal = session.get(Deal, deal_id)
+    if not deal or not user_can_access_record(deal, user):
+        raise HTTPException(status_code=404, detail="Deal not found")
+    return _score_single_deal(session, deal)
 
 
 @router.post("", response_model=DealRead)

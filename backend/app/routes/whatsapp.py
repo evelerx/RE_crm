@@ -1,4 +1,4 @@
-"""WhatsApp media send route for CRM follow-up attachments."""
+"""WhatsApp message and media routes for CRM follow-up threads."""
 
 from __future__ import annotations
 
@@ -7,14 +7,20 @@ from typing import Any
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from sqlmodel import Session
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile
+from sqlmodel import Session, col, select
 
 from ..auth import get_current_user
 from ..db import get_session
 from ..enterprise_scope import assign_enterprise_fields, user_can_access_record
-from ..models import Contact, User, WhatsAppMessage
-from ..schemas import WhatsAppMediaSendResponse
+from ..models import Contact, Deal, User, WhatsAppMessage
+from ..schemas import (
+    WhatsAppConversationRead,
+    WhatsAppConversationSummaryRead,
+    WhatsAppMediaSendResponse,
+    WhatsAppMessageRead,
+    WhatsAppMessageSendRequest,
+)
 from ..settings import settings
 
 
@@ -89,6 +95,188 @@ async def _post_meta_message(phone: str, media_payload: dict[str, Any]) -> str:
     messages = body.get("messages") or []
     first = messages[0] if messages else {}
     return str(first.get("id") or "")
+
+
+async def _post_meta_text_message(phone: str, message: str) -> str:
+    send_url = f"https://graph.facebook.com/v18.0/{settings.whatsapp_phone_number_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {settings.whatsapp_token}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": phone,
+        "type": "text",
+        "text": {"preview_url": False, "body": message},
+    }
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(send_url, headers=headers, json=payload)
+    if response.status_code >= 300:
+        raise HTTPException(status_code=502, detail=response.text or "Meta message send failed")
+    body = response.json()
+    messages = body.get("messages") or []
+    first = messages[0] if messages else {}
+    return str(first.get("id") or "")
+
+
+@router.get("/messages/{deal_id}", response_model=list[WhatsAppMessageRead])
+def list_deal_messages(
+    deal_id: UUID,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[WhatsAppMessage]:
+    """Return the WhatsApp thread for the deal's linked contact."""
+
+    deal = session.get(Deal, deal_id)
+    if not deal or not user_can_access_record(deal, user):
+        raise HTTPException(status_code=404, detail="Deal not found")
+    if not deal.contact_id:
+        return []
+    contact = session.get(Contact, deal.contact_id)
+    if not contact or not user_can_access_record(contact, user):
+        raise HTTPException(status_code=404, detail="Contact not found")
+    return session.exec(
+        select(WhatsAppMessage)
+        .where(WhatsAppMessage.contact_id == contact.id)
+        .order_by(col(WhatsAppMessage.timestamp).asc())
+    ).all()
+
+
+@router.get("/inbox", response_model=list[WhatsAppConversationSummaryRead])
+def list_inbox_conversations(
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[WhatsAppConversationSummaryRead]:
+    """Return one latest-message summary per accessible contact for the WhatsApp inbox."""
+
+    messages = session.exec(select(WhatsAppMessage).order_by(col(WhatsAppMessage.timestamp).desc())).all()
+    summaries: list[WhatsAppConversationSummaryRead] = []
+    seen_contacts: set[UUID] = set()
+
+    for message in messages:
+        if message.contact_id in seen_contacts:
+            continue
+        contact = session.get(Contact, message.contact_id)
+        if not contact or not user_can_access_record(contact, user):
+            continue
+        seen_contacts.add(contact.id)
+        summaries.append(
+            WhatsAppConversationSummaryRead(
+                contact_id=contact.id,
+                contact_name=contact.name,
+                contact_phone=contact.phone,
+                contact_email=contact.email,
+                latest_message=message.message_body,
+                latest_direction=message.direction,
+                latest_status=message.status,
+                latest_timestamp=message.timestamp,
+                message_count=len(
+                    session.exec(select(WhatsAppMessage).where(WhatsAppMessage.contact_id == contact.id)).all()
+                ),
+            )
+        )
+
+    contacts = session.exec(select(Contact).order_by(col(Contact.updated_at).desc())).all()
+    for contact in contacts:
+        if contact.id in seen_contacts or not user_can_access_record(contact, user):
+            continue
+        if not _normalize_phone(contact.phone):
+            continue
+        summaries.append(
+            WhatsAppConversationSummaryRead(
+                contact_id=contact.id,
+                contact_name=contact.name,
+                contact_phone=contact.phone,
+                contact_email=contact.email,
+                latest_message="No messages yet",
+                latest_direction="outbound",
+                latest_status="sent",
+                latest_timestamp=None,
+                message_count=0,
+            )
+        )
+
+    return summaries
+
+
+@router.get("/conversation/{contact_id}", response_model=WhatsAppConversationRead)
+def get_contact_conversation(
+    contact_id: UUID,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> WhatsAppConversationRead:
+    """Return the full WhatsApp thread for one accessible contact."""
+
+    contact = session.get(Contact, contact_id)
+    if not contact or not user_can_access_record(contact, user):
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    messages = session.exec(
+        select(WhatsAppMessage)
+        .where(WhatsAppMessage.contact_id == contact.id)
+        .order_by(col(WhatsAppMessage.timestamp).asc())
+    ).all()
+
+    return WhatsAppConversationRead(
+        contact_id=contact.id,
+        contact_name=contact.name,
+        contact_phone=contact.phone,
+        contact_email=contact.email,
+        messages=[WhatsAppMessageRead.model_validate(message) for message in messages],
+    )
+
+
+@router.post("/send", response_model=WhatsAppMessageRead)
+async def send_message(
+    payload: WhatsAppMessageSendRequest = Body(...),
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> WhatsAppMessage:
+    """Send a plain text WhatsApp message and persist it for the CRM thread."""
+
+    contact = session.get(Contact, payload.contact_id)
+    if not contact or not user_can_access_record(contact, user):
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    phone = _normalize_phone(contact.phone)
+    if not phone:
+        raise HTTPException(status_code=400, detail="Linked contact needs a valid phone number before sending.")
+
+    message = WhatsAppMessage(
+        contact_id=contact.id,
+        direction="outbound",
+        message_body=payload.message.strip(),
+        timestamp=datetime.utcnow(),
+        status="failed",
+    )
+    assign_enterprise_fields(message, user)
+    session.add(message)
+    session.commit()
+    session.refresh(message)
+
+    if not settings.whatsapp_token or not settings.whatsapp_phone_number_id:
+        raise HTTPException(status_code=503, detail="WhatsApp Cloud API credentials are not configured.")
+
+    try:
+        wa_message_id = await _post_meta_text_message(phone, payload.message.strip())
+        message.status = "sent"
+        message.wa_message_id = wa_message_id or None
+        session.add(message)
+        session.commit()
+        session.refresh(message)
+        return message
+    except HTTPException:
+        message.status = "failed"
+        session.add(message)
+        session.commit()
+        session.refresh(message)
+        raise
+    except Exception as exc:  # noqa: BLE001
+        message.status = "failed"
+        session.add(message)
+        session.commit()
+        session.refresh(message)
+        raise HTTPException(status_code=502, detail=str(exc) or "WhatsApp send failed") from exc
 
 
 @router.post("/send-media", response_model=WhatsAppMediaSendResponse)

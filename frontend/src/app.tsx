@@ -28,6 +28,7 @@ import SequencesPage from "./pages/SequencesPage";
 import SettingsPage from "./pages/SettingsPage";
 import TargetsPage from "./pages/TargetsPage";
 import TodayPage from "./pages/TodayPage";
+import WhatsAppPage from "./pages/WhatsAppPage";
 
 type MeResponse = {
   email: string;
@@ -51,26 +52,51 @@ function CrmRoutes({ isAdmin }: { isAdmin: boolean }) {
       <Route path="/contacts" element={isAdmin ? <AdminOwnerContactsPage /> : <ContactsPage />} />
       <Route path="/properties" element={<PropertiesPage />} />
       <Route
-        path="/whatsapp"
+        path="/inventory"
         element={
           <PlaceholderWorkspacePage
-            title="WhatsApp Inbox"
-            description="Conversation routing and native WhatsApp threads will live here. The shell and route are ready so the channel can be styled and integrated without breaking the CRM frame."
-            bullets={["Unread conversation queue", "Thread preview with quick actions", "Status and delivery tracking"]}
+            title="Inventory"
+            description="Inventory and unit availability tools route here so enterprise and builder teams can work from a consistent shell."
+            bullets={["Project inventory overview", "Availability and status updates", "Reserved and blocked stock visibility"]}
           />
         }
       />
       <Route
-        path="/inbox"
+        path="/whatsapp"
+        element={<WhatsAppPage />}
+      />
+      <Route path="/inbox" element={<Navigate to="/whatsapp" replace />} />
+      <Route path="/calls" element={<CallsPage />} />
+      <Route
+        path="/automations"
         element={
           <PlaceholderWorkspacePage
-            title="Unified Inbox"
-            description="Bring email, portal leads, and channel replies into one operator queue. This placeholder keeps the navigation and layout structure intact."
-            bullets={["Recent activity stream", "Assignment filters", "Escalation and follow-up actions"]}
+            title="Automations"
+            description="Workflow automation engine is scaffolded here without disturbing the current CRM navigation."
+            bullets={["Follow-up rules", "Assignment triggers", "Scheduled workflow actions"]}
           />
         }
       />
-      <Route path="/calls" element={<CallsPage />} />
+      <Route
+        path="/webhooks"
+        element={
+          <PlaceholderWorkspacePage
+            title="Webhooks"
+            description="Webhook endpoints and integration diagnostics will surface here for operators and admins."
+            bullets={["Inbound lead source mapping", "Delivery logs", "Endpoint validation"]}
+          />
+        }
+      />
+      <Route
+        path="/integrations"
+        element={
+          <PlaceholderWorkspacePage
+            title="Integrations Setup"
+            description="External channel, ad, and lead-source setup can now route through a dedicated integrations view."
+            bullets={["Provider connection health", "Webhook URL copy", "Token and permission checklist"]}
+          />
+        }
+      />
       <Route path="/calc" element={<CalculatorPage />} />
       <Route path="/insights" element={<InsightsPage />} />
       <Route path="/leaderboard" element={<LeaderboardPage />} />

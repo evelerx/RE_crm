@@ -35,6 +35,8 @@ export default function PipelinePage() {
   const [canSeeDealPriority, setCanSeeDealPriority] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadingDealId, setUploadingDealId] = useState<string | null>(null);
+  const [draggingDealId, setDraggingDealId] = useState<string | null>(null);
+  const [scoreDealId, setScoreDealId] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -80,6 +82,39 @@ export default function PipelinePage() {
     for (const d of deals) map.get(d.stage)?.push(d);
     return map;
   }, [deals]);
+
+  const stageTotals = useMemo(() => {
+    const totals = new Map<Stage, number>();
+    for (const stage of STAGES) {
+      totals.set(
+        stage,
+        (byStage.get(stage) ?? []).reduce((sum, deal) => sum + Number(deal.ticket_size || deal.customer_budget || 0), 0),
+      );
+    }
+    return totals;
+  }, [byStage]);
+
+  async function regenerateScore(dealId: string) {
+    setScoreDealId(dealId);
+    try {
+      const resp = await api<{ close_probability: number; risk_flags: string[] }>(`/deals/${dealId}/score`, { method: "POST" });
+      setDeals((prev) =>
+        prev.map((deal) =>
+          deal.id === dealId
+            ? {
+                ...deal,
+                close_probability: resp.close_probability,
+                risk_flags: (resp.risk_flags || []).join(", "),
+              }
+            : deal,
+        ),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not refresh deal score");
+    } finally {
+      setScoreDealId(null);
+    }
+  }
 
   async function onDragEnd(event: DragEndEvent) {
     const dealId = String(event.active.id);
@@ -165,14 +200,31 @@ export default function PipelinePage() {
       ) : null}
       <DealPriorityDashboard visible={canSeeDealPriority} />
 
-      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+      <DndContext
+        sensors={sensors}
+        onDragStart={(event) => setDraggingDealId(String(event.active.id))}
+        onDragCancel={() => setDraggingDealId(null)}
+        onDragEnd={async (event) => {
+          setDraggingDealId(null);
+          await onDragEnd(event);
+        }}
+      >
         <div className="kanban">
           {STAGES.map((st) => (
-            <StageColumn key={st} stage={st} label={stageLabel(st)} count={byStage.get(st)?.length ?? 0}>
+            <StageColumn
+              key={st}
+              stage={st}
+              label={stageLabel(st)}
+              count={byStage.get(st)?.length ?? 0}
+              totalValue={stageTotals.get(st) ?? 0}
+              dragging={Boolean(draggingDealId)}
+            >
               {(byStage.get(st) ?? []).map((deal) => (
                 <DraggableDeal
                   key={deal.id}
                   deal={deal}
+                  scoring={scoreDealId === deal.id}
+                  onRegenerateScore={regenerateScore}
                   onAddPhoto={(dealId) => {
                     setUploadingDealId(dealId);
                     uploadRef.current?.click();
@@ -201,26 +253,41 @@ function StageColumn({
   stage,
   label,
   count,
+  totalValue,
+  dragging,
   children
 }: {
   stage: Stage;
   label: string;
   count: number;
+  totalValue: number;
+  dragging: boolean;
   children: ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
+  const columnClass = `col kanbanColumn${dragging ? " isDropReady" : ""}${isOver ? " isDropOver" : ""}`;
   return (
-    <div className="col" ref={setNodeRef} style={isOver ? { outline: "2px solid rgba(138,180,255,0.5)" } : undefined}>
+    <div className={columnClass} ref={setNodeRef}>
       <div className="colHeader">
         <div className="colTitle">{label}</div>
-        <div className="count">{count}</div>
+        <div className="count">{count} deals · Rs {Math.round(totalValue).toLocaleString()}</div>
       </div>
       <div className="colBody">{children}</div>
     </div>
   );
 }
 
-function DraggableDeal({ deal, onAddPhoto }: { deal: Deal; onAddPhoto?: (dealId: string) => void }) {
+function DraggableDeal({
+  deal,
+  onAddPhoto,
+  onRegenerateScore,
+  scoring,
+}: {
+  deal: Deal;
+  onAddPhoto?: (dealId: string) => void;
+  onRegenerateScore?: (dealId: string) => void;
+  scoring?: boolean;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
   const style: CSSProperties = {
     transform: CSS.Translate.toString(transform),
@@ -228,8 +295,8 @@ function DraggableDeal({ deal, onAddPhoto }: { deal: Deal; onAddPhoto?: (dealId:
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
-      <DealCard deal={deal} onAddPhoto={onAddPhoto} />
+    <div ref={setNodeRef} style={style} className={isDragging ? "dealCardDragWrap isDragging" : "dealCardDragWrap"} {...listeners} {...attributes}>
+      <DealCard deal={deal} onAddPhoto={onAddPhoto} onRegenerateScore={onRegenerateScore} scoring={scoring} />
     </div>
   );
 }

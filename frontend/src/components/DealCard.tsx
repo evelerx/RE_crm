@@ -36,8 +36,27 @@ function relativeTime(value: string | null | undefined) {
   return `${days}d ago`;
 }
 
-export default function DealCard({ deal, onAddPhoto }: { deal: Deal; onAddPhoto?: (dealId: string) => void }) {
+function scoreTone(score: number | null | undefined) {
+  if (score == null) return { label: "Unscored", className: "neutral" };
+  if (score >= 80) return { label: "Hot", className: "hot" };
+  if (score >= 50) return { label: "Warm", className: "warm" };
+  return { label: "Cold", className: "cold" };
+}
+
+export default function DealCard({
+  deal,
+  onAddPhoto,
+  onRegenerateScore,
+  scoring,
+}: {
+  deal: Deal;
+  onAddPhoto?: (dealId: string) => void;
+  onRegenerateScore?: (dealId: string) => void;
+  scoring?: boolean;
+}) {
   const typologyLabel = formatTypology(deal);
+  const scoreMeta = scoreTone(deal.close_probability);
+  const stageLabel = deal.status === "closed" ? "Closed" : deal.stage;
 
   return (
     <Link to={`/deals/${deal.id}`} className="dealCard">
@@ -58,26 +77,41 @@ export default function DealCard({ deal, onAddPhoto }: { deal: Deal; onAddPhoto?
         </button>
       ) : null}
       <div className="dcTop">
-        <div className="dcTitle">{deal.title}</div>
-        <div className={`pill ${deal.status === "closed" ? "pillClosed" : ""}`}>{deal.status === "closed" ? "Closed" : deal.asset_type}</div>
+        <div className="dcTitleWrap">
+          <div className="dcTitle">{deal.title}</div>
+          <div className="muted small">
+            {deal.area || "Area"}
+            {deal.city ? `, ${deal.city}` : ""}
+          </div>
+        </div>
+        <div className="dcStageWrap">
+          <div className={`pill ${deal.status === "closed" ? "pillClosed" : ""}`}>{stageLabel}</div>
+        </div>
       </div>
       <div className="dcMeta">
-        <div className="muted">
-          {deal.area || "Area"}
-          {deal.city ? `, ${deal.city}` : ""}
-        </div>
-        <div className="muted">Rs {formatMoney(deal.ticket_size)}</div>
+        <div className="dcMoney">Rs {formatMoney(deal.ticket_size)}</div>
+        <div className="muted small">{deal.asset_type}</div>
       </div>
       {typologyLabel ? <div className="muted small">{typologyLabel}</div> : null}
       {deal.status === "closed" ? (
         <div className="muted small">Closed by {deal.closed_by_user_name || "Unknown"} - {relativeTime(deal.closed_at)}</div>
       ) : null}
       <div className="dcBottom">
+        <button
+          type="button"
+          className={`scorePill ${scoreMeta.className}`}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onRegenerateScore?.(deal.id);
+          }}
+          disabled={!onRegenerateScore || scoring}
+          title={onRegenerateScore ? "Refresh score" : "Deal score"}
+        >
+          {scoring ? "Scoring..." : `● ${deal.close_probability ?? "-"} ${scoreMeta.label}`}
+        </button>
         <div className="mini">
-          Close: <b>{deal.close_probability ?? "-"}%</b>
-        </div>
-        <div className="mini">
-          Yield: <b>{deal.expected_yield_pct ?? "-"}%</b>
+          Last touch: <b>{relativeTime(deal.last_activity_at || deal.updated_at)}</b>
         </div>
       </div>
     </Link>

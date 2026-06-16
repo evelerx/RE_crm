@@ -934,7 +934,7 @@ export default function AdminPage() {
           ["CRM Settings", "admin-settings", "C"],
           ["Org & Demo", "admin-organization", "O"],
           ["Enterprise", "admin-enterprise", "E"],
-          ["AI Assign", "admin-ai-assignment", "I"],
+          ["AI Assign", "admin-ai-allocation", "I"],
           ["Compliance", "admin-compliance", "M"],
           ["Support", "admin-support", "P"],
           ["Logs", "admin-logs", "L"],
@@ -993,7 +993,7 @@ export default function AdminPage() {
             onClick={() => {
               setAiAssignmentExpanded(true);
               window.setTimeout(() => {
-                document.getElementById("admin-ai-assignment")?.scrollIntoView({
+                document.getElementById("admin-ai-allocation")?.scrollIntoView({
                   behavior: "smooth",
                   block: "start"
                 });
@@ -1506,7 +1506,7 @@ export default function AdminPage() {
         </section>
       ) : null}
 
-      <section id="admin-organizations" className="card adminAnchorTarget">
+      <section id="admin-organization" className="card adminAnchorTarget">
         <div className="cardTitle">Reset user password</div>
         <form
           id="admin-ai-access-form"

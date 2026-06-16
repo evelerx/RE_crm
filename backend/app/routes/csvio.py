@@ -356,9 +356,18 @@ async def import_contacts(
     await file.seek(0)
     rows = _load_tabular_rows(file)
     created = 0
-    for row in rows:
+    failed_rows: list[dict[str, object]] = []
+    for row_number, row in enumerate(rows, start=2):
         name = _match_value(row, CONTACT_FIELD_ALIASES["name"])
         if not name:
+            failed_rows.append(
+                {
+                    "row_number": row_number,
+                    "column_name": "name",
+                    "error_reason": "Name is required",
+                    "row": row,
+                }
+            )
             continue
         contact = Contact(
             name=name,
@@ -373,7 +382,7 @@ async def import_contacts(
         session.add(contact)
         created += 1
     session.commit()
-    return {"created": created}
+    return {"created": created, "success_count": created, "failed_count": len(failed_rows), "failed_rows": failed_rows}
 
 
 @router.post("/import/deals")
@@ -385,14 +394,23 @@ async def import_deals(
     await file.seek(0)
     rows = _load_tabular_rows(file)
     created = 0
+    failed_rows: list[dict[str, object]] = []
 
     # Map contact emails to ids for linking
     contacts = session.exec(select(Contact).where(user_read_filter(Contact, user))).all()
     email_to_id = {c.email.lower(): c.id for c in contacts if c.email}
 
-    for row in rows:
+    for row_number, row in enumerate(rows, start=2):
         title = _deal_title_from_row(row).strip()
         if not title:
+            failed_rows.append(
+                {
+                    "row_number": row_number,
+                    "column_name": "title",
+                    "error_reason": "Deal title is required",
+                    "row": row,
+                }
+            )
             continue
         contact_id: Optional[UUID] = None
         contact_email = _match_value(row, DEAL_FIELD_ALIASES["contact_email"]).lower()
@@ -425,4 +443,4 @@ async def import_deals(
         created += 1
 
     session.commit()
-    return {"created": created}
+    return {"created": created, "success_count": created, "failed_count": len(failed_rows), "failed_rows": failed_rows}

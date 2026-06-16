@@ -77,6 +77,36 @@ export type DealImage = {
   is_primary: boolean;
 };
 
+export type WhatsAppMessage = {
+  id: string;
+  contact_id: string;
+  direction: "inbound" | "outbound";
+  message_body: string;
+  timestamp: string;
+  status: "sent" | "delivered" | "read" | "failed";
+  wa_message_id: string | null;
+};
+
+export type WhatsAppConversationSummary = {
+  contact_id: string;
+  contact_name: string;
+  contact_phone: string | null;
+  contact_email: string | null;
+  latest_message: string;
+  latest_direction: "inbound" | "outbound";
+  latest_status: "sent" | "delivered" | "read" | "failed";
+  latest_timestamp: string | null;
+  message_count: number;
+};
+
+export type WhatsAppConversation = {
+  contact_id: string;
+  contact_name: string;
+  contact_phone: string | null;
+  contact_email: string | null;
+  messages: WhatsAppMessage[];
+};
+
 export type DealClosureEvent = {
   id: string;
   deal_id: string;
