@@ -1,6 +1,6 @@
 // MODIFIED: Part 3 — CRM sidebar shell — Adds grouped navigation, responsive collapse, and stable account actions around existing CRM pages.
 import { useMemo } from "react";
-import { NavLink } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { crmNavGroups } from "./navigation";
 
@@ -18,6 +18,7 @@ function SidebarIcon({ icon }: { icon: string }) {
 
 export default function AppSidebar({ isAdmin, isOwnerLike, userName, userRole, onLogout }: AppSidebarProps) {
   const groups = useMemo(() => crmNavGroups({ isAdmin, isOwnerLike }), [isAdmin, isOwnerLike]);
+  const location = useLocation();
   const initials = (userName || "U")
     .split(" ")
     .filter(Boolean)
@@ -42,21 +43,31 @@ export default function AppSidebar({ isAdmin, isOwnerLike, userName, userRole, o
           <div className="shellNavGroup" key={group.label}>
             <div className="shellNavLabel">{group.label}</div>
             <div className="shellNavItems">
-              {group.items.map((item) => (
-                <NavLink
-                  key={`${group.label}-${item.label}`}
-                  to={item.to}
-                  end={item.to === "/" || item.to.startsWith("/admin")}
-                  className={({ isActive }) => `shellNavItem${isActive ? " active" : ""}`}
-                  title={item.label}
-                >
-                  <span className="shellNavIcon">
-                    <SidebarIcon icon={item.icon} />
-                  </span>
-                  <span className="shellNavText">{item.label}</span>
-                  {item.badge ? <span className="shellNavBadge">{item.badge}</span> : null}
-                </NavLink>
-              ))}
+              {group.items.map((item) => {
+                const [itemPath, itemHash = ""] = item.to.split("#");
+                const currentPath = location.pathname;
+                const currentHash = location.hash.replace(/^#/, "");
+                const active = itemHash
+                  ? currentPath === itemPath && currentHash === itemHash
+                  : itemPath === "/"
+                    ? currentPath === "/"
+                    : currentPath === itemPath && !currentHash;
+
+                return (
+                  <Link
+                    key={`${group.label}-${item.label}`}
+                    to={item.to}
+                    className={`shellNavItem${active ? " active" : ""}`}
+                    title={item.label}
+                  >
+                    <span className="shellNavIcon">
+                      <SidebarIcon icon={item.icon} />
+                    </span>
+                    <span className="shellNavText">{item.label}</span>
+                    {item.badge ? <span className="shellNavBadge">{item.badge}</span> : null}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         ))}
