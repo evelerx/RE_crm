@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import type { Profile } from "../api/types";
 
@@ -19,16 +20,43 @@ function validateRera(rera: string): string | null {
 }
 
 type MeState = {
+  email?: string;
+  plan?: string;
+  is_admin?: boolean;
   ai_enabled?: boolean;
   ai_scope?: string;
   ai_model?: string;
   profile_completion?: { completed: number; total: number; ready: boolean };
   enterprise_company_name?: string;
+  enterprise_member_role?: string;
+  subscription_plan?: string;
+  subscription_cycle?: string;
+  subscription_seats?: number;
+  can_install_app?: boolean;
 };
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
+function scopeLabel(scope: string | undefined, companyName: string | undefined) {
+  if (scope === "inherited_enterprise") return companyName ? `Inherited from ${companyName}` : "Inherited from enterprise owner";
+  if (scope === "direct") return "Assigned directly by admin";
+  if (scope === "admin") return "Managed in Admin";
+  return "Not allocated yet";
+}
+
+function formatPlanLabel(me: MeState | null) {
+  return (me?.subscription_plan || me?.plan || "free_trial").replace(/_/g, " ");
+}
 
 export default function AccountPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [me, setMe] = useState<MeState | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installBusy, setInstallBusy] = useState(false);
+  const [installMsg, setInstallMsg] = useState<string | null>(null);
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
   const [profileErr, setProfileErr] = useState<string | null>(null);
@@ -40,6 +68,7 @@ export default function AccountPage() {
   const [error, setError] = useState<string | null>(null);
 
   const canSubmit = currentPassword.length > 0 && newPassword.length >= 8 && !busy;
+  const isSubscriptionOwner = Boolean(me?.can_install_app);
   const profileChecks = profile
     ? [
         { label: "RERA ID", done: Boolean(profile.rera_id.trim()) },
@@ -64,12 +93,22 @@ export default function AccountPage() {
     })();
   }, []);
 
+  useEffect(() => {
+    function handleBeforeInstallPrompt(event: Event) {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+  }, []);
+
   return (
     <div className="page">
       <div className="pageHeader">
         <div>
-          <div className="h1">Account</div>
-          <div className="muted">Profile and access details.</div>
+          <div className="h1">User Profile</div>
+          <div className="muted">Your profile, account access, security, and app settings in one place.</div>
         </div>
       </div>
 
@@ -109,6 +148,141 @@ export default function AccountPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="card premiumPanel">
+        <div className="cardTitle">Account Overview</div>
+        <div className="statsGrid">
+          <div className="statCard">
+            <div className="statLabel">Email</div>
+            <div className="statValue" style={{ fontSize: "1.15rem" }}>{me?.email || "Loading..."}</div>
+            <div className="statHint">Primary sign-in identity for this CRM workspace.</div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">Subscription</div>
+            <div className="statValue" style={{ textTransform: "capitalize" }}>{formatPlanLabel(me)}</div>
+            <div className="statHint">
+              {(me?.subscription_cycle || "monthly").replace(/_/g, " ")} billing
+              {me?.subscription_seats ? ` · ${me.subscription_seats} seats` : ""}
+            </div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">Workspace role</div>
+            <div className="statValue" style={{ textTransform: "capitalize" }}>
+              {me?.is_admin ? "Admin" : (me?.enterprise_member_role || "Owner").replace(/_/g, " ")}
+            </div>
+            <div className="statHint">
+              {me?.enterprise_company_name ? `Attached to ${me.enterprise_company_name}.` : "Personal CRM workspace."}
+            </div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">AI access</div>
+            <div className="statValue">{me?.ai_enabled ? "Active" : "Pending"}</div>
+            <div className="statHint">{scopeLabel(me?.ai_scope, me?.enterprise_company_name)}</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="cardTitle">User Settings</div>
+        <div className="mini">
+          <div>
+            <b>AI status:</b> {me?.ai_enabled ? "Active" : me?.is_admin ? "Admin-managed" : "Waiting for allocation"}
+          </div>
+          <div>
+            <b>AI model:</b> {me?.ai_model || "Not assigned"}
+          </div>
+          <div>
+            <b>Source:</b> {scopeLabel(me?.ai_scope, me?.enterprise_company_name)}
+          </div>
+        </div>
+        <div className="muted small">
+          Profile information is editable below. System-level billing, admin policy, and secure environment controls stay managed separately.
+        </div>
+        <div className="row" style={{ marginTop: 16 }}>
+          <button
+            className="btn ghost"
+            type="button"
+            disabled={!me?.ai_enabled || busy}
+            onClick={async () => {
+              setBusy(true);
+              setError(null);
+              setMsg(null);
+              try {
+                const resp = await api<{ ok: boolean; output: string }>("/ai/llm/test", {
+                  method: "POST",
+                  body: JSON.stringify({ provider: "openrouter" }),
+                });
+                setMsg(`AI access verified: ${resp.output}`);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "AI test failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? "Testing..." : "Test AI access"}
+          </button>
+          {me?.is_admin ? (
+            <Link className="btn ghost" to="/admin">
+              Open Admin
+            </Link>
+          ) : null}
+          <Link className="btn ghost" to="/settings">
+            Open System Settings
+          </Link>
+        </div>
+        {msg ? <div className="alert ok" style={{ marginTop: 16 }}>{msg}</div> : null}
+        {error ? <div className="alert" style={{ marginTop: 16 }}>{error}</div> : null}
+      </section>
+
+      {isSubscriptionOwner ? (
+        <section className="card premiumPanel" id="install-app">
+          <div className="cardTitle">Install Northstone App</div>
+          <div className="muted small">
+            Subscription owners can install Northstone like an app while keeping live CRM, deals, and reports tied to the same workspace.
+          </div>
+          <div className="mini" style={{ marginTop: 14 }}>
+            <div>
+              <b>Plan:</b> {formatPlanLabel(me)}
+            </div>
+            <div>
+              <b>Billing cycle:</b> {(me?.subscription_cycle || "monthly").replace(/_/g, " ")}
+            </div>
+            <div>
+              <b>Seat allocation:</b> {me?.subscription_seats || 1}
+            </div>
+          </div>
+          {installMsg ? <div className="alert ok" style={{ marginTop: 16 }}>{installMsg}</div> : null}
+          <div className="row" style={{ marginTop: 16 }}>
+            <button
+              className="btn"
+              type="button"
+              disabled={installBusy}
+              onClick={async () => {
+                setInstallBusy(true);
+                setInstallMsg(null);
+                try {
+                  if (installPrompt) {
+                    await installPrompt.prompt();
+                    const choice = await installPrompt.userChoice;
+                    setInstallPrompt(null);
+                    setInstallMsg(choice.outcome === "accepted" ? "Northstone install started." : "Install prompt dismissed. You can try again anytime.");
+                  } else {
+                    setInstallMsg("Install prompt is not available right now. On Chrome or Edge, use the browser menu and choose Install app / Add to desktop.");
+                  }
+                } finally {
+                  setInstallBusy(false);
+                }
+              }}
+            >
+              {installBusy ? "Opening..." : "Install CRM app"}
+            </button>
+            <Link className="btn ghost" to="/">
+              Open CRM
+            </Link>
           </div>
         </section>
       ) : null}
