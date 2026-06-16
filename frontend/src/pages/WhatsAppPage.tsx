@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  api,
   getWhatsAppConversation,
   listWhatsAppInbox,
   sendWhatsAppMessage,
   type WhatsAppConversationRead,
   type WhatsAppConversationSummaryRead,
 } from "../api/client";
+import Modal from "../components/Modal";
+import type { Contact, ContactCreate } from "../api/types";
 
 function formatTimestamp(value: string) {
   return new Date(value).toLocaleString([], {
@@ -23,22 +26,29 @@ function formatOptionalTimestamp(value: string | null) {
 
 export default function WhatsAppPage() {
   const [conversations, setConversations] = useState<WhatsAppConversationSummaryRead[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [thread, setThread] = useState<WhatsAppConversationRead | null>(null);
   const [loadingInbox, setLoadingInbox] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function loadInbox(preferredContactId?: string | null) {
     setLoadingInbox(true);
     try {
-      const rows = await listWhatsAppInbox();
+      const [rows, contactRows] = await Promise.all([listWhatsAppInbox(), api<Contact[]>("/contacts")]);
       setConversations(rows);
+      setContacts(contactRows);
       setSelectedContactId((current) => {
-        const target = preferredContactId ?? current ?? rows[0]?.contact_id ?? null;
-        return rows.some((row) => row.contact_id === target) ? target : rows[0]?.contact_id ?? null;
+        const fallbackId = rows[0]?.contact_id ?? contactRows[0]?.id ?? null;
+        const target = preferredContactId ?? current ?? fallbackId;
+        const inRows = rows.some((row) => row.contact_id === target);
+        const inContacts = contactRows.some((row) => row.id === target);
+        return inRows || inContacts ? target : fallbackId;
       });
       setError(null);
     } catch (e) {
@@ -82,9 +92,55 @@ export default function WhatsAppPage() {
     return () => window.clearInterval(timer);
   }, [selectedContactId]);
 
+  const mergedContacts = useMemo(() => {
+    const byId = new Map<string, WhatsAppConversationSummaryRead>();
+    for (const conversation of conversations) {
+      byId.set(conversation.contact_id, conversation);
+    }
+
+    const rows: WhatsAppConversationSummaryRead[] = contacts.map((contact) => {
+      const existing = byId.get(contact.id);
+      if (existing) return existing;
+      return {
+        contact_id: contact.id,
+        contact_name: contact.name,
+        contact_phone: contact.phone,
+        contact_email: contact.email,
+        latest_message: "No messages yet",
+        latest_direction: "outbound",
+        latest_status: "sent",
+        latest_timestamp: null,
+        message_count: 0,
+      };
+    });
+
+    for (const conversation of conversations) {
+      if (!rows.some((row) => row.contact_id === conversation.contact_id)) {
+        rows.push(conversation);
+      }
+    }
+
+    const term = search.trim().toLowerCase();
+    const filtered = term
+      ? rows.filter((row) =>
+          [row.contact_name, row.contact_phone ?? "", row.contact_email ?? "", row.latest_message]
+            .join(" ")
+            .toLowerCase()
+            .includes(term),
+        )
+      : rows;
+
+    return filtered.sort((left, right) => {
+      const leftTs = left.latest_timestamp ? new Date(left.latest_timestamp).getTime() : 0;
+      const rightTs = right.latest_timestamp ? new Date(right.latest_timestamp).getTime() : 0;
+      if (leftTs !== rightTs) return rightTs - leftTs;
+      return left.contact_name.localeCompare(right.contact_name);
+    });
+  }, [contacts, conversations, search]);
+
   const selectedSummary = useMemo(
-    () => conversations.find((conversation) => conversation.contact_id === selectedContactId) ?? null,
-    [conversations, selectedContactId],
+    () => mergedContacts.find((conversation) => conversation.contact_id === selectedContactId) ?? null,
+    [mergedContacts, selectedContactId],
   );
 
   async function handleSend() {
@@ -119,10 +175,20 @@ export default function WhatsAppPage() {
       <div className="whatsappLayout">
         <aside className="whatsappSidebar">
           <div className="sectionTitle">Conversations</div>
+          <div className="row" style={{ marginTop: 12, marginBottom: 12 }}>
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search contacts"
+            />
+            <button className="btn ghost" type="button" onClick={() => setCreateOpen(true)}>
+              + Add contact
+            </button>
+          </div>
           {loadingInbox ? <div className="muted">Loading conversations...</div> : null}
-          {!loadingInbox && conversations.length === 0 ? <div className="muted">No WhatsApp conversations yet.</div> : null}
+          {!loadingInbox && mergedContacts.length === 0 ? <div className="muted">No contacts available yet.</div> : null}
           <div className="whatsappConversationList">
-            {conversations.map((conversation) => (
+            {mergedContacts.map((conversation) => (
               <button
                 key={conversation.contact_id}
                 type="button"
@@ -154,9 +220,12 @@ export default function WhatsAppPage() {
             <>
               <div className="whatsappThreadHeader">
                 <div>
-                  <div className="h2">{selectedSummary.contact_name}</div>
+                  <div className="h2">{thread?.contact_name || selectedSummary.contact_name}</div>
                   <div className="muted">
-                    {selectedSummary.contact_phone || "No phone"} {selectedSummary.contact_email ? `· ${selectedSummary.contact_email}` : ""}
+                    {(thread?.contact_phone ?? selectedSummary.contact_phone) || "No phone"}{" "}
+                    {(thread?.contact_email ?? selectedSummary.contact_email)
+                      ? `· ${thread?.contact_email ?? selectedSummary.contact_email}`
+                      : ""}
                   </div>
                 </div>
                 <div className="muted whatsappTiny">Latest update {formatOptionalTimestamp(selectedSummary.latest_timestamp)}</div>
@@ -194,11 +263,92 @@ export default function WhatsAppPage() {
                     {sending ? "Sending..." : "Send"}
                   </button>
                 </div>
+                {!selectedSummary.contact_phone ? (
+                  <div className="muted whatsappTiny">Add a phone number to this contact before sending outbound WhatsApp messages.</div>
+                ) : null}
               </div>
             </>
           )}
         </section>
       </div>
+
+      <Modal title="Add contact to WhatsApp" open={createOpen} onClose={() => setCreateOpen(false)}>
+        <CreateWhatsAppContactForm
+          onCreate={async (payload) => {
+            const created = await api<Contact>("/contacts", { method: "POST", body: JSON.stringify(payload) });
+            setCreateOpen(false);
+            setSearch("");
+            await loadInbox(created.id);
+          }}
+        />
+      </Modal>
     </div>
+  );
+}
+
+function CreateWhatsAppContactForm({ onCreate }: { onCreate: (payload: ContactCreate) => Promise<void> }) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("buyer");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const canSubmit = name.trim().length >= 2 && !busy;
+
+  return (
+    <form
+      className="form"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (!canSubmit) return;
+        setBusy(true);
+        try {
+          await onCreate({
+            name: name.trim(),
+            phone: phone.trim() || null,
+            email: email.trim() || null,
+            role,
+            notes: notes.trim(),
+          });
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label>
+        Name
+        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Client or investor name" />
+      </label>
+      <div className="grid2">
+        <label>
+          Phone
+          <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+91 98XXXXXXXX" />
+        </label>
+        <label>
+          Email
+          <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" />
+        </label>
+      </div>
+      <label>
+        Purpose
+        <select value={role} onChange={(event) => setRole(event.target.value)}>
+          <option value="buyer">Buyer</option>
+          <option value="seller">Seller</option>
+          <option value="investor">Investor</option>
+          <option value="tenant">Tenant</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label>
+        Notes
+        <textarea className="textarea" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Context for the first conversation" />
+      </label>
+      <div className="row right">
+        <button className="btn" type="submit" disabled={!canSubmit}>
+          {busy ? "Creating..." : "Create contact"}
+        </button>
+      </div>
+    </form>
   );
 }
