@@ -79,9 +79,14 @@ export default function AppSidebar({ isAdmin, isOwnerLike, userName, userRole, o
           <div className="shellUserName">{userName || "Northstone user"}</div>
           <div className="shellUserRole">{userRole || "CRM access"}</div>
         </div>
-        <button className="shellUserMenuButton" type="button" onClick={onLogout} title="Logout">
-          ...
-        </button>
+        <div className="shellUserActions">
+          <Link className="shellUserLink" to="/account" title="My Profile">
+            Profile
+          </Link>
+          <button className="shellUserMenuButton" type="button" onClick={onLogout} title="Logout">
+            Logout
+          </button>
+        </div>
       </div>
     </aside>
   );

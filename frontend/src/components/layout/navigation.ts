@@ -61,6 +61,14 @@ export function crmNavGroups(options: { isAdmin: boolean; isOwnerLike: boolean }
     });
   }
 
+  groups.push({
+    label: "Profile",
+    items: [
+      { label: "My Profile", to: "/account", icon: "AC" },
+      { label: "Settings", to: "/settings", icon: "ST" },
+    ],
+  });
+
   if (options.isAdmin) {
     groups.push({
       label: "Admin",
