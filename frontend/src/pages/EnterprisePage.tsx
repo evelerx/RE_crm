@@ -379,6 +379,72 @@ export default function EnterprisePage() {
         </div>
       ) : null}
 
+      <section className="card premiumPanel" id="ai-workbench">
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+          <div className="grow">
+            <div className="cardTitle">AI workbench</div>
+            <div className="muted small">
+              Open every AI-assisted organization tool from one place: builder website generation, builder document drafting, AI market insights, investment reports, and deal memo generation.
+            </div>
+          </div>
+          <button className="btn ghost" type="button" onClick={() => void load()}>
+            Refresh AI tools
+          </button>
+        </div>
+        <div className="statsGrid">
+          <div className="statCard">
+            <div className="statLabel">AI website builder</div>
+            <div className="statValue">
+              {isEnterpriseOwner && overview?.owner_plan === "builder" ? "Ready" : overview?.owner_plan === "builder" ? "Owner only" : "Builder plan"}
+            </div>
+            <div className="statHint">
+              Generate, edit, save, preview, and publish a public builder microsite from the CRM.
+            </div>
+            <div className="row" style={{ marginTop: 12 }}>
+              <a className="btn ghost" href="#ai-builder-website">
+                Open website desk
+              </a>
+            </div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">AI document desk</div>
+            <div className="statValue">{isEnterpriseOwner ? "Ready" : "Preview"}</div>
+            <div className="statHint">
+              Draft company profiles, project overviews, sales offers, brochures, and construction summaries.
+            </div>
+            <div className="row" style={{ marginTop: 12 }}>
+              <a className="btn ghost" href="#ai-builder-documents">
+                Open document desk
+              </a>
+            </div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">AI market insights</div>
+            <div className="statValue">{market?.areas?.length ? `${market.areas.length} zones` : "Waiting"}</div>
+            <div className="statHint">
+              Review pricing signals, absorption, average ticket size, and city-location trend summaries.
+            </div>
+            <div className="row" style={{ marginTop: 12 }}>
+              <a className="btn ghost" href="#ai-market-insights">
+                Open insights
+              </a>
+            </div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">AI reports</div>
+            <div className="statValue">{deals.length ? `${deals.length} deals` : "No deals yet"}</div>
+            <div className="statHint">
+              Score live deals, then generate investment reports and deal memos that can be refined anytime.
+            </div>
+            <div className="row" style={{ marginTop: 12 }}>
+              <a className="btn ghost" href="#ai-deal-intelligence">
+                Open reports
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="card premiumPanel">
         <div className="cardTitle">Organization overview</div>
         {overview ? (
@@ -830,9 +896,35 @@ export default function EnterprisePage() {
         </form>
       </section>
 
-      {isEnterpriseOwner && overview?.owner_plan === "builder" ? <BuilderWebsiteDesk /> : null}
+      <div id="ai-builder-website">
+        {isEnterpriseOwner && overview?.owner_plan === "builder" ? <BuilderWebsiteDesk /> : null}
+      </div>
 
-      <section className="card premiumPanel">
+      {!publicPreviewMode && (!overview || overview.owner_plan !== "builder") ? (
+        <section className="card premiumPanel" id="ai-builder-website-upgrade">
+          <div className="cardTitle">AI builder website desk</div>
+          <div className="muted small">
+            Builder subscriptions unlock the full website desk: AI-assisted starter copy, editable property sections, image management, save-draft flow, and live publishing to the Northstone builder public URL.
+          </div>
+          <div className="row" style={{ marginTop: 14 }}>
+            <button
+              className="btn"
+              type="button"
+              onClick={() =>
+                openUpgradePrompt(
+                  "Upgrade to a Builder subscription to unlock the AI website builder, editable public pages, property galleries, and live builder publishing.",
+                  "builder",
+                  "Unlock AI builder website desk"
+                )
+              }
+            >
+              Unlock website builder
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="card premiumPanel" id="ai-builder-documents">
         <div className="cardTitle">Builder and construction document desk</div>
         <div className="muted small">
           This workspace is for builder and construction subscriptions that need AI-drafted company profiles, project overviews, sales offers, compliance cover letters, and other human-sounding first drafts.
@@ -1043,7 +1135,7 @@ export default function EnterprisePage() {
         )}
       </section>
 
-      <section className="card">
+      <section className="card" id="ai-market-insights">
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div className="cardTitle" style={{ marginBottom: 0 }}>AI market insights (organization-wide)</div>
           <button className="btn ghost" type="button" onClick={() => setCompactAvgTicket((value) => !value)}>
@@ -1082,7 +1174,7 @@ export default function EnterprisePage() {
         )}
       </section>
 
-      <section className="card">
+      <section className="card" id="ai-deal-intelligence">
         <div className="cardTitle">Predictive deal scoring and reports</div>
         <div className="form">
           <label>

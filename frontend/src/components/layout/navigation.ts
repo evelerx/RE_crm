@@ -36,10 +36,10 @@ export function crmNavGroups(options: { isAdmin: boolean; isOwnerLike: boolean }
     {
       label: "Intelligence",
       items: [
-        { label: "AI Follow-ups", to: "/today", icon: "AI" },
-        { label: "Lead Scoring", to: "/insights", icon: "LS" },
+        { label: "AI Workbench", to: "/enterprise#ai-workbench", icon: "AI" },
+        { label: "Lead Scoring", to: "/enterprise#ai-deal-intelligence", icon: "LS" },
         { label: "Leaderboard", to: "/leaderboard", icon: "LB" },
-        { label: "ROI Insights", to: "/insights", icon: "RI" },
+        { label: "ROI Insights", to: "/enterprise#ai-market-insights", icon: "RI" },
       ],
     },
   ];
@@ -49,6 +49,8 @@ export function crmNavGroups(options: { isAdmin: boolean; isOwnerLike: boolean }
       label: "Team",
       items: [
         { label: "Team IDs", to: "/enterprise", icon: "TM" },
+        { label: "AI Docs", to: "/enterprise#ai-builder-documents", icon: "DC" },
+        { label: "Builder Site", to: "/enterprise#ai-builder-website", icon: "WB" },
         { label: "Targets", to: "/targets", icon: "TG" },
         { label: "Sequences", to: "/sequences", icon: "SQ" },
       ],
