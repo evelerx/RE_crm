@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -25,6 +26,7 @@ from ..settings import settings
 
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
+logger = logging.getLogger(__name__)
 
 ALLOWED_MEDIA_TYPES = {
     "image/jpeg",
@@ -40,6 +42,27 @@ MAX_MEDIA_SIZE = 16 * 1024 * 1024
 
 def _normalize_phone(value: str | None) -> str:
     return "".join(ch for ch in (value or "") if ch.isdigit())
+
+
+def _ensure_whatsapp_credentials() -> None:
+    """Fail fast when the WhatsApp Cloud API is not configured on the backend."""
+
+    if not settings.whatsapp_token or not settings.whatsapp_phone_number_id:
+        raise HTTPException(status_code=503, detail="WhatsApp Cloud API credentials are not configured.")
+
+
+def _save_message_record(session: Session, message: WhatsAppMessage) -> WhatsAppMessage:
+    """Persist a WhatsApp message safely so request failures do not turn into fake CORS issues."""
+
+    try:
+        session.add(message)
+        session.commit()
+        session.refresh(message)
+        return message
+    except Exception as exc:  # noqa: BLE001
+        session.rollback()
+        logger.exception("Failed to persist WhatsApp message record", exc_info=exc)
+        raise HTTPException(status_code=500, detail="Failed to save WhatsApp message record.") from exc
 
 
 def _infer_media_payload(file: UploadFile, media_id: str, caption: str) -> dict[str, Any]:
@@ -242,6 +265,8 @@ async def send_message(
     if not phone:
         raise HTTPException(status_code=400, detail="Linked contact needs a valid phone number before sending.")
 
+    _ensure_whatsapp_credentials()
+
     message = WhatsAppMessage(
         contact_id=contact.id,
         direction="outbound",
@@ -250,32 +275,21 @@ async def send_message(
         status="failed",
     )
     assign_enterprise_fields(message, user)
-    session.add(message)
-    session.commit()
-    session.refresh(message)
-
-    if not settings.whatsapp_token or not settings.whatsapp_phone_number_id:
-        raise HTTPException(status_code=503, detail="WhatsApp Cloud API credentials are not configured.")
 
     try:
         wa_message_id = await _post_meta_text_message(phone, payload.message.strip())
         message.status = "sent"
         message.wa_message_id = wa_message_id or None
-        session.add(message)
-        session.commit()
-        session.refresh(message)
-        return message
-    except HTTPException:
+        return _save_message_record(session, message)
+    except HTTPException as exc:
         message.status = "failed"
-        session.add(message)
-        session.commit()
-        session.refresh(message)
-        raise
+        logger.warning("WhatsApp text send failed for contact %s: %s", contact.id, exc.detail)
+        _save_message_record(session, message)
+        raise exc
     except Exception as exc:  # noqa: BLE001
         message.status = "failed"
-        session.add(message)
-        session.commit()
-        session.refresh(message)
+        logger.exception("Unexpected WhatsApp text send failure for contact %s", contact.id, exc_info=exc)
+        _save_message_record(session, message)
         raise HTTPException(status_code=502, detail=str(exc) or "WhatsApp send failed") from exc
 
 
@@ -305,6 +319,8 @@ async def send_media(
     if len(content) > MAX_MEDIA_SIZE:
         raise HTTPException(status_code=413, detail="File too large")
 
+    _ensure_whatsapp_credentials()
+
     message = WhatsAppMessage(
         contact_id=contact.id,
         direction="outbound",
@@ -313,14 +329,6 @@ async def send_media(
         status="failed",
     )
     assign_enterprise_fields(message, user)
-    session.add(message)
-    session.commit()
-    session.refresh(message)
-
-    if not settings.whatsapp_token or not settings.whatsapp_phone_number_id:
-        session.add(message)
-        session.commit()
-        raise HTTPException(status_code=503, detail="WhatsApp Cloud API credentials are not configured.")
 
     try:
         media_id = await _post_meta_media(file, content)
@@ -328,8 +336,7 @@ async def send_media(
         wa_message_id = await _post_meta_message(phone, media_payload)
         message.status = "sent"
         message.wa_message_id = wa_message_id or None
-        session.add(message)
-        session.commit()
+        _save_message_record(session, message)
         return WhatsAppMediaSendResponse(
             ok=True,
             contact_id=contact.id,
@@ -338,11 +345,11 @@ async def send_media(
         )
     except HTTPException as exc:
         message.status = "failed"
-        session.add(message)
-        session.commit()
+        logger.warning("WhatsApp media send failed for contact %s: %s", contact.id, exc.detail)
+        _save_message_record(session, message)
         raise exc
     except Exception as exc:  # noqa: BLE001
         message.status = "failed"
-        session.add(message)
-        session.commit()
+        logger.exception("Unexpected WhatsApp media send failure for contact %s", contact.id, exc_info=exc)
+        _save_message_record(session, message)
         raise HTTPException(status_code=502, detail=str(exc) or "WhatsApp media send failed") from exc
