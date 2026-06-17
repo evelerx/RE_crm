@@ -50,7 +50,7 @@ export function crmNavGroups(options: { isAdmin: boolean; isOwnerLike: boolean }
     groups.push({
       label: "Enterprise",
       items: [
-        { label: "Team IDs", to: "/enterprise", icon: "TM" },
+        { label: "Team IDs", to: "/enterprise#team-ids", icon: "TM" },
         { label: "AI Docs", to: "/enterprise#ai-builder-documents", icon: "DC" },
         { label: "Builder Site", to: "/enterprise#ai-builder-website", icon: "WB" },
         { label: "Automations", to: "/automations", icon: "AT" },

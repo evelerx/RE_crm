@@ -667,7 +667,7 @@ export default function EnterprisePage() {
       {showOrganizationFeatures ? (
         <>
       {isEnterpriseOwner ? (
-      <section className="card">
+      <section id="team-ids" className="card">
         <div className="cardTitle">Create broker / CP / employee ID</div>
         <div className="muted">These users get the normal CRM interface, and all of their data rolls up into this enterprise account.</div>
         <form
@@ -737,7 +737,7 @@ export default function EnterprisePage() {
         </form>
       </section>
       ) : (
-      <section className="card">
+      <section id="team-ids" className="card">
         <div className="cardTitle">Create broker / CP / employee ID</div>
         <div className="muted">
           Everyone can preview this workflow, but only Enterprise and Builder owners can create managed team IDs and roll their work into one organization cockpit.

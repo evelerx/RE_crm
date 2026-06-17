@@ -1,5 +1,5 @@
-// MODIFIED: Part 2 — CRM app shell — Wraps existing pages in the new sidebar + topbar layout without changing page logic.
-import type { ReactNode } from "react";
+// MODIFIED: CRM shell hash navigation wiring — Ensures enterprise sidebar links scroll to live in-page sections inside the app shell instead of appearing non-functional.
+import { useEffect, useRef, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import AppSidebar from "./AppSidebar";
@@ -18,6 +18,26 @@ type AppShellProps = {
 export default function AppShell({ isAdmin, isOwnerLike, userName, userRole, onLogout, children }: AppShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const mainRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const container = mainRef.current;
+    if (!container) return;
+
+    if (!location.hash) {
+      container.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    const hashId = decodeURIComponent(location.hash.replace(/^#/, ""));
+    const target = document.getElementById(hashId);
+
+    if (!target) return;
+
+    window.requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [location.pathname, location.hash]);
 
   return (
     <div className="shellRoot">
@@ -38,7 +58,7 @@ export default function AppShell({ isAdmin, isOwnerLike, userName, userRole, onL
             </button>
           }
         />
-        <main className="shellMainContent">{children}</main>
+        <main ref={mainRef} className="shellMainContent">{children}</main>
       </div>
     </div>
   );
