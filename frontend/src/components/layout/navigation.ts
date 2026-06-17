@@ -30,7 +30,7 @@ export function crmNavGroups(options: { isAdmin: boolean; isOwnerLike: boolean }
         { label: "WhatsApp", to: "/whatsapp", icon: "WA" },
         { label: "Inbox", to: "/inbox", icon: "IN" },
         { label: "Calls", to: "/calls", icon: "CL" },
-        { label: "Calendar", to: "/apps", icon: "CA" },
+        { label: "Apps", to: "/apps", icon: "CA" },
         { label: "Ads", to: "/ads", icon: "AD" },
       ],
     },
