@@ -1,10 +1,10 @@
+import { MARKETING_PHASES } from "../../types/marketing";
+
 type Props = {
   status: string;
   canEdit: boolean;
   onPick: (status: string) => void;
 };
-
-const phases = ["submitted", "under_review", "approved", "in_progress", "completed"];
 
 export default function PhaseTracker({ status, canEdit, onPick }: Props) {
   return (
@@ -16,7 +16,7 @@ export default function PhaseTracker({ status, canEdit, onPick }: Props) {
         </div>
       </div>
       <div className="marketingPromptPhaseRow">
-        {phases.map((phase) => (
+        {MARKETING_PHASES.map((phase) => (
           <button
             key={phase}
             className={`marketingPromptPhasePill ${status === phase ? "active" : ""}`}

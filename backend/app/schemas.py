@@ -678,7 +678,9 @@ class AgencyAuthMeRead(BaseModel):
 
 
 class AgencyRequestStatusUpdate(BaseModel):
-    status: str = Field(pattern="^(submitted|under_review|approved|in_progress|changes_requested|completed|rejected)$")
+    status: str = Field(
+        pattern="^(submitted|agency_review|agency_approved|agency_rejected|changes_requested|manager_review|forwarded_to_employee|in_progress|completed|under_review|approved|rejected)$"
+    )
     note: str = Field(default="", max_length=2000)
 
 

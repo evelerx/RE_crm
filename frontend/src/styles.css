@@ -3588,6 +3588,511 @@ textarea.textarea {
   justify-content: flex-end;
 }
 
+.marketingStandaloneApp {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.marketingStandaloneContent {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.marketingPromptMain {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.marketingPromptSidebar {
+  position: sticky;
+  top: 94px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 249, 255, 0.98));
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.marketingPromptSidebarBrand {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.marketingPromptSidebarEyebrow,
+.marketingPromptLabel {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brand);
+}
+
+.marketingPromptSidebarTitle,
+.marketingPromptPanelTitle {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.marketingPromptSidebarCopy {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.marketingPromptSidebarStats {
+  display: grid;
+  gap: 10px;
+}
+
+.marketingPromptSidebarStat {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(248, 251, 255, 0.98);
+  padding: 12px 14px;
+}
+
+.marketingPromptSidebarStat strong {
+  display: block;
+  color: var(--text-primary);
+}
+
+.marketingPromptNav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.marketingPromptNavItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.marketingPromptNavItem.active {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22);
+}
+
+.marketingPromptNavItem:hover {
+  border-color: var(--border);
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.marketingPromptSidebarCta {
+  width: 100%;
+}
+
+.marketingPromptTopBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px 22px;
+}
+
+.marketingPromptTopBarTitle {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.marketingPromptTopBarSubtitle {
+  margin-top: 8px;
+  color: var(--text-secondary);
+  max-width: 720px;
+}
+
+.marketingPromptTopBarActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.marketingPromptPanel {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px 22px;
+}
+
+.marketingPromptPanel.soft {
+  background: rgba(244, 248, 255, 0.96);
+}
+
+.marketingPromptPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.marketingPromptMetricsGrid,
+.marketingPromptReportsGrid,
+.marketingPromptPlanGrid,
+.marketingPromptAssetGrid,
+.marketingPromptKeyValueGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.marketingPromptMetricsGrid,
+.marketingPromptReportsGrid,
+.marketingPromptPlanGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.marketingPromptAssetGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.marketingPromptKeyValueGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.marketingPromptMetricCard,
+.marketingPromptPlanCard,
+.marketingPromptAssetCard {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(248, 251, 255, 0.98);
+  padding: 16px;
+}
+
+.marketingPromptMetricCard strong,
+.marketingPromptPlanCard strong {
+  color: var(--text-primary);
+}
+
+.marketingPromptPlanCard ul {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.marketingPromptAssetCard {
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+
+.marketingPromptAssetIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--color-primary);
+  font-weight: 800;
+}
+
+.marketingPromptCampaignTable {
+  display: grid;
+  gap: 10px;
+}
+
+.marketingPromptCampaignHead,
+.marketingPromptCampaignRow,
+.marketingPromptApprovalCard,
+.marketingPromptRequestCard,
+.marketingPromptActivityItem {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(250, 252, 255, 0.98);
+  padding: 14px 16px;
+}
+
+.marketingPromptCampaignHead,
+.marketingPromptCampaignRow,
+.marketingPromptRequestCard {
+  display: grid;
+  gap: 8px;
+}
+
+.marketingPromptStatusChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.marketingPromptStatusChip.completed,
+.marketingPromptStatusChip.approved {
+  background: rgba(22, 163, 74, 0.12);
+  color: #166534;
+}
+
+.marketingPromptStatusChip.changes_requested,
+.marketingPromptStatusChip.agency_rejected,
+.marketingPromptStatusChip.rejected {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+.marketingPromptStatusChip.in_progress,
+.marketingPromptStatusChip.forwarded_to_employee,
+.marketingPromptStatusChip.manager_review {
+  background: rgba(202, 164, 104, 0.18);
+  color: #9a3412;
+}
+
+.marketingPromptOverviewGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.marketingPromptRightStack,
+.marketingPromptFormStack,
+.marketingPromptApprovalList,
+.marketingPromptActivityList,
+.marketingPromptRequestList {
+  display: grid;
+  gap: 14px;
+}
+
+.marketingPromptFunnel {
+  display: grid;
+  gap: 12px;
+}
+
+.marketingPromptFunnelRow {
+  display: grid;
+  gap: 8px;
+}
+
+.marketingPromptFunnelMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.marketingPromptFunnelTrack {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  overflow: hidden;
+}
+
+.marketingPromptFunnelFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+}
+
+.marketingPromptWizard {
+  display: grid;
+  gap: 18px;
+}
+
+.marketingPromptWizardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.marketingPromptWizardMeta {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.marketingPromptStepBar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.marketingPromptStep {
+  min-height: 40px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(248, 251, 255, 0.98);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.marketingPromptStep.active {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.26);
+  color: var(--color-primary);
+}
+
+.marketingPromptStep.done {
+  background: rgba(22, 163, 74, 0.08);
+  border-color: rgba(22, 163, 74, 0.24);
+  color: #166534;
+}
+
+.marketingPromptFormGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.marketingPromptBudgetSummary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.marketingPromptBudgetSummary > div {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(248, 251, 255, 0.98);
+}
+
+.marketingPromptBudgetSummary span,
+.marketingPromptKeyValueGrid span {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.marketingPromptBudgetSummary b,
+.marketingPromptKeyValueGrid b {
+  color: var(--text-primary);
+}
+
+.marketingPromptWizardActions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.marketingPromptRequestCard {
+  width: 100%;
+  text-align: left;
+  background: rgba(250, 252, 255, 0.98);
+  cursor: pointer;
+}
+
+.marketingPromptRequestCard.active {
+  border-color: rgba(37, 99, 235, 0.26);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.12);
+}
+
+.marketingPromptRequestCard strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.marketingPromptRequestCard span,
+.marketingPromptActivityItem span,
+.marketingPromptApprovalCard span {
+  color: var(--text-secondary);
+}
+
+.marketingPromptRequestMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.marketingPromptActivityItem.unread {
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.marketingPromptUpgrade {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(242, 247, 255, 0.99));
+}
+
+.marketingAdminStack {
+  display: grid;
+  gap: 18px;
+}
+
+@media (max-width: 1120px) {
+  .marketingStandaloneApp,
+  .marketingPromptOverviewGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .marketingPromptSidebar {
+    position: static;
+  }
+
+  .marketingPromptMetricsGrid,
+  .marketingPromptReportsGrid,
+  .marketingPromptPlanGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .marketingPromptFormGrid,
+  .marketingPromptAssetGrid,
+  .marketingPromptBudgetSummary,
+  .marketingPromptKeyValueGrid,
+  .marketingPromptMetricsGrid,
+  .marketingPromptReportsGrid,
+  .marketingPromptPlanGrid,
+  .marketingPromptStepBar {
+    grid-template-columns: 1fr;
+  }
+
+  .marketingPromptTopBar,
+  .marketingPromptWizardHeader,
+  .marketingPromptPanelHeader,
+  .marketingPromptRequestMeta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .marketingPromptWizardActions {
+    flex-direction: column;
+  }
+}
+
 @media (max-width: 960px) {
   .whatsappLayout {
     grid-template-columns: 1fr;

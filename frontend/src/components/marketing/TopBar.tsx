@@ -1,15 +1,24 @@
 type TopBarProps = {
+  eyebrow?: string;
   title: string;
   subtitle: string;
   onRefresh: () => void;
-  onNewRequest: () => void;
+  onNewRequest?: () => void;
+  primaryActionLabel?: string;
 };
 
-export default function MarketingTopBar({ title, subtitle, onRefresh, onNewRequest }: TopBarProps) {
+export default function MarketingTopBar({
+  eyebrow = "Marketing workspace",
+  title,
+  subtitle,
+  onRefresh,
+  onNewRequest,
+  primaryActionLabel = "New request",
+}: TopBarProps) {
   return (
     <header className="marketingPromptTopBar">
       <div>
-        <div className="marketingPromptLabel">Owner marketing workspace</div>
+        <div className="marketingPromptLabel">{eyebrow}</div>
         <h1 className="marketingPromptTopBarTitle">{title}</h1>
         <p className="marketingPromptTopBarSubtitle">{subtitle}</p>
       </div>
@@ -17,9 +26,11 @@ export default function MarketingTopBar({ title, subtitle, onRefresh, onNewReque
         <button className="btn ghost" type="button" onClick={onRefresh}>
           Refresh
         </button>
-        <button className="btn" type="button" onClick={onNewRequest}>
-          New request
-        </button>
+        {onNewRequest ? (
+          <button className="btn" type="button" onClick={onNewRequest}>
+            {primaryActionLabel}
+          </button>
+        ) : null}
       </div>
     </header>
   );

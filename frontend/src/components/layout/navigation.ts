@@ -31,6 +31,7 @@ export function crmNavGroups(options: { isAdmin: boolean; isOwnerLike: boolean }
         { label: "Inbox", to: "/inbox", icon: "IN" },
         { label: "Calls", to: "/calls", icon: "CL" },
         { label: "Calendar", to: "/apps", icon: "CA" },
+        { label: "Ads", to: "/ads", icon: "AD" },
       ],
     },
     {
@@ -98,6 +99,7 @@ export const adminNavGroups: NavGroup[] = [
       { label: "Razorpay Txns", to: "/admin#admin-transactions", icon: "TX" },
       { label: "Demo Accounts", to: "/admin#admin-demo-accounts", icon: "DM" },
       { label: "Revenue", to: "/admin#admin-revenue", icon: "RV" },
+      { label: "Marketing Accounts", to: "/admin#admin-marketing-accounts", icon: "MK" },
     ],
   },
   {
@@ -147,6 +149,7 @@ export function routeTitle(pathname: string) {
   if (pathname.startsWith("/whatsapp")) return "WhatsApp";
   if (pathname.startsWith("/inbox")) return "Inbox";
   if (pathname.startsWith("/calls")) return "Calls";
+  if (pathname.startsWith("/ads")) return "Ads";
   if (pathname.startsWith("/leaderboard")) return "Leaderboard";
   if (pathname.startsWith("/calc")) return "ROI Calculator";
   if (pathname.startsWith("/targets")) return "Targets";
@@ -171,6 +174,7 @@ export function routeBreadcrumb(pathname: string) {
   if (pathname.startsWith("/whatsapp")) return "Channels / WhatsApp";
   if (pathname.startsWith("/inbox")) return "Channels / Inbox";
   if (pathname.startsWith("/calls")) return "Channels / Calls";
+  if (pathname.startsWith("/ads")) return "Channels / Ads";
   if (pathname.startsWith("/leaderboard")) return "Intelligence / Leaderboard";
   if (pathname.startsWith("/calc")) return "Intelligence / ROI Calculator";
   if (pathname.startsWith("/targets")) return "Team / Targets";

@@ -21,6 +21,7 @@ import EnterprisePage from "./pages/EnterprisePage";
 import InsightsPage from "./pages/InsightsPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import LoginPage from "./pages/LoginPage";
+import MarketingPage from "./pages/MarketingPage";
 import PipelinePage from "./pages/PipelinePage";
 import PlaceholderWorkspacePage from "./pages/PlaceholderWorkspacePage";
 import PropertiesPage from "./pages/PropertiesPage";
@@ -67,6 +68,7 @@ function CrmRoutes({ isAdmin }: { isAdmin: boolean }) {
       />
       <Route path="/inbox" element={<Navigate to="/whatsapp" replace />} />
       <Route path="/calls" element={<CallsPage />} />
+      <Route path="/ads" element={<MarketingPage />} />
       <Route
         path="/automations"
         element={

@@ -1,6 +1,7 @@
 // MODIFIED: Phase 5 — Admin portal efficiency overhaul — Adds admin navigation, quick stats, user management, debounced search, pagination, and audited support actions.
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../api/client";
+import AdminAccountsPanel from "../components/marketing/AdminAccountsPanel";
 import RevenueGraph from "../components/RevenueGraph";
 import SubscriberDataTable from "../components/SubscriberDataTable";
 
@@ -760,6 +761,24 @@ export default function AdminPage() {
   })();
 
   const activeSubscriptions = displayRows.filter((row) => !row.enterprise_owner_id && !row.is_blacklisted && row.subscription_plan && row.subscription_plan !== "demo");
+  const marketingPortalOwners = useMemo(
+    () =>
+      displayRows
+        .filter(
+          (row) =>
+            !row.is_admin_account &&
+            !row.enterprise_owner_id &&
+            !row.is_blacklisted &&
+            ["enterprise", "builder"].includes((row.subscription_plan || row.plan || "").toLowerCase()),
+        )
+        .map((row) => ({
+          id: row.id,
+          email: row.email,
+          company: row.company || "",
+          plan: row.subscription_plan || row.plan || "free",
+        })),
+    [displayRows],
+  );
   const estimatedMrr = activeSubscriptions.reduce((sum, row) => {
     const amount = Number(row.subscription_amount_inr || 0);
     const isAnnual = row.subscription_cycle === "annual" || row.subscription_cycle === "yearly";
@@ -930,12 +949,13 @@ export default function AdminPage() {
           ["Users", "admin-users", "U"],
           ["Subscriptions", "admin-subscriptions", "S"],
           ["Revenue", "admin-revenue", "R"],
+          ["Marketing Accounts", "admin-marketing-accounts", "M"],
           ["Security", "admin-security", "A"],
           ["CRM Settings", "admin-settings", "C"],
           ["Org & Demo", "admin-organization", "O"],
           ["Enterprise", "admin-enterprise", "E"],
           ["AI Assign", "admin-ai-allocation", "I"],
-          ["Compliance", "admin-compliance", "M"],
+          ["Compliance", "admin-compliance", "Q"],
           ["Support", "admin-support", "P"],
           ["Logs", "admin-logs", "L"],
         ].map(([label, href, shortcut]) => (
@@ -1160,6 +1180,9 @@ export default function AdminPage() {
 
       <section id="admin-revenue">
         <RevenueGraph />
+      </section>
+      <section id="admin-marketing-accounts" className="adminAnchorTarget">
+        <AdminAccountsPanel owners={marketingPortalOwners} />
       </section>
       <section id="admin-subscriptions">
         <SubscriberDataTable />

@@ -76,8 +76,8 @@ def agency_manager_dashboard(
         )
     return {
         "total_requests": len(requests),
-        "pending_review": len([row for row in requests if row.status in {"submitted", "under_review"}]),
-        "in_progress": len([row for row in requests if row.status == "in_progress"]),
+        "pending_review": len([row for row in requests if row.status in {"submitted", "agency_review", "manager_review", "under_review"}]),
+        "in_progress": len([row for row in requests if row.status in {"forwarded_to_employee", "in_progress"}]),
         "completed_this_month": len([row for row in requests if row.status == "completed" and row.updated_at.month == utc_now_naive().month and row.updated_at.year == utc_now_naive().year]),
         "tasks_overdue": len([task for task in tasks if task.due_date and task.due_date < utc_now_naive().date() and task.status != "completed"]),
         "executive_workload": workload,
@@ -124,11 +124,17 @@ def agency_manager_update_request_status(
     """Update request status with manager-only transitions."""
     row = _manager_request_or_404(session, request_id, manager)
     allowed = {
-        "submitted": {"under_review"},
-        "under_review": {"approved", "changes_requested", "rejected"},
-        "approved": {"in_progress"},
+        "submitted": {"agency_review"},
+        "agency_review": {"agency_approved", "agency_rejected", "changes_requested"},
+        "agency_approved": {"manager_review"},
+        "manager_review": {"forwarded_to_employee", "changes_requested"},
+        "forwarded_to_employee": {"in_progress", "changes_requested"},
         "in_progress": {"completed", "changes_requested"},
-        "changes_requested": {"under_review", "approved"},
+        "changes_requested": {"agency_review", "manager_review"},
+        # Backward-compatible transitions for older rows still on legacy states.
+        "under_review": {"agency_approved", "agency_rejected", "changes_requested"},
+        "approved": {"manager_review", "in_progress"},
+        "rejected": {"agency_review"},
     }
     if payload.status != row.status and payload.status not in allowed.get(row.status, set()):
         raise HTTPException(status_code=400, detail=f"Invalid status transition from {row.status} to {payload.status}")
@@ -182,7 +188,7 @@ def agency_manager_create_task(
         updated_at=utc_now_naive(),
     )
     session.add(task)
-    row.status = "in_progress" if row.status in {"approved", "under_review", "submitted"} else row.status
+    row.status = "forwarded_to_employee" if row.status in {"agency_approved", "manager_review", "approved", "under_review", "submitted"} else row.status
     row.updated_at = utc_now_naive()
     session.add(row)
     session.commit()

@@ -1,5 +1,20 @@
 // In-memory GET response cache — survives route changes, expires after 45s.
 // Any mutating request (POST/PATCH/DELETE) clears the entire cache.
+import type {
+  AdminMarketingRequestRow,
+  MarketingAccount,
+  MarketingAccountAllotment,
+  MarketingAccountCreatePayload,
+  MarketingActivityLogEntry,
+  MarketingAddonStatusResponse,
+  MarketingMetrics,
+  MarketingNotification,
+  MarketingRequestCreatePayload,
+  MarketingRequestDetail,
+  MarketingRequestSummary,
+  MarketingWorkspaceAccess,
+} from "../types/marketing";
+
 const _apiCache = new Map<string, { data: unknown; exp: number }>();
 const _CACHE_TTL = 45_000;
 
@@ -233,6 +248,99 @@ export async function getWhatsAppConversation(contactId: string) {
 
 export async function getWhatsAppConfigStatus() {
   return api<WhatsAppConfigStatusRead>("/whatsapp/config-status");
+}
+
+export async function getMarketingWorkspace() {
+  return api<MarketingWorkspaceAccess>("/marketing/workspace");
+}
+
+export async function getMarketingAddonStatus() {
+  return api<MarketingAddonStatusResponse>("/marketing/addon");
+}
+
+export async function getMarketingMetrics() {
+  return api<MarketingMetrics>("/marketing/metrics");
+}
+
+export async function listMarketingRequests() {
+  return api<MarketingRequestSummary[]>("/marketing/requests");
+}
+
+export async function getMarketingRequest(requestId: string) {
+  return api<MarketingRequestDetail>(`/marketing/requests/${requestId}`);
+}
+
+export async function createMarketingRequest(payload: MarketingRequestCreatePayload) {
+  return api<MarketingRequestDetail>("/marketing/requests", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function addMarketingComment(requestId: string, message: string, taskId?: string | null) {
+  return api<MarketingRequestDetail["comments"][number]>(`/marketing/requests/${requestId}/comments`, {
+    method: "POST",
+    body: JSON.stringify({ message, task_id: taskId ?? null }),
+  });
+}
+
+export async function listMarketingApprovals(requestId: string) {
+  return api<MarketingRequestDetail["approvals"]>(`/marketing/requests/${requestId}/approvals`);
+}
+
+export async function ownerSignOffMarketingApproval(approvalId: string, action: "approved" | "changes_requested" | "rejected", note = "") {
+  return api<MarketingRequestDetail["approvals"][number]>(`/marketing/approvals/${approvalId}/owner-sign-off`, {
+    method: "PATCH",
+    body: JSON.stringify({ action, note }),
+  });
+}
+
+export async function listMarketingNotifications() {
+  return api<MarketingNotification[]>("/marketing/notifications");
+}
+
+export async function markMarketingNotificationRead(notificationId: string) {
+  return api<{ ok: boolean }>(`/marketing/notifications/${notificationId}/read`, {
+    method: "PATCH",
+  });
+}
+
+export async function listMarketingActivity(requestId: string) {
+  return api<MarketingActivityLogEntry[]>(`/marketing/requests/${requestId}/activity`);
+}
+
+export async function listAdminMarketingAccounts() {
+  return api<MarketingAccount[]>("/admin/marketing/accounts");
+}
+
+export async function createAdminMarketingAccount(payload: MarketingAccountCreatePayload) {
+  return api<MarketingAccount>("/admin/marketing/accounts", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function allotAdminMarketingAccount(accountId: string, enterpriseOwnerId: string, notes = "") {
+  return api<MarketingAccount>(`/admin/marketing/accounts/${accountId}/allot`, {
+    method: "POST",
+    body: JSON.stringify({ enterprise_owner_id: enterpriseOwnerId, notes }),
+  });
+}
+
+export async function revokeAdminMarketingAccount(accountId: string, notes = "") {
+  return api<MarketingAccount>(`/admin/marketing/accounts/${accountId}/revoke`, {
+    method: "POST",
+    body: JSON.stringify({ notes }),
+  });
+}
+
+export async function listAdminMarketingAccountAudit() {
+  return api<MarketingAccountAllotment[]>("/admin/marketing/accounts/audit");
+}
+
+export async function listAdminMarketingRequests(status?: string) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return api<AdminMarketingRequestRow[]>(`/admin/marketing/requests${query}`);
 }
 
 export async function sendWhatsAppMedia(contactId: string, caption: string, file: File) {
