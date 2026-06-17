@@ -142,6 +142,9 @@ def require_marketing_addon(
 ) -> MarketingAddonSubscription:
     """Ensure the CRM owner has an active marketing addon."""
     scope_owner_id = getattr(current_user, "enterprise_owner_id", None) or current_user.id
+    scope_owner = session.get(User, scope_owner_id)
+    if scope_owner and not bool(getattr(scope_owner, "marketing_portal_enabled", False)):
+        raise HTTPException(status_code=403, detail="Marketing portal access is not enabled for this account.")
     addon = session.exec(
         select(MarketingAddonSubscription)
         .where(MarketingAddonSubscription.enterprise_owner_id == scope_owner_id)

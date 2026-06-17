@@ -41,6 +41,8 @@ class User(SQLModel, table=True):
     subscription_amount_inr: int = 0
     subscription_started_at: Optional[datetime] = None
     subscription_expires_at: Optional[datetime] = None
+    marketing_portal_enabled: bool = False
+    marketing_portal_enabled_at: Optional[datetime] = None
 
 
 class Profile(SQLModel, table=True):

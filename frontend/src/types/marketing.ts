@@ -183,6 +183,7 @@ export type MarketingWorkspaceAccess = {
   role: MarketingRole | string;
   subscription_plan: string;
   crm_plan: string;
+  marketing_portal_enabled: boolean;
   active_addon_type: string | null;
   active_addon_status: string;
   request_allowed: boolean;
@@ -190,6 +191,22 @@ export type MarketingWorkspaceAccess = {
   allowed_addons: string[];
   upgrade_required: boolean;
   upgrade_message: string | null;
+};
+
+export type AdminMarketingAccessRecord = {
+  owner_id: string;
+  owner_email: string;
+  owner_name: string;
+  company: string;
+  city: string;
+  plan: string;
+  marketing_portal_enabled: boolean;
+  marketing_portal_enabled_at: string | null;
+  addon_type: string;
+  addon_status: string;
+  monthly_amount: number;
+  currency: string;
+  end_date: string | null;
 };
 
 export type MarketingRequestCreatePayload = {

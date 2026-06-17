@@ -2,6 +2,7 @@
 // Any mutating request (POST/PATCH/DELETE) clears the entire cache.
 import type {
   AdminMarketingRequestRow,
+  AdminMarketingAccessRecord,
   MarketingAccount,
   MarketingAccountAllotment,
   MarketingAccountCreatePayload,
@@ -341,6 +342,22 @@ export async function listAdminMarketingAccountAudit() {
 export async function listAdminMarketingRequests(status?: string) {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
   return api<AdminMarketingRequestRow[]>(`/admin/marketing/requests${query}`);
+}
+
+export async function listAdminMarketingAccess() {
+  return api<AdminMarketingAccessRecord[]>("/admin/marketing/access");
+}
+
+export async function setAdminMarketingAccess(payload: {
+  email: string;
+  marketing_portal_enabled: boolean;
+  addon_type: "none" | "marketing_assist" | "managed_marketing" | "ai_brand";
+  billing_term_months: number;
+}) {
+  return api<{ ok: boolean; message: string; record: AdminMarketingAccessRecord }>("/admin/marketing/access", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function sendWhatsAppMedia(contactId: string, caption: string, file: File) {

@@ -1,6 +1,6 @@
 // MODIFIED: Phase 5 — Admin portal efficiency overhaul — Adds admin navigation, quick stats, user management, debounced search, pagination, and audited support actions.
 import { useEffect, useMemo, useState } from "react";
-import { api, ApiError } from "../api/client";
+import { api, ApiError, setAdminMarketingAccess } from "../api/client";
 import AdminAccountsPanel from "../components/marketing/AdminAccountsPanel";
 import RevenueGraph from "../components/RevenueGraph";
 import SubscriberDataTable from "../components/SubscriberDataTable";
@@ -32,6 +32,11 @@ type AdminUserRow = {
   subscription_amount_inr: number;
   subscription_started_at: string | null;
   subscription_expires_at: string | null;
+  marketing_portal_enabled?: boolean;
+  marketing_portal_enabled_at?: string | null;
+  active_marketing_addon_type?: string;
+  active_marketing_addon_status?: string;
+  active_marketing_addon_end_date?: string | null;
   is_demo_account?: boolean;
   demo_plan?: string;
   enterprise_enabled_at: string | null;
@@ -226,6 +231,8 @@ type SubscriptionAnalytics = {
   note: string;
 };
 
+type MarketingAddonType = "none" | "marketing_assist" | "managed_marketing" | "ai_brand";
+
 type RbacPermissionGroup = {
   label: string;
   permissions: string[];
@@ -280,6 +287,21 @@ function demoPlanLabel(row: AdminUserRow) {
   if (row.plan === "enterprise") return "enterprise";
   if (row.plan === "builder") return "builder";
   return "solo";
+}
+
+function marketingAddonLabel(value: MarketingAddonType | string) {
+  if (value === "marketing_assist") return "Marketing Assist";
+  if (value === "managed_marketing") return "Managed Marketing";
+  if (value === "ai_brand") return "AI Brand";
+  return "No marketing subscription";
+}
+
+function marketingTermLabel(addonType: MarketingAddonType, termMonths: number) {
+  if (addonType === "none") return "No billing";
+  if (addonType === "ai_brand") {
+    return termMonths === 1 ? "Monthly billing" : `${termMonths}-month billing`;
+  }
+  return `${Math.max(3, termMonths)}-month minimum`;
 }
 
 function fallbackEmployeesFromUsers(rows: AdminUserRow[], selectedEnterpriseId: string): FallbackEmployeeRow[] {
@@ -380,6 +402,9 @@ const JOB_SEED: JobMonitorRow[] = [
 ];
 
 export default function AdminPage() {
+  const [adminSectionHash, setAdminSectionHash] = useState(() =>
+    typeof window !== "undefined" && window.location.hash ? window.location.hash : "#admin-dashboard",
+  );
   const [rows, setRows] = useState<AdminUserRow[]>([]);
   const [enterprises, setEnterprises] = useState<EnterpriseDetail[]>([]);
   const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string>("");
@@ -428,6 +453,19 @@ export default function AdminPage() {
   const [planValue, setPlanValue] = useState<"free" | "enterprise" | "builder">("enterprise");
   const [planBusy, setPlanBusy] = useState(false);
   const [planMsg, setPlanMsg] = useState<string | null>(null);
+  const [marketingAccessForm, setMarketingAccessForm] = useState<{
+    email: string;
+    marketing_portal_enabled: boolean;
+    addon_type: MarketingAddonType;
+    billing_term_months: number;
+  }>({
+    email: "",
+    marketing_portal_enabled: true,
+    addon_type: "marketing_assist",
+    billing_term_months: 3,
+  });
+  const [marketingAccessBusy, setMarketingAccessBusy] = useState(false);
+  const [marketingAccessMsg, setMarketingAccessMsg] = useState<string | null>(null);
   const [demoForm, setDemoForm] = useState({
     email: "",
     password: "",
@@ -686,6 +724,8 @@ export default function AdminPage() {
   const aiAssignedRows = displayRows.filter((row) => hasEffectiveAiAccess(row));
   const aiUnassignedRows = displayRows.filter((row) => !hasEffectiveAiAccess(row));
   const ownerSelectableRows = displayRows.filter((row) => !row.is_admin_account && !row.enterprise_owner_id);
+  const selectedMarketingOwner =
+    ownerSelectableRows.find((row) => row.email === marketingAccessForm.email) ?? null;
   const aiSelectableRows = displayRows.filter((row) => !row.is_demo_account);
   const filteredAiUnassignedRows = aiUnassignedRows.filter((row) => {
     const q = aiAssignmentSearch.trim().toLowerCase();
@@ -779,6 +819,38 @@ export default function AdminPage() {
         })),
     [displayRows],
   );
+  useEffect(() => {
+    const syncHash = () => {
+      setAdminSectionHash(window.location.hash || "#admin-dashboard");
+    };
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
+  useEffect(() => {
+    if (!selectedMarketingOwner) return;
+    setMarketingAccessForm((current) => {
+      const nextAddon = ((selectedMarketingOwner.active_marketing_addon_type || "none") as MarketingAddonType);
+      const nextPortal = Boolean(selectedMarketingOwner.marketing_portal_enabled);
+      if (
+        current.email === selectedMarketingOwner.email &&
+        current.addon_type === nextAddon &&
+        current.marketing_portal_enabled === nextPortal
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        email: selectedMarketingOwner.email,
+        marketing_portal_enabled: nextPortal,
+        addon_type: nextAddon,
+        billing_term_months:
+          nextAddon === "ai_brand"
+            ? Math.max(1, current.billing_term_months || 1)
+            : Math.max(3, current.billing_term_months || 3),
+      };
+    });
+  }, [selectedMarketingOwner]);
   const estimatedMrr = activeSubscriptions.reduce((sum, row) => {
     const amount = Number(row.subscription_amount_inr || 0);
     const isAnnual = row.subscription_cycle === "annual" || row.subscription_cycle === "yearly";
@@ -949,6 +1021,7 @@ export default function AdminPage() {
           ["Users", "admin-users", "U"],
           ["Subscriptions", "admin-subscriptions", "S"],
           ["Revenue", "admin-revenue", "R"],
+          ["Marketing Access", "admin-marketing-access", "X"],
           ["Marketing Accounts", "admin-marketing-accounts", "M"],
           ["Security", "admin-security", "A"],
           ["CRM Settings", "admin-settings", "C"],
@@ -959,7 +1032,11 @@ export default function AdminPage() {
           ["Support", "admin-support", "P"],
           ["Logs", "admin-logs", "L"],
         ].map(([label, href, shortcut]) => (
-          <a key={href} href={`#${href}`} className="adminNavItem">
+          <a
+            key={href}
+            href={`#${href}`}
+            className={`adminNavItem ${adminSectionHash === `#${href}` ? "active" : ""}`}
+          >
             <span>{label}</span>
             <kbd>{shortcut}</kbd>
           </a>
@@ -1180,6 +1257,218 @@ export default function AdminPage() {
 
       <section id="admin-revenue">
         <RevenueGraph />
+      </section>
+      <section id="admin-marketing-access" className="card premiumPanel adminAnchorTarget">
+        <div className="sectionHeader">
+          <div>
+            <div className="cardTitle">Marketing portal access</div>
+            <div className="muted">
+              Enable the marketing portal and assign a paid marketing subscription. Marketing Assist and Managed Marketing are billed with a minimum 3-month term. AI Brand can be billed monthly or for longer terms.
+            </div>
+          </div>
+        </div>
+        <form
+          className="form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!marketingAccessForm.email.trim()) return;
+            setMarketingAccessBusy(true);
+            setMarketingAccessMsg(null);
+            try {
+              const nextTermMonths =
+                marketingAccessForm.addon_type === "ai_brand"
+                  ? Math.max(1, marketingAccessForm.billing_term_months || 1)
+                  : marketingAccessForm.addon_type === "none"
+                    ? 1
+                    : Math.max(3, marketingAccessForm.billing_term_months || 3);
+              const response = await setAdminMarketingAccess({
+                email: marketingAccessForm.email.trim(),
+                marketing_portal_enabled: marketingAccessForm.marketing_portal_enabled,
+                addon_type: marketingAccessForm.addon_type,
+                billing_term_months: nextTermMonths,
+              });
+              setMarketingAccessMsg(response.message || "Marketing access updated.");
+              await load(selectedEnterpriseId);
+            } catch (err) {
+              setMarketingAccessMsg(err instanceof Error ? err.message : "Could not update marketing access");
+            } finally {
+              setMarketingAccessBusy(false);
+            }
+          }}
+        >
+          <div className="grid2">
+            <label>
+              Owner account
+              <select
+                value={marketingAccessForm.email}
+                onChange={(e) =>
+                  setMarketingAccessForm((current) => ({
+                    ...current,
+                    email: e.target.value,
+                  }))
+                }
+              >
+                <option value="">Select eligible owner</option>
+                {ownerSelectableRows
+                  .filter((row) => row.plan === "enterprise" || row.plan === "builder")
+                  .map((row) => (
+                    <option key={row.id} value={row.email}>
+                      {row.email}{row.company ? ` · ${row.company}` : ""} · {row.plan === "builder" ? "Builder" : "Enterprise"}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Portal access
+              <select
+                value={marketingAccessForm.marketing_portal_enabled ? "enabled" : "disabled"}
+                onChange={(e) =>
+                  setMarketingAccessForm((current) => ({
+                    ...current,
+                    marketing_portal_enabled: e.target.value === "enabled",
+                  }))
+                }
+              >
+                <option value="enabled">Enabled</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </label>
+          </div>
+          <div className="grid2">
+            <label>
+              Marketing subscription
+              <select
+                value={marketingAccessForm.addon_type}
+                onChange={(e) => {
+                  const nextAddon = (e.target.value as MarketingAddonType) || "none";
+                  setMarketingAccessForm((current) => ({
+                    ...current,
+                    addon_type: nextAddon,
+                    billing_term_months:
+                      nextAddon === "none"
+                        ? 1
+                        : nextAddon === "ai_brand"
+                          ? Math.max(1, current.billing_term_months || 1)
+                          : Math.max(3, current.billing_term_months || 3),
+                  }));
+                }}
+              >
+                <option value="none">No marketing subscription</option>
+                <option value="marketing_assist">Marketing Assist</option>
+                <option value="managed_marketing">Managed Marketing</option>
+                <option value="ai_brand">AI Brand</option>
+              </select>
+            </label>
+            <label>
+              Billing term
+              <select
+                value={String(marketingAccessForm.billing_term_months)}
+                onChange={(e) =>
+                  setMarketingAccessForm((current) => ({
+                    ...current,
+                    billing_term_months: Number(e.target.value) || 1,
+                  }))
+                }
+                disabled={marketingAccessForm.addon_type === "none"}
+              >
+                {marketingAccessForm.addon_type === "ai_brand" ? (
+                  <>
+                    <option value="1">1 month</option>
+                    <option value="3">3 months</option>
+                    <option value="6">6 months</option>
+                    <option value="12">12 months</option>
+                  </>
+                ) : marketingAccessForm.addon_type === "none" ? (
+                  <option value="1">No billing</option>
+                ) : (
+                  <>
+                    <option value="3">3 months</option>
+                    <option value="6">6 months</option>
+                    <option value="12">12 months</option>
+                  </>
+                )}
+              </select>
+            </label>
+          </div>
+          {selectedMarketingOwner ? (
+            <div className="statsGrid">
+              <div className="statCard">
+                <div className="statLabel">Current portal access</div>
+                <div className="statValue">
+                  {selectedMarketingOwner.marketing_portal_enabled ? "Enabled" : "Disabled"}
+                </div>
+                <div className="statHint">
+                  {selectedMarketingOwner.marketing_portal_enabled_at
+                    ? `Enabled at ${fmtDt(selectedMarketingOwner.marketing_portal_enabled_at)}`
+                    : "No portal access has been granted yet."}
+                </div>
+              </div>
+              <div className="statCard">
+                <div className="statLabel">Current marketing subscription</div>
+                <div className="statValue">
+                  {marketingAddonLabel(selectedMarketingOwner.active_marketing_addon_type || "none")}
+                </div>
+                <div className="statHint">
+                  Status: {selectedMarketingOwner.active_marketing_addon_status || "none"}{selectedMarketingOwner.active_marketing_addon_end_date ? ` · ends ${fmtDt(selectedMarketingOwner.active_marketing_addon_end_date)}` : ""}
+                </div>
+              </div>
+              <div className="statCard">
+                <div className="statLabel">Billing rule</div>
+                <div className="statValue">
+                  {marketingTermLabel(marketingAccessForm.addon_type, marketingAccessForm.billing_term_months)}
+                </div>
+                <div className="statHint">
+                  Assist and Managed Marketing always start at 3 months. AI Brand can stay monthly or extend if the user prefers.
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {marketingAccessMsg ? <div className="alert ok">{marketingAccessMsg}</div> : null}
+          <button className="btn" type="submit" disabled={marketingAccessBusy || !marketingAccessForm.email.trim()}>
+            {marketingAccessBusy ? "Saving..." : "Save marketing access"}
+          </button>
+        </form>
+
+        <div className="tableWrap adminTableOffset">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Owner</th>
+                <th>Plan</th>
+                <th>Portal</th>
+                <th>Marketing subscription</th>
+                <th>Status</th>
+                <th>Ends</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ownerSelectableRows
+                .filter((row) => row.plan === "enterprise" || row.plan === "builder")
+                .map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      <div className="tdTitle">{row.email}</div>
+                      <div className="muted small">{row.company || row.full_name || "-"}</div>
+                    </td>
+                    <td>{row.plan === "builder" ? "Builder" : "Enterprise"}</td>
+                    <td>
+                      <span className={`statusPill ${row.marketing_portal_enabled ? "active" : "cancelled"}`}>
+                        {row.marketing_portal_enabled ? "Enabled" : "Disabled"}
+                      </span>
+                    </td>
+                    <td>{marketingAddonLabel(row.active_marketing_addon_type || "none")}</td>
+                    <td>{row.active_marketing_addon_status || "none"}</td>
+                    <td>{fmtDt(row.active_marketing_addon_end_date || null)}</td>
+                  </tr>
+                ))}
+              {!ownerSelectableRows.filter((row) => row.plan === "enterprise" || row.plan === "builder").length ? (
+                <tr>
+                  <td colSpan={6} className="muted">No Enterprise or Builder owners are available for marketing access yet.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
       </section>
       <section id="admin-marketing-accounts" className="adminAnchorTarget">
         <AdminAccountsPanel owners={marketingPortalOwners} />

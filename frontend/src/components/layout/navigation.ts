@@ -99,6 +99,7 @@ export const adminNavGroups: NavGroup[] = [
       { label: "Razorpay Txns", to: "/admin#admin-transactions", icon: "TX" },
       { label: "Demo Accounts", to: "/admin#admin-demo-accounts", icon: "DM" },
       { label: "Revenue", to: "/admin#admin-revenue", icon: "RV" },
+      { label: "Marketing Access", to: "/admin#admin-marketing-access", icon: "MA" },
       { label: "Marketing Accounts", to: "/admin#admin-marketing-accounts", icon: "MK" },
     ],
   },

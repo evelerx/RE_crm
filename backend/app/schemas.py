@@ -156,6 +156,13 @@ class AdminSetPlanRequest(BaseModel):
     plan: str = Field(pattern="^(free|enterprise|builder)$")
 
 
+class AdminSetMarketingAccessRequest(BaseModel):
+    email: str
+    marketing_portal_enabled: bool = False
+    addon_type: str = Field(default="none", pattern="^(none|marketing_assist|managed_marketing|ai_brand)$")
+    billing_term_months: int = Field(default=3, ge=1, le=24)
+
+
 class AdminSetEmployeeLimitRequest(BaseModel):
     email: str
     employee_limit: int = Field(ge=0, le=10000)
@@ -748,6 +755,7 @@ class MarketingWorkspaceAccessRead(BaseModel):
     role: str
     subscription_plan: str
     crm_plan: str
+    marketing_portal_enabled: bool = False
     active_addon_type: Optional[str] = None
     active_addon_status: str = ""
     request_allowed: bool = False

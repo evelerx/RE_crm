@@ -70,24 +70,37 @@ def marketing_workspace_access(
         .where(MarketingAddonSubscription.enterprise_owner_id == owner_id)
         .order_by(MarketingAddonSubscription.created_at.desc())
     ).first()
+    addon_active = bool(addon and addon.status == "active" and (not addon.end_date or addon.end_date >= date.today()))
     subscription_plan = _effective_subscription_plan(current_user)
     allowed_addons = allowed_marketing_addons_for_plan(subscription_plan)
     managed_allowed = managed_marketing_allowed_for_plan(subscription_plan)
     is_admin = (settings.admin_email or "").strip().lower() == (current_user.email or "").strip().lower()
-    upgrade_required = not bool(allowed_addons)
-    upgrade_message = (
-        "Upgrade to Enterprise or Builder to unlock marketing requests."
-        if upgrade_required
-        else ("Managed Marketing requires Enterprise or Builder access." if not managed_allowed else None)
-    )
+    portal_enabled = bool(is_admin or getattr(session.get(User, owner_id) or current_user, "marketing_portal_enabled", False))
+    request_allowed = bool(portal_enabled and allowed_addons and addon_active)
+    if not portal_enabled:
+        upgrade_required = True
+        upgrade_message = "Admin has not enabled Marketing Portal access for this account yet."
+    elif not allowed_addons:
+        upgrade_required = True
+        upgrade_message = "Upgrade to Enterprise or Builder to unlock marketing requests."
+    elif not addon_active:
+        upgrade_required = True
+        upgrade_message = "No active marketing subscription is assigned yet. Ask admin to assign Marketing Assist, Managed Marketing, or AI Brand."
+    elif not managed_allowed:
+        upgrade_required = False
+        upgrade_message = "Managed Marketing requires Enterprise or Builder access."
+    else:
+        upgrade_required = False
+        upgrade_message = None
 
     return MarketingWorkspaceAccessRead(
         role="admin" if is_admin else "subscriber",
         subscription_plan=subscription_plan,
         crm_plan=(current_user.plan or "free"),
+        marketing_portal_enabled=portal_enabled,
         active_addon_type=normalize_marketing_addon_type(addon.addon_type) if addon else None,
         active_addon_status=addon.status if addon else "",
-        request_allowed=bool(allowed_addons),
+        request_allowed=request_allowed,
         managed_marketing_allowed=managed_allowed,
         allowed_addons=allowed_addons,
         upgrade_required=upgrade_required,

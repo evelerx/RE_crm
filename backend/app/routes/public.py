@@ -42,8 +42,8 @@ PLAN_RULES = {
 
 MARKETING_RULES = {
     "none": {"monthly": 0, "label": "CRM only"},
-    "marketing_assist": {"monthly": 14999, "label": "CRM + Marketing Assist"},
-    "managed_marketing": {"monthly": 29999, "label": "CRM + Managed Marketing"},
+    "marketing_assist": {"monthly": 18000, "label": "CRM + Marketing Assist"},
+    "managed_marketing": {"monthly": 25000, "label": "CRM + Managed Marketing"},
 }
 
 BILLING_MONTHS = {

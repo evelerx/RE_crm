@@ -420,6 +420,10 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "user", "subscription_started_at DATETIME")
             if "subscription_expires_at" not in cols:
                 _sqlite_add_column(conn, "user", "subscription_expires_at DATETIME")
+            if "marketing_portal_enabled" not in cols:
+                _sqlite_add_column(conn, "user", "marketing_portal_enabled BOOLEAN DEFAULT 0")
+            if "marketing_portal_enabled_at" not in cols:
+                _sqlite_add_column(conn, "user", "marketing_portal_enabled_at DATETIME")
 
 
 def _postgres_best_effort_migrate() -> None:
@@ -462,6 +466,8 @@ def _postgres_best_effort_migrate() -> None:
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_amount_inr INTEGER DEFAULT 0;
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_started_at TIMESTAMP;
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMP;
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS marketing_portal_enabled BOOLEAN DEFAULT FALSE;
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS marketing_portal_enabled_at TIMESTAMP;
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'open';
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS closed_by_user_id UUID;
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS closed_by_user_name VARCHAR DEFAULT '';

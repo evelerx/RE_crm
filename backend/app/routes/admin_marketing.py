@@ -9,13 +9,49 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from ..db import get_session
-from ..marketing_support import allowed_marketing_addons_for_plan, ensure_marketing_account_seed, normalize_marketing_addon_type, profile_summary, utc_now_naive
+from ..audit import log_audit_event
+from ..marketing_support import addon_price_map, allowed_marketing_addons_for_plan, ensure_marketing_account_seed, normalize_marketing_addon_type, profile_summary, utc_now_naive
 from ..models import MarketingAccount, MarketingAccountAllotment, MarketingAddonSubscription, MarketingRequest, User
-from ..schemas import MarketingAccountAllotRequest, MarketingAccountCreate, MarketingAccountAllotmentRead, MarketingAccountRead, MarketingAccountRevokeRequest
+from ..schemas import (
+    AdminSetMarketingAccessRequest,
+    MarketingAccountAllotRequest,
+    MarketingAccountAllotmentRead,
+    MarketingAccountCreate,
+    MarketingAccountRead,
+    MarketingAccountRevokeRequest,
+)
 from .admin import require_admin
 
 
 router = APIRouter(prefix="/admin/marketing", tags=["admin-marketing"])
+
+
+def _active_addon_for_owner(session: Session, owner_id: UUID) -> MarketingAddonSubscription | None:
+    return session.exec(
+        select(MarketingAddonSubscription)
+        .where(MarketingAddonSubscription.enterprise_owner_id == owner_id)
+        .order_by(MarketingAddonSubscription.updated_at.desc(), MarketingAddonSubscription.created_at.desc())
+    ).first()
+
+
+def _serialize_marketing_access(session: Session, owner: User) -> dict:
+    addon = _active_addon_for_owner(session, owner.id)
+    company, city, owner_name = profile_summary(session, owner.id)
+    return {
+        "owner_id": str(owner.id),
+        "owner_email": owner.email,
+        "owner_name": owner_name,
+        "company": company,
+        "city": city,
+        "plan": (owner.plan or owner.subscription_plan or "free"),
+        "marketing_portal_enabled": bool(getattr(owner, "marketing_portal_enabled", False)),
+        "marketing_portal_enabled_at": getattr(owner, "marketing_portal_enabled_at", None),
+        "addon_type": normalize_marketing_addon_type(addon.addon_type) if addon and addon.status == "active" else "none",
+        "addon_status": addon.status if addon else "none",
+        "monthly_amount": float(addon.monthly_amount or 0) if addon else 0,
+        "currency": addon.currency if addon else "INR",
+        "end_date": addon.end_date if addon else None,
+    }
 
 
 def _serialize_marketing_account(session: Session, account: MarketingAccount) -> MarketingAccountRead:
@@ -187,6 +223,103 @@ def admin_marketing_account_audit(
 
     rows = session.exec(select(MarketingAccountAllotment).order_by(MarketingAccountAllotment.created_at.desc())).all()
     return [_serialize_allotment(session, row) for row in rows]
+
+
+@router.get("/access")
+def admin_marketing_access_overview(
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> list[dict]:
+    """Return owner-level marketing portal and addon access state for admin controls."""
+
+    owners = session.exec(select(User).where(User.enterprise_owner_id.is_(None)).order_by(User.created_at.desc())).all()
+    rows: list[dict] = []
+    for owner in owners:
+        if (owner.plan or "free") not in {"enterprise", "builder"}:
+            continue
+        rows.append(_serialize_marketing_access(session, owner))
+    return rows
+
+
+@router.post("/access")
+def admin_set_marketing_access(
+    payload: AdminSetMarketingAccessRequest,
+    session: Session = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> dict:
+    """Enable marketing portal access and optionally assign a paid marketing subscription."""
+
+    owner = session.exec(select(User).where(User.email == payload.email.strip().lower())).first()
+    if not owner:
+        raise HTTPException(status_code=404, detail="Subscription user not found")
+    if owner.enterprise_owner_id:
+        raise HTTPException(status_code=400, detail="Assign marketing access to the owner account, not an employee account.")
+
+    plan = (owner.plan or owner.subscription_plan or "free").strip().lower()
+    addon_type = normalize_marketing_addon_type(payload.addon_type)
+    allowed_addons = allowed_marketing_addons_for_plan(plan)
+    if addon_type != "none" and addon_type not in allowed_addons:
+        raise HTTPException(status_code=400, detail="Selected plan is not eligible for this marketing subscription.")
+
+    term_months = int(payload.billing_term_months or 1)
+    if addon_type in {"marketing_assist", "managed_marketing"} and term_months < 3:
+        raise HTTPException(status_code=400, detail="Marketing Assist and Managed Marketing require a minimum 3-month billing term.")
+
+    owner.marketing_portal_enabled = bool(payload.marketing_portal_enabled)
+    owner.marketing_portal_enabled_at = utc_now_naive() if owner.marketing_portal_enabled else None
+    session.add(owner)
+
+    addon = _active_addon_for_owner(session, owner.id)
+    if addon_type == "none":
+        if addon and addon.status == "active":
+            addon.status = "cancelled"
+            addon.end_date = utc_now_naive().date()
+            addon.updated_at = utc_now_naive()
+            session.add(addon)
+    else:
+        monthly_amount, default_term_days = addon_price_map(addon_type)
+        term_days = max(default_term_days, term_months * 30)
+        if addon:
+            addon.addon_type = addon_type
+            addon.status = "active"
+            addon.monthly_amount = monthly_amount
+            addon.currency = "INR"
+            addon.start_date = addon.start_date or utc_now_naive().date()
+            addon.end_date = utc_now_naive().date() + timedelta(days=term_days)
+            addon.updated_at = utc_now_naive()
+        else:
+            addon = MarketingAddonSubscription(
+                enterprise_owner_id=owner.id,
+                addon_type=addon_type,
+                status="active",
+                start_date=utc_now_naive().date(),
+                end_date=utc_now_naive().date() + timedelta(days=term_days),
+                monthly_amount=monthly_amount,
+                currency="INR",
+                created_at=utc_now_naive(),
+                updated_at=utc_now_naive(),
+            )
+        session.add(addon)
+
+    log_notes = (
+        f"portal_enabled={owner.marketing_portal_enabled} addon={addon_type} term_months={term_months}"
+    )
+    log_audit_event(
+        session,
+        actor=admin_user,
+        kind="admin.set_marketing_access",
+        summary=f"Updated marketing access for {owner.email}",
+        detail=log_notes,
+        target_user_id=owner.id,
+        enterprise_owner_id=owner.id,
+    )
+    session.commit()
+    return {
+        "ok": True,
+        "message": "Marketing portal access updated.",
+        "audit_detail": log_notes,
+        "record": _serialize_marketing_access(session, owner),
+    }
 
 
 @router.get("/addons")

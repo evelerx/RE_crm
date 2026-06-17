@@ -15,7 +15,7 @@ from ..auth import decode_token, get_current_user, hash_password, is_admin_email
 from ..crypto import decrypt_if_configured, encrypt_if_configured
 from ..db import delete_demo_account_tree, get_session
 from ..enterprise_scope import count_org_records, employee_record_counts, org_owner_filter
-from ..models import Activity, AuditEvent, Contact, Deal, Profile, SupportChatMessage, User
+from ..models import Activity, AuditEvent, Contact, Deal, MarketingAddonSubscription, Profile, SupportChatMessage, User
 from ..schemas import (
     AdminBlacklistRequest,
     AdminCreateDemoAccountRequest,
@@ -657,6 +657,13 @@ def users(
     user_ids = [u.id for u in user_list]
     profiles = session.exec(select(Profile).where(Profile.owner_id.in_(user_ids))).all() if user_ids else []
     profile_by_owner = {profile.owner_id: profile for profile in profiles}
+    addon_rows = session.exec(
+        select(MarketingAddonSubscription).order_by(MarketingAddonSubscription.updated_at.desc(), MarketingAddonSubscription.created_at.desc())
+    ).all()
+    addon_by_owner: dict[UUID, MarketingAddonSubscription] = {}
+    for addon in addon_rows:
+        if addon.enterprise_owner_id not in addon_by_owner:
+            addon_by_owner[addon.enterprise_owner_id] = addon
     employee_counts: dict[UUID, int] = {}
     for user in user_list:
         owner_id = getattr(user, "enterprise_owner_id", None)
@@ -667,6 +674,7 @@ def users(
         last_seen_at: Optional[datetime] = _normalize_db_datetime(u.last_seen_at)
         is_online = bool(last_seen_at and last_seen_at >= online_cutoff)
         profile = profile_by_owner.get(u.id)
+        addon = addon_by_owner.get(u.id)
 
         out.append(
             {
@@ -694,6 +702,11 @@ def users(
                 "subscription_amount_inr": int(getattr(u, "subscription_amount_inr", 0) or 0),
                 "subscription_started_at": getattr(u, "subscription_started_at", None),
                 "subscription_expires_at": getattr(u, "subscription_expires_at", None),
+                "marketing_portal_enabled": bool(getattr(u, "marketing_portal_enabled", False)),
+                "marketing_portal_enabled_at": getattr(u, "marketing_portal_enabled_at", None),
+                "active_marketing_addon_type": ((addon.addon_type or "").strip().lower() if addon and addon.status == "active" else ""),
+                "active_marketing_addon_status": (addon.status if addon else ""),
+                "active_marketing_addon_end_date": (addon.end_date if addon else None),
                 "is_demo_account": ((getattr(u, "subscription_plan", "") or "").strip().lower() == "demo"),
                 "demo_plan": _demo_plan_from_user(u) if ((getattr(u, "subscription_plan", "") or "").strip().lower() == "demo") else "",
                 "enterprise_enabled_at": getattr(u, "enterprise_enabled_at", None),
