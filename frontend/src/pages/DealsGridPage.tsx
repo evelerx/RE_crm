@@ -405,8 +405,8 @@ export default function DealsGridPage() {
               <div className="muted">
                 No closures yet
                 <button
-                  className="btnSecondary"
-                  style={{ display: "block", marginTop: 10, fontSize: 12 }}
+                  className="btn"
+                  style={{ marginTop: 10, width: "100%" }}
                   disabled={backfilling}
                   onClick={async () => {
                     setBackfilling(true);
