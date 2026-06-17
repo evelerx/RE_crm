@@ -1,86 +1,136 @@
-// MODIFIED: Part 5D — Properties / inventory page scaffold — Adds the requested inventory workspace UI without touching core CRM logic.
-import { useMemo, useState } from "react";
+// MODIFIED: Inventory-to-deals wiring — Replaces the fake inventory seed with live CRM deal-backed properties, plus add-property and status update actions.
+import { useEffect, useMemo, useState } from "react";
 
-type UnitStatus = "available" | "soft_hold" | "blocked" | "sold";
+import { api } from "../api/client";
+import type { Deal } from "../api/types";
 
-type Unit = {
-  id: string;
-  label: string;
+type InventoryStatus = Deal["inventory_status"];
+
+type PropertyForm = {
+  title: string;
+  asset_type: Deal["asset_type"];
+  city: string;
   area: string;
-  floor: string;
-  type: string;
-  price: string;
-  status: UnitStatus;
+  typology: string;
+  ticket_size: string;
+  inventory_status: InventoryStatus;
 };
 
-type Project = {
-  id: string;
-  name: string;
-  location: string;
-  propertyType: string;
-  units: Unit[];
+const emptyForm: PropertyForm = {
+  title: "",
+  asset_type: "residential",
+  city: "",
+  area: "",
+  typology: "",
+  ticket_size: "",
+  inventory_status: "available",
 };
 
-const projectsSeed: Project[] = [
-  {
-    id: "project-1",
-    name: "Palm Avenue Residences",
-    location: "Pune West",
-    propertyType: "Residential",
-    units: [
-      { id: "u-101", label: "101", area: "785 sq ft", floor: "1", type: "2 BHK", price: "₹78L", status: "available" },
-      { id: "u-102", label: "102", area: "820 sq ft", floor: "1", type: "2 BHK", price: "₹81L", status: "soft_hold" },
-      { id: "u-201", label: "201", area: "1105 sq ft", floor: "2", type: "3 BHK", price: "₹1.14Cr", status: "blocked" },
-      { id: "u-202", label: "202", area: "1105 sq ft", floor: "2", type: "3 BHK", price: "₹1.16Cr", status: "sold" },
-    ],
-  },
-  {
-    id: "project-2",
-    name: "Trade Square",
-    location: "Thane Central",
-    propertyType: "Commercial",
-    units: [
-      { id: "c-11", label: "C11", area: "420 sq ft", floor: "Ground", type: "Retail", price: "₹1.42Cr", status: "available" },
-      { id: "c-12", label: "C12", area: "420 sq ft", floor: "Ground", type: "Retail", price: "₹1.39Cr", status: "available" },
-      { id: "c-18", label: "C18", area: "670 sq ft", floor: "1", type: "Office", price: "₹1.95Cr", status: "soft_hold" },
-    ],
-  },
-];
+function formatTicket(value: number | null) {
+  if (value == null) return "-";
+  return `₹${Math.round(value).toLocaleString("en-IN")}`;
+}
+
+function normalizeStatus(deal: Deal): InventoryStatus {
+  if (deal.inventory_status) return deal.inventory_status;
+  if (deal.stage === "closed" || deal.status === "closed") return "sold";
+  if (deal.stage === "lost" || deal.status === "lost") return "blocked";
+  return "available";
+}
 
 export default function PropertiesPage() {
-  const [projects, setProjects] = useState(projectsSeed);
-  const [selectedProjectId, setSelectedProjectId] = useState(projectsSeed[0]?.id ?? "");
-  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [form, setForm] = useState<PropertyForm>(emptyForm);
 
-  const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId) ?? projects[0],
-    [projects, selectedProjectId],
-  );
-  const selectedUnit = selectedProject?.units.find((unit) => unit.id === selectedUnitId) ?? null;
-
-  function statusCounts(project: Project) {
-    return project.units.reduce(
-      (acc, unit) => {
-        acc.total += 1;
-        acc[unit.status] += 1;
-        return acc;
-      },
-      { total: 0, available: 0, soft_hold: 0, blocked: 0, sold: 0 },
-    );
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const rows = await api<Deal[]>("/deals");
+      const withStatus = rows.map((row) => ({ ...row, inventory_status: normalizeStatus(row) }));
+      setDeals(withStatus);
+      setSelectedId((current) => current ?? withStatus[0]?.id ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load inventory.");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function setUnitStatus(status: UnitStatus) {
-    if (!selectedProject || !selectedUnitId) return;
-    setProjects((current) =>
-      current.map((project) =>
-        project.id !== selectedProject.id
-          ? project
-          : {
-              ...project,
-              units: project.units.map((unit) => (unit.id === selectedUnitId ? { ...unit, status } : unit)),
-            },
-      ),
-    );
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const grouped = useMemo(() => {
+    const counts = { total: deals.length, available: 0, soft_hold: 0, blocked: 0, sold: 0 };
+    for (const deal of deals) {
+      counts[normalizeStatus(deal)] += 1;
+    }
+    return counts;
+  }, [deals]);
+
+  const selected = useMemo(() => deals.find((deal) => deal.id === selectedId) ?? null, [deals, selectedId]);
+
+  async function updateInventoryStatus(status: InventoryStatus) {
+    if (!selected) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const payload: Partial<Deal> = { inventory_status: status };
+      if (status === "sold") {
+        payload.stage = "closed";
+      }
+      const updated = await api<Deal>(`/deals/${selected.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      const normalized = { ...updated, inventory_status: normalizeStatus(updated) };
+      setDeals((current) => current.map((row) => (row.id === selected.id ? normalized : row)));
+      setMessage(`Inventory status updated to ${status.replace("_", " ")}.`);
+      window.setTimeout(() => setMessage(null), 2200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update property status.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function createProperty(event: React.FormEvent) {
+    event.preventDefault();
+    if (!form.title.trim()) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const created = await api<Deal>("/deals", {
+        method: "POST",
+        body: JSON.stringify({
+          title: form.title.trim(),
+          asset_type: form.asset_type,
+          city: form.city.trim(),
+          area: form.area.trim(),
+          typology: form.typology.trim(),
+          ticket_size: form.ticket_size ? Number(form.ticket_size) : null,
+          inventory_status: form.inventory_status,
+          stage: form.inventory_status === "sold" ? "closed" : "lead",
+        }),
+      });
+      const normalized = { ...created, inventory_status: normalizeStatus(created) };
+      setDeals((current) => [normalized, ...current]);
+      setSelectedId(normalized.id);
+      setForm(emptyForm);
+      setMessage("Property added to inventory.");
+      window.setTimeout(() => setMessage(null), 2200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not add property.");
+    } finally {
+      setCreating(false);
+    }
   }
 
   return (
@@ -88,83 +138,155 @@ export default function PropertiesPage() {
       <div className="pageHeader">
         <div>
           <div className="h1">Properties</div>
-          <div className="muted">Track project inventory, unit status, and deal linkage at a glance.</div>
+          <div className="muted">Track live project inventory from real deal records and add new properties directly here.</div>
         </div>
+        <button className="btn ghost" type="button" onClick={() => void load()} disabled={loading}>
+          {loading ? "Refreshing..." : "Refresh"}
+        </button>
       </div>
 
+      {error ? <div className="alert err">{error}</div> : null}
+      {message ? <div className="alert ok">{message}</div> : null}
+
       <section className="inventoryGrid">
-        {projects.map((project) => {
-          const counts = statusCounts(project);
-          return (
-            <button
-              key={project.id}
-              type="button"
-              className={`inventoryProjectCard${project.id === selectedProject?.id ? " active" : ""}`}
-              onClick={() => {
-                setSelectedProjectId(project.id);
-                setSelectedUnitId(null);
-              }}
-            >
-              <div className="inventoryProjectHead">
-                <div>
-                  <div className="inventoryProjectTitle">{project.name}</div>
-                  <div className="muted">{project.location}</div>
-                </div>
-                <span className="chip chip-gray">{project.propertyType}</span>
-              </div>
-              <div className="inventoryProjectStats">
-                <span><strong>{counts.total}</strong> total</span>
-                <span className="inventoryStatGood"><strong>{counts.available}</strong> available</span>
-                <span className="inventoryStatWarn"><strong>{counts.soft_hold}</strong> held</span>
-                <span className="inventoryStatMute"><strong>{counts.sold}</strong> sold</span>
-              </div>
-            </button>
-          );
-        })}
+        <div className="card card-pad">
+          <div className="cardTitle">All properties</div>
+          <div className="h1" style={{ fontSize: "2rem" }}>{grouped.total}</div>
+          <div className="muted">Inventory synced from live CRM deal records.</div>
+        </div>
+        <div className="card card-pad">
+          <div className="cardTitle">Available / held</div>
+          <div className="h1" style={{ fontSize: "2rem" }}>{grouped.available + grouped.soft_hold}</div>
+          <div className="muted">Available: {grouped.available} · Soft hold: {grouped.soft_hold}</div>
+        </div>
+        <div className="card card-pad">
+          <div className="cardTitle">Blocked / sold</div>
+          <div className="h1" style={{ fontSize: "2rem" }}>{grouped.blocked + grouped.sold}</div>
+          <div className="muted">Blocked: {grouped.blocked} · Sold: {grouped.sold}</div>
+        </div>
       </section>
 
-      {selectedProject ? (
+      <div className="sequenceBuilderLayout">
         <section className="card card-pad">
-          <div className="pageHeader">
-            <div>
-              <div className="cardTitle">{selectedProject.name}</div>
-              <div className="muted">Select a unit to inspect pricing, type, and status.</div>
+          <div className="cardTitle">Add property</div>
+          <form className="form" onSubmit={(event) => void createProperty(event)}>
+            <div className="grid2">
+              <label>
+                Property name
+                <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Prestige Park Grove" />
+              </label>
+              <label>
+                Property type
+                <select value={form.asset_type} onChange={(event) => setForm((current) => ({ ...current, asset_type: event.target.value as Deal["asset_type"] }))}>
+                  <option value="residential">Residential</option>
+                  <option value="commercial">Commercial</option>
+                  <option value="land">Land</option>
+                  <option value="industrial">Industrial</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
             </div>
-          </div>
-          <div className="inventoryUnitGrid">
-            {selectedProject.units.map((unit) => (
-              <button
-                key={unit.id}
-                type="button"
-                className={`inventoryUnitTile status-${unit.status}${selectedUnitId === unit.id ? " active" : ""}`}
-                title={`${unit.label} • ${unit.area}`}
-                onClick={() => setSelectedUnitId(unit.id)}
-              >
-                <span>{unit.label}</span>
-              </button>
-            ))}
+            <div className="grid2">
+              <label>
+                City
+                <input value={form.city} onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))} placeholder="Pune" />
+              </label>
+              <label>
+                Area / locality
+                <input value={form.area} onChange={(event) => setForm((current) => ({ ...current, area: event.target.value }))} placeholder="Baner" />
+              </label>
+            </div>
+            <div className="grid2">
+              <label>
+                Typology / unit type
+                <input value={form.typology} onChange={(event) => setForm((current) => ({ ...current, typology: event.target.value }))} placeholder="2 BHK / Retail / Plot" />
+              </label>
+              <label>
+                Price
+                <input value={form.ticket_size} onChange={(event) => setForm((current) => ({ ...current, ticket_size: event.target.value }))} placeholder="12500000" />
+              </label>
+            </div>
+            <label>
+              Inventory status
+              <select value={form.inventory_status} onChange={(event) => setForm((current) => ({ ...current, inventory_status: event.target.value as InventoryStatus }))}>
+                <option value="available">Available</option>
+                <option value="soft_hold">Soft hold</option>
+                <option value="blocked">Blocked</option>
+                <option value="sold">Sold</option>
+              </select>
+            </label>
+            <button className="btn" type="submit" disabled={creating || !form.title.trim()}>
+              {creating ? "Adding..." : "Add property"}
+            </button>
+          </form>
+        </section>
+
+        <section className="card card-pad">
+          <div className="cardTitle">Inventory list</div>
+          <div className="tableWrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Property</th>
+                  <th>Type</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="muted">Loading properties...</td>
+                  </tr>
+                ) : deals.length ? (
+                  deals.map((deal) => {
+                    const status = normalizeStatus(deal);
+                    return (
+                      <tr key={deal.id} onClick={() => setSelectedId(deal.id)} style={{ cursor: "pointer" }}>
+                        <td className="tdTitle">{deal.title}</td>
+                        <td>{deal.asset_type}</td>
+                        <td>{[deal.area, deal.city].filter(Boolean).join(", ") || "-"}</td>
+                        <td><span className={`chip chip-${status === "available" ? "success" : status === "soft_hold" ? "warning" : status === "blocked" ? "danger" : "teal"}`}>{status.replace("_", " ")}</span></td>
+                        <td>{formatTicket(deal.ticket_size)}</td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="muted">No properties yet. Add the first property above.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
-      ) : null}
+      </div>
 
-      {selectedUnit ? (
+      {selected ? (
         <section className="card card-pad inventoryUnitDetail">
-          <div className="cardTitle">Unit {selectedUnit.label}</div>
+          <div className="pageHeader">
+            <div>
+              <div className="cardTitle">{selected.title}</div>
+              <div className="muted">This property is backed by the CRM deal record, so inventory and deal views stay aligned.</div>
+            </div>
+          </div>
           <div className="inventoryUnitMeta">
-            <div><span className="section-label">Floor</span><strong>{selectedUnit.floor}</strong></div>
-            <div><span className="section-label">Type</span><strong>{selectedUnit.type}</strong></div>
-            <div><span className="section-label">Area</span><strong>{selectedUnit.area}</strong></div>
-            <div><span className="section-label">Price</span><strong>{selectedUnit.price}</strong></div>
+            <div><span className="section-label">Type</span><strong>{selected.asset_type}</strong></div>
+            <div><span className="section-label">Typology</span><strong>{selected.typology || "-"}</strong></div>
+            <div><span className="section-label">Location</span><strong>{[selected.area, selected.city].filter(Boolean).join(", ") || "-"}</strong></div>
+            <div><span className="section-label">Price</span><strong>{formatTicket(selected.ticket_size)}</strong></div>
           </div>
           <div className="inventoryStatusRow">
-            {(["available", "soft_hold", "blocked", "sold"] as UnitStatus[]).map((status) => (
+            {(["available", "soft_hold", "blocked", "sold"] as InventoryStatus[]).map((status) => (
               <button
                 key={status}
                 type="button"
-                className={`inventoryStatusPill${selectedUnit.status === status ? " active" : ""}`}
-                onClick={() => setUnitStatus(status)}
+                className={`inventoryStatusPill${normalizeStatus(selected) === status ? " active" : ""}`}
+                onClick={() => void updateInventoryStatus(status)}
+                disabled={saving}
               >
-                {status.replace("_", " ")}
+                {saving && normalizeStatus(selected) === status ? "Saving..." : status.replace("_", " ")}
               </button>
             ))}
           </div>

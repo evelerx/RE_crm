@@ -107,6 +107,7 @@ class Deal(SQLModel, table=True):
     risk_flags: str = ""  # JSON-ish string for MVP (e.g. "pricing,legal")
 
     contact_id: Optional[UUID] = Field(default=None, foreign_key="contact.id")
+    inventory_status: str = "available"  # available | soft_hold | blocked | sold
     notes: str = ""
     status: str = "open"  # open | closed | lost
     closed_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
@@ -258,6 +259,17 @@ class BuilderWebsiteProperty(SQLModel, table=True):
     price_label: str = ""
     description: str = ""
     image_urls: str = ""
+
+
+class FollowUpSequence(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    owner_id: UUID = Field(foreign_key="user.id", index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    created_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    name: str = "Default sequence"
+    steps_json: str = "[]"
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     sort_order: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

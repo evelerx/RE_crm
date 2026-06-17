@@ -19,6 +19,7 @@ export type Deal = {
   close_probability: number | null;
   risk_flags: string;
   contact_id: string | null;
+  inventory_status: "available" | "soft_hold" | "blocked" | "sold";
   notes: string;
   status: "open" | "closed" | "lost";
   closed_by_user_name: string;
@@ -75,6 +76,21 @@ export type DealImage = {
   filename: string;
   uploaded_at: string;
   is_primary: boolean;
+};
+
+export type SequenceStep = {
+  id: string;
+  delay: string;
+  subject: string;
+  body: string;
+};
+
+export type FollowUpSequence = {
+  id: string | null;
+  name: string;
+  steps: SequenceStep[];
+  created_at: string | null;
+  updated_at: string | null;
 };
 
 export type WhatsAppMessage = {

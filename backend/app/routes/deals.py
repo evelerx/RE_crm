@@ -221,6 +221,7 @@ def _deal_read(deal: Deal, primary_image_url: str | None) -> DealRead:
         close_probability=deal.close_probability,
         risk_flags=deal.risk_flags,
         contact_id=deal.contact_id,
+        inventory_status=deal.inventory_status,
         notes=deal.notes,
         status=deal.status,
         closed_by_user_name=deal.closed_by_user_name,
@@ -482,6 +483,8 @@ def create_deal(
         if not contact or not user_can_access_record(contact, user):
             raise HTTPException(status_code=404, detail="Contact not found")
     deal = Deal(**payload.model_dump())
+    if deal.stage == "closed":
+        deal.inventory_status = "sold"
     if deal.stage == "closed":
         deal.status = "closed"
     elif deal.stage == "lost":
@@ -782,6 +785,8 @@ def update_deal(
         setattr(deal, key, value)
     if "stage" in data and data["stage"] is not None:
         deal.status = "closed" if deal.stage == "closed" else "lost" if deal.stage == "lost" else "open"
+        if deal.stage == "closed":
+            deal.inventory_status = "sold"
     if data.get("stage") == "closed" and old_stage != "closed":
         display_name = _closing_display_name(session, user)
         deal.closed_by_user_id = user.id

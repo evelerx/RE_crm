@@ -20,6 +20,7 @@ from .models import (
     DealClosureEvent,
     DealImage,
     DealStageEvent,
+    FollowUpSequence,
     PasswordResetToken,
     Profile,
     SupportChatMessage,
@@ -297,6 +298,8 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "deal", "client_phase VARCHAR DEFAULT ''")
             if "status" not in cols:
                 _sqlite_add_column(conn, "deal", "status VARCHAR DEFAULT 'open'")
+            if "inventory_status" not in cols:
+                _sqlite_add_column(conn, "deal", "inventory_status VARCHAR DEFAULT 'available'")
             if "closed_by_user_id" not in cols:
                 _sqlite_add_column(conn, "deal", "closed_by_user_id VARCHAR")
             if "closed_by_user_name" not in cols:
@@ -469,6 +472,7 @@ def _postgres_best_effort_migrate() -> None:
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS marketing_portal_enabled BOOLEAN DEFAULT FALSE;
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS marketing_portal_enabled_at TIMESTAMP;
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'open';
+                  ALTER TABLE deal ADD COLUMN IF NOT EXISTS inventory_status VARCHAR DEFAULT 'available';
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS closed_by_user_id UUID;
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS closed_by_user_name VARCHAR DEFAULT '';
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP;

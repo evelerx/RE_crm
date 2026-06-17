@@ -398,3 +398,17 @@ export async function closeDeal(dealId: string, closure_note: string) {
 export async function closureFeed() {
   return api<import("./types").DealClosureEvent[]>("/deals/closure-feed");
 }
+
+export async function getDefaultSequence() {
+  return api<import("./types").FollowUpSequence>("/sequences/default");
+}
+
+export async function saveDefaultSequence(payload: {
+  name: string;
+  steps: import("./types").SequenceStep[];
+}) {
+  return api<import("./types").FollowUpSequence>("/sequences/default", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}

@@ -864,6 +864,7 @@ class DealCreate(BaseModel):
     close_probability: Optional[int] = Field(default=None, ge=0, le=100)
     risk_flags: str = ""
     contact_id: Optional[UUID] = None
+    inventory_status: str = Field(default="available", pattern="^(available|soft_hold|blocked|sold)$")
     notes: str = ""
 
 
@@ -884,6 +885,7 @@ class DealUpdate(BaseModel):
     close_probability: Optional[int] = Field(default=None, ge=0, le=100)
     risk_flags: Optional[str] = None
     contact_id: Optional[UUID] = None
+    inventory_status: Optional[str] = Field(default=None, pattern="^(available|soft_hold|blocked|sold)$")
     notes: Optional[str] = None
 
 
@@ -905,6 +907,7 @@ class DealRead(BaseModel):
     close_probability: Optional[int] = None
     risk_flags: str
     contact_id: Optional[UUID] = None
+    inventory_status: str = "available"
     notes: str
     status: str = "open"
     closed_by_user_name: str = ""
@@ -918,6 +921,29 @@ class DealRead(BaseModel):
 
 class DealCloseRequest(BaseModel):
     closure_note: str = Field(default="", max_length=4000)
+
+
+class SequenceStepInput(BaseModel):
+    id: str = Field(min_length=1, max_length=80)
+    delay: str = Field(default="0h", max_length=80)
+    subject: str = Field(default="", max_length=240)
+    body: str = Field(default="", max_length=4000)
+
+
+class FollowUpSequenceUpsertRequest(BaseModel):
+    name: str = Field(default="Default sequence", max_length=120)
+    steps: list[SequenceStepInput] = Field(default_factory=list)
+
+
+class FollowUpSequenceRead(BaseModel):
+    id: UUID | None = None
+    name: str
+    steps: list[SequenceStepInput]
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
 
 
 class DealClosureEventRead(BaseModel):
