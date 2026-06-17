@@ -22,6 +22,9 @@ import {
   getMarketingMetrics,
   getMarketingRequest,
   getMarketingWorkspace,
+  listAdminMarketingAccountAudit,
+  listAdminMarketingAccounts,
+  listAdminMarketingRequests,
   listMarketingActivity,
   listMarketingNotifications,
   listMarketingRequests,
@@ -30,9 +33,12 @@ import {
 } from "../api/client";
 import type {
   Approval,
+  AdminMarketingRequestRow,
   Campaign,
   Comment,
   LeadFunnelMetrics,
+  MarketingAccount,
+  MarketingAccountAllotment,
   MarketingActivityLogEntry,
   MarketingAddonCatalogPlan,
   MarketingAddonStatusResponse,
@@ -165,6 +171,9 @@ function MarketingPageInner() {
   const [requestDetail, setRequestDetail] = useState<MarketingRequestDetail | null>(null);
   const [activity, setActivity] = useState<MarketingActivityLogEntry[]>([]);
   const [notifications, setNotifications] = useState<MarketingNotification[]>([]);
+  const [adminAccounts, setAdminAccounts] = useState<MarketingAccount[]>([]);
+  const [adminAudit, setAdminAudit] = useState<MarketingAccountAllotment[]>([]);
+  const [adminRequests, setAdminRequests] = useState<AdminMarketingRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
@@ -227,6 +236,21 @@ function MarketingPageInner() {
         }
       } else {
         setMetrics(null);
+      }
+
+      if (workspaceRes.role === "admin") {
+        const [accountsRes, auditRes, adminRequestsRes] = await Promise.all([
+          listAdminMarketingAccounts().catch(() => []),
+          listAdminMarketingAccountAudit().catch(() => []),
+          listAdminMarketingRequests().catch(() => []),
+        ]);
+        setAdminAccounts(accountsRes);
+        setAdminAudit(auditRes);
+        setAdminRequests(adminRequestsRes);
+      } else {
+        setAdminAccounts([]);
+        setAdminAudit([]);
+        setAdminRequests([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load the marketing workspace");
@@ -526,6 +550,76 @@ function MarketingPageInner() {
     );
   }
 
+  function renderAdminAccounts() {
+    return (
+      <div className="marketingPromptOverviewGrid">
+        <section className="marketingPromptPanel">
+          <div className="marketingPromptPanelHeader">
+            <div>
+              <div className="marketingPromptLabel">Account pool</div>
+              <div className="marketingPromptPanelTitle">Marketing portal allotment overview</div>
+            </div>
+          </div>
+          <div className="marketingPromptMetricsGrid">
+            <div className="marketingPromptMetricCard">
+              <span>Accounts in pool</span>
+              <strong>{adminAccounts.length}</strong>
+            </div>
+            <div className="marketingPromptMetricCard">
+              <span>Available</span>
+              <strong>{adminAccounts.filter((row) => row.status === "available").length}</strong>
+            </div>
+            <div className="marketingPromptMetricCard">
+              <span>Allotted</span>
+              <strong>{adminAccounts.filter((row) => row.status === "allotted").length}</strong>
+            </div>
+            <div className="marketingPromptMetricCard">
+              <span>Audit events</span>
+              <strong>{adminAudit.length}</strong>
+            </div>
+          </div>
+          <div className="marketingPromptActivityList">
+            {adminAccounts.length === 0 ? <div className="muted">No marketing accounts have been seeded yet.</div> : null}
+            {adminAccounts.slice(0, 8).map((row) => (
+              <div key={row.id} className="marketingPromptActivityItem">
+                <strong>{row.account_name}</strong>
+                <span>{row.platform} · {row.status}</span>
+                <small>{row.allotted_to_owner_email || "Available pool"}</small>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="marketingPromptPanel">
+          <div className="marketingPromptPanelHeader">
+            <div>
+              <div className="marketingPromptLabel">Admin action</div>
+              <div className="marketingPromptPanelTitle">Open the full admin assignment console</div>
+            </div>
+          </div>
+          <div className="marketingPromptFormStack">
+            <p className="muted">
+              Full account allotment, revoke controls, and audit history live inside the Admin Portal under Marketing Accounts.
+            </p>
+            <a className="btn" href="/admin#admin-marketing-accounts">
+              Open Marketing Accounts
+            </a>
+            <div className="marketingPromptActivityList">
+              {adminRequests.slice(0, 6).map((row) => (
+                <div key={row.id} className="marketingPromptActivityItem">
+                  <strong>{row.request_code}</strong>
+                  <span>{row.owner_name || row.company || "Subscriber request"} · {row.status.replace(/_/g, " ")}</span>
+                  <small>{row.project_name || row.channel}</small>
+                </div>
+              ))}
+              {adminRequests.length === 0 ? <div className="muted">No submitted marketing requests yet.</div> : null}
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   function renderReports() {
     return (
       <div className="marketingPromptOverviewGrid">
@@ -636,6 +730,8 @@ function MarketingPageInner() {
               <p className="muted">The request wizard is ready, but the live marketing portal opens only after an active Marketing Assist or Managed Marketing addon is attached to this account.</p>
               {renderBilling()}
             </section>
+          ) : activeNav === "accounts" && workspace?.role === "admin" ? (
+            renderAdminAccounts()
           ) : activeNav === "messages" ? (
             renderMessages()
           ) : activeNav === "reports" ? (

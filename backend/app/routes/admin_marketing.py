@@ -9,7 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from ..db import get_session
-from ..marketing_support import allowed_marketing_addons_for_plan, ensure_marketing_account_seed, profile_summary, utc_now_naive
+from ..marketing_support import allowed_marketing_addons_for_plan, ensure_marketing_account_seed, normalize_marketing_addon_type, profile_summary, utc_now_naive
 from ..models import MarketingAccount, MarketingAccountAllotment, MarketingAddonSubscription, MarketingRequest, User
 from ..schemas import MarketingAccountAllotRequest, MarketingAccountCreate, MarketingAccountAllotmentRead, MarketingAccountRead, MarketingAccountRevokeRequest
 from .admin import require_admin
@@ -50,7 +50,7 @@ def _serialize_allotment(session: Session, row: MarketingAccountAllotment) -> Ma
         owner_name=owner_name,
         owner_email=owner.email if owner else "",
         subscription_plan=row.subscription_plan,
-        addon_type=row.addon_type,
+        addon_type=normalize_marketing_addon_type(row.addon_type),
         action=row.action,
         allotted_by_user_id=row.allotted_by_user_id,
         revoked_by_user_id=row.revoked_by_user_id,
@@ -111,7 +111,7 @@ def admin_allot_marketing_account(
     if not owner:
         raise HTTPException(status_code=404, detail="Subscription user not found")
     plan = (owner.plan or owner.subscription_plan or "free").strip().lower()
-    if plan not in {"enterprise", "builder"}:
+    if not allowed_marketing_addons_for_plan(plan):
         raise HTTPException(status_code=400, detail="Upgrade required before this account can be allotted.")
     if account.allotted_to_owner_id and account.allotted_to_owner_id != owner.id:
         raise HTTPException(status_code=400, detail="Marketing account is already allotted.")
@@ -130,7 +130,7 @@ def admin_allot_marketing_account(
         account_id=account.id,
         enterprise_owner_id=owner.id,
         subscription_plan=plan,
-        addon_type=addon.addon_type if addon else "",
+        addon_type=normalize_marketing_addon_type(addon.addon_type) if addon else "",
         action="allotted",
         allotted_by_user_id=admin_user.id,
         notes=payload.notes.strip(),
@@ -214,7 +214,7 @@ def admin_marketing_addons(
                 "owner_email": owner.email if owner else "",
                 "company": company,
                 "city": city,
-                "addon_type": addon.addon_type,
+                "addon_type": normalize_marketing_addon_type(addon.addon_type),
                 "status": addon.status,
                 "amount": addon.monthly_amount,
                 "currency": addon.currency,

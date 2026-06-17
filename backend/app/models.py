@@ -292,7 +292,7 @@ class AppIntegrationConnection(SQLModel, table=True):
 class MarketingAddonSubscription(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     enterprise_owner_id: UUID = Field(foreign_key="user.id", index=True, unique=True)
-    addon_type: str = Field(default="growth", index=True)
+    addon_type: str = Field(default="marketing_assist", index=True)
     status: str = Field(default="active", index=True)
     start_date: date = Field(default_factory=date.today, index=True)
     end_date: Optional[date] = Field(default=None, index=True)

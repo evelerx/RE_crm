@@ -30,6 +30,20 @@ from .schemas import AgencyUserRead
 from .settings import settings
 
 
+def normalize_marketing_addon_type(addon_type: str) -> str:
+    """Map legacy and new addon names to a single canonical label."""
+
+    normalized = (addon_type or "").strip().lower()
+    alias_map = {
+        "growth": "marketing_assist",
+        "marketing_assist": "marketing_assist",
+        "scale": "managed_marketing",
+        "managed_marketing": "managed_marketing",
+        "ai_brand": "ai_brand",
+    }
+    return alias_map.get(normalized, normalized or "marketing_assist")
+
+
 def utc_now_naive() -> datetime:
     """Return UTC now without tzinfo to match current DB storage style."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -114,8 +128,8 @@ def require_executive(user: AgencyUser = Depends(get_agency_user)) -> AgencyUser
 
 def addon_price_map(addon_type: str) -> tuple[float, int]:
     """Return monthly amount and term in days for an addon."""
-    normalized = (addon_type or "growth").strip().lower()
-    if normalized == "scale":
+    normalized = normalize_marketing_addon_type(addon_type)
+    if normalized == "managed_marketing":
         return 25000, 90
     if normalized == "ai_brand":
         return 16000, 30
@@ -147,11 +161,11 @@ def require_marketing_addon(
 
 def validate_addon_request_scope(addon: MarketingAddonSubscription, channel: str, objective: str) -> None:
     """Reject requests that exceed the purchased addon scope."""
-    addon_type = (addon.addon_type or "growth").strip().lower()
+    addon_type = normalize_marketing_addon_type(addon.addon_type or "marketing_assist")
     channel_value = (channel or "").strip().lower()
     objective_value = (objective or "").strip().lower()
-    if addon_type == "growth" and channel_value == "all":
-        raise HTTPException(status_code=400, detail="Your Growth addon does not include multi-channel scope. Upgrade to Scale.")
+    if addon_type == "marketing_assist" and channel_value == "all":
+        raise HTTPException(status_code=400, detail="Your Marketing Assist addon does not include full multi-channel scope. Upgrade to Managed Marketing.")
     if addon_type == "ai_brand" and objective_value not in {"brand assets", "brand awareness", "creative production"}:
         raise HTTPException(status_code=400, detail="Your AI Brand addon is limited to brand-asset and awareness work.")
 
@@ -279,16 +293,16 @@ def allowed_marketing_addons_for_plan(plan: str) -> list[str]:
 
     normalized = (plan or "free").strip().lower()
     if normalized == "builder":
-        return ["growth", "scale", "ai_brand"]
+        return ["marketing_assist", "managed_marketing", "ai_brand"]
     if normalized == "enterprise":
-        return ["growth", "scale"]
+        return ["marketing_assist", "managed_marketing"]
     return []
 
 
 def managed_marketing_allowed_for_plan(plan: str) -> bool:
     """Return whether the plan can request fully managed marketing."""
 
-    return "scale" in allowed_marketing_addons_for_plan(plan)
+    return "managed_marketing" in allowed_marketing_addons_for_plan(plan)
 
 
 def log_marketing_activity(

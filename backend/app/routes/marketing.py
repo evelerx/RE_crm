@@ -20,6 +20,7 @@ from ..marketing_support import (
     log_marketing_activity,
     managed_marketing_allowed_for_plan,
     next_marketing_request_code,
+    normalize_marketing_addon_type,
     notify_agency_managers,
     profile_summary,
     push_marketing_notification,
@@ -32,7 +33,7 @@ from ..marketing_support import (
     utc_now_naive,
     validate_addon_request_scope,
 )
-from ..models import AgencyUser, MarketingAddonSubscription, MarketingApproval, MarketingComment, MarketingRequest, MarketingTask, User
+from ..models import AgencyUser, MarketingAddonSubscription, MarketingApproval, MarketingComment, MarketingNotification, MarketingRequest, MarketingTask, User
 from ..schemas import (
     MarketingActivityLogRead,
     MarketingAddonRead,
@@ -84,7 +85,7 @@ def marketing_workspace_access(
         role="admin" if is_admin else "subscriber",
         subscription_plan=subscription_plan,
         crm_plan=(current_user.plan or "free"),
-        active_addon_type=addon.addon_type if addon else None,
+        active_addon_type=normalize_marketing_addon_type(addon.addon_type) if addon else None,
         active_addon_status=addon.status if addon else "",
         request_allowed=bool(allowed_addons),
         managed_marketing_allowed=managed_allowed,
@@ -161,7 +162,7 @@ def _serialize_addon(row: MarketingAddonSubscription) -> MarketingAddonRead:
     return MarketingAddonRead(
         id=row.id,
         enterprise_owner_id=row.enterprise_owner_id,
-        addon_type=row.addon_type,
+        addon_type=normalize_marketing_addon_type(row.addon_type),
         status=row.status,
         start_date=row.start_date,
         end_date=row.end_date,
@@ -186,7 +187,7 @@ def _serialize_request_summary(session: Session, row: MarketingRequest) -> Marke
         objective=row.objective,
         project_name=row.project_name,
         status=row.status,
-        addon_type=(addon.addon_type if addon else ""),
+        addon_type=(normalize_marketing_addon_type(addon.addon_type) if addon else ""),
         owner=MarketingOwnerSummaryRead(
             id=row.enterprise_owner_id,
             name=name,
@@ -261,12 +262,14 @@ def active_marketing_addon(
             "has_active_addon": False,
             "addon": None,
             "plans": [
-                {"addon_type": "growth", "monthly_amount": 18000, "term_days": 90, "features": ["Meta or Google lead gen", "Weekly reporting", "Owner request thread"]},
-                {"addon_type": "scale", "monthly_amount": 25000, "term_days": 90, "features": ["All channels", "Full CRM attribution", "Manager + executive delivery"]},
+                {"addon_type": "marketing_assist", "monthly_amount": 18000, "term_days": 90, "features": ["Meta or Google lead gen", "Weekly reporting", "Owner request thread"]},
+                {"addon_type": "managed_marketing", "monthly_amount": 25000, "term_days": 90, "features": ["All channels", "Full CRM attribution", "Manager + executive delivery"]},
                 {"addon_type": "ai_brand", "monthly_amount": 16000, "term_days": 30, "features": ["Brand asset creation", "Creative packs", "Launch collateral"]},
             ],
         }
-    return {"has_active_addon": True, "addon": _serialize_addon(addon)}
+    addon_payload = _serialize_addon(addon)
+    addon_payload.addon_type = normalize_marketing_addon_type(addon_payload.addon_type)
+    return {"has_active_addon": True, "addon": addon_payload}
 
 
 @router.get("/metrics", response_model=MarketingMetricsRead)
@@ -291,7 +294,7 @@ def marketing_metrics(
         in_progress_tasks=len([row for row in tasks if row.status in {"in_progress", "review"}]),
         completed_this_month=len([row for row in tasks if row.status == "completed" and row.updated_at >= start_of_month]),
         unread_comments=len([row for row in comments if row.sender_role != "owner"]),
-        active_addon_type=addon.addon_type,
+        active_addon_type=normalize_marketing_addon_type(addon.addon_type),
         active_addon_renews_on=addon.end_date,
     )
 
@@ -568,15 +571,16 @@ def create_marketing_addon_payment(
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     """Create a placeholder Razorpay order payload for a marketing addon."""
-    addon_type = (payload.get("addon_type") or "growth").strip().lower()
+    addon_type = (payload.get("addon_type") or "marketing_assist").strip().lower()
+    addon_type = normalize_marketing_addon_type(addon_type)
     currency = (payload.get("currency") or "INR").strip().upper()
     monthly_amount, term_days = addon_price_map(addon_type)
     amount_map = {
-        ("growth", "INR"): 1800000,
-        ("scale", "INR"): 2500000,
+        ("marketing_assist", "INR"): 1800000,
+        ("managed_marketing", "INR"): 2500000,
         ("ai_brand", "INR"): 1600000,
-        ("growth", "USD"): 21600,
-        ("scale", "USD"): 30000,
+        ("marketing_assist", "USD"): 21600,
+        ("managed_marketing", "USD"): 30000,
         ("ai_brand", "USD"): 19200,
     }
     amount = amount_map.get((addon_type, currency), int(monthly_amount * 100))
@@ -599,7 +603,7 @@ def verify_marketing_addon_payment(
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     """Verify addon purchase and activate the marketing subscription."""
-    addon_type = (payload.get("addon_type") or "growth").strip().lower()
+    addon_type = normalize_marketing_addon_type((payload.get("addon_type") or "marketing_assist").strip().lower())
     monthly_amount, term_days = addon_price_map(addon_type)
     owner_id = _scope_owner_id(current_user)
     existing = session.exec(
