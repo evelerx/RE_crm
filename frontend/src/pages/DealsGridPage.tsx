@@ -81,6 +81,7 @@ export default function DealsGridPage() {
   const [loading, setLoading] = useState(true);
   const [feed, setFeed] = useState<DealClosureEvent[]>([]);
   const [newFeedIds, setNewFeedIds] = useState<string[]>([]);
+  const [backfilling, setBackfilling] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [bulkStage, setBulkStage] = useState<Deal["stage"]>("lead");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -400,7 +401,28 @@ export default function DealsGridPage() {
           <div className="cardTitle">Closure Feed</div>
           <div className="muted small">Org-wide deal closures refresh every 60 seconds.</div>
           <div className="list">
-            {feed.length === 0 ? <div className="muted">No closures yet</div> : null}
+            {feed.length === 0 ? (
+              <div className="muted">
+                No closures yet
+                <button
+                  className="btnSecondary"
+                  style={{ display: "block", marginTop: 10, fontSize: 12 }}
+                  disabled={backfilling}
+                  onClick={async () => {
+                    setBackfilling(true);
+                    try {
+                      await api("/deals/closure-feed/backfill", { method: "POST" });
+                      const updated = await closureFeed();
+                      setFeed(updated);
+                    } catch { /* ignore */ } finally {
+                      setBackfilling(false);
+                    }
+                  }}
+                >
+                  {backfilling ? "Syncing…" : "Sync existing closed deals"}
+                </button>
+              </div>
+            ) : null}
             {feed.map((item) => (
               <div key={item.id} className={`listItem ${newFeedIds.includes(item.id) ? "feedRowNew" : ""}`}>
                 <div>

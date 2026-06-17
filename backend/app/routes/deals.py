@@ -308,6 +308,53 @@ def closure_feed(
     ).all()
 
 
+@router.post("/closure-feed/backfill")
+def closure_feed_backfill(
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """One-shot backfill: create DealClosureEvent rows for all deals already marked closed that have no event yet."""
+    _require_main_or_owner(user)
+    scope_owner_id = _scope_owner_id(user)
+
+    existing_ids = set(
+        session.exec(
+            select(DealClosureEvent.deal_id).where(DealClosureEvent.enterprise_owner_id == scope_owner_id)
+        ).all()
+    )
+
+    closed_deals = session.exec(
+        select(Deal).where(
+            Deal.stage == "closed",
+            col(Deal.enterprise_owner_id) == scope_owner_id,
+        )
+    ).all()
+
+    now = datetime.utcnow()
+    created = 0
+    for deal in closed_deals:
+        if deal.id in existing_ids:
+            continue
+        closed_ts = getattr(deal, "closed_at", None) or getattr(deal, "updated_at", None) or now
+        session.add(
+            DealClosureEvent(
+                deal_id=deal.id,
+                deal_title=deal.title or "Untitled Deal",
+                deal_value=getattr(deal, "value", None),
+                closed_by_user_id=getattr(deal, "closed_by_user_id", None) or user.id,
+                closed_by_user_name=getattr(deal, "closed_by_user_name", None) or user.email,
+                closed_at=closed_ts,
+                owner_id=deal.owner_id,
+                enterprise_owner_id=scope_owner_id,
+                closure_note=getattr(deal, "closure_note", "") or "",
+            )
+        )
+        created += 1
+
+    session.commit()
+    return {"backfilled": created}
+
+
 @router.get("/intelligence/priority", response_model=DealPriorityDashboardRead)
 def deal_priority_dashboard(
     session: Session = Depends(get_session),
