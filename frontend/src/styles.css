@@ -1436,7 +1436,7 @@ textarea.textarea {
   flex-wrap: wrap;
   padding: 2px 0 6px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 20px;
+  margin-bottom: 60px;
 }
 
 .dealTabs a {
@@ -1532,7 +1532,7 @@ textarea.textarea {
   gap: 8px;
   overflow-x: auto;
   padding: 8px 0 12px;
-  margin-bottom: 20px;
+  margin-bottom: 60px;
   background: linear-gradient(180deg, rgba(245, 248, 255, 0.95), rgba(245, 248, 255, 0.82));
 }
 
