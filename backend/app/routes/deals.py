@@ -13,6 +13,7 @@ from ..db import get_session
 from ..enterprise_scope import (
     assign_enterprise_fields,
     get_enterprise_owner_id,
+    is_enterprise_owner,
     is_enterprise_member,
     user_can_access_record,
     user_read_filter,
@@ -26,6 +27,7 @@ from ..schemas import (
     DealImageRead,
     DealPriorityDashboardRead,
     DealPriorityItem,
+    DealReassignRequest,
     DealRead,
     DealScoreResponse,
     DealUpdate,
@@ -186,6 +188,32 @@ def _scope_owner_id(user: User) -> UUID:
     return get_enterprise_owner_id(user) or user.id
 
 
+@router.get("/reassign-options")
+def list_reassign_options(
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Return users eligible to receive deals in the current organization scope."""
+    member_role = (getattr(user, "enterprise_member_role", "") or "").strip().lower()
+    can_reassign = is_enterprise_owner(user) or member_role == "manager"
+    if not can_reassign:
+        raise HTTPException(status_code=403, detail="You do not have permission to reassign deals")
+
+    scope_owner_id = _scope_owner_id(user)
+    owner = session.get(User, scope_owner_id)
+    employees = session.exec(select(User).where(User.enterprise_owner_id == scope_owner_id).order_by(User.created_at.asc())).all()
+    rows = [owner, *employees] if owner else employees
+    return [
+        {
+            "id": str(row.id),
+            "email": row.email,
+            "role": (getattr(row, "enterprise_member_role", "") or "").strip() or ("owner" if not getattr(row, "enterprise_owner_id", None) else "employee"),
+        }
+        for row in rows
+        if row is not None
+    ]
+
+
 def _closing_display_name(session: Session, user: User) -> str:
     profile = session.exec(select(Profile).where(Profile.owner_id == user.id)).first()
     if profile and (profile.full_name or "").strip():
@@ -205,6 +233,7 @@ def _primary_images_map(session: Session, deal_ids: list[UUID]) -> dict[UUID, st
 def _deal_read(deal: Deal, primary_image_url: str | None) -> DealRead:
     return DealRead(
         id=deal.id,
+        owner_id=deal.owner_id,
         title=deal.title,
         asset_type=deal.asset_type,
         stage=deal.stage,
@@ -812,6 +841,51 @@ def update_deal(
         summary=f"Updated deal {deal.title}",
         detail=f"stage={old_stage}->{deal.stage}",
         enterprise_owner_id=getattr(deal, "enterprise_owner_id", None),
+    )
+    session.commit()
+    session.refresh(deal)
+    return _deal_read(deal, _primary_images_map(session, [deal.id]).get(deal.id))
+
+
+@router.post("/{deal_id}/reassign", response_model=DealRead)
+def reassign_deal(
+    deal_id: UUID,
+    payload: DealReassignRequest,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Reassign a deal to another user in the same owner scope."""
+    deal = session.get(Deal, deal_id)
+    if not deal or not user_can_access_record(deal, user):
+        raise HTTPException(status_code=404, detail="Deal not found")
+
+    member_role = (getattr(user, "enterprise_member_role", "") or "").strip().lower()
+    can_reassign = is_enterprise_owner(user) or member_role == "manager"
+    if not can_reassign:
+        raise HTTPException(status_code=403, detail="You do not have permission to reassign deals")
+
+    target_user = session.get(User, payload.owner_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found")
+
+    scope_owner_id = _scope_owner_id(user)
+    target_scope_owner_id = get_enterprise_owner_id(target_user) or target_user.id
+    if target_scope_owner_id != scope_owner_id:
+        raise HTTPException(status_code=400, detail="Target user is outside this organization scope")
+
+    old_owner_id = deal.owner_id
+    deal.owner_id = target_user.id
+    deal.enterprise_owner_id = scope_owner_id if scope_owner_id != target_user.id else getattr(deal, "enterprise_owner_id", None)
+    deal.updated_at = datetime.utcnow()
+    session.add(deal)
+    log_audit_event(
+        session,
+        actor=user,
+        target_user_id=target_user.id,
+        kind="deal.reassign",
+        summary=f"Reassigned deal {deal.title}",
+        detail=f"from={old_owner_id} to={target_user.id}",
+        enterprise_owner_id=getattr(deal, "enterprise_owner_id", None) or scope_owner_id,
     )
     session.commit()
     session.refresh(deal)

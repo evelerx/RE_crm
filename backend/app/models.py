@@ -275,6 +275,27 @@ class FollowUpSequence(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class TargetGoal(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    owner_id: UUID = Field(foreign_key="user.id", index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    created_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    subject_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    subject_label: str = ""
+    metric: str = Field(default="deals_closed", index=True)
+    target_value: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class RbacMatrixSetting(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    scope_key: str = Field(default="global", index=True, unique=True)
+    matrix_json: str = "{}"
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+
+
 class PasswordResetToken(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     user_id: UUID = Field(foreign_key="user.id", index=True)

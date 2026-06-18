@@ -251,6 +251,65 @@ export async function getWhatsAppConfigStatus() {
   return api<WhatsAppConfigStatusRead>("/whatsapp/config-status");
 }
 
+export async function listLeaderboard() {
+  return api<import("./types").LeaderboardRow[]>("/leaderboard");
+}
+
+export async function listTargets() {
+  return api<import("./types").TargetGoal[]>("/targets");
+}
+
+export async function createTarget(payload: import("./types").TargetGoalCreate) {
+  return api<import("./types").TargetGoal>("/targets", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateTarget(targetId: string, payload: import("./types").TargetGoalUpdate) {
+  return api<import("./types").TargetGoal>(`/targets/${targetId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteTarget(targetId: string) {
+  return api<{ deleted: boolean }>(`/targets/${targetId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getRbacMatrix() {
+  return api<import("./types").RbacMatrix>("/admin/rbac-matrix");
+}
+
+export async function saveRbacMatrix(matrix: Record<string, Record<string, boolean>>) {
+  return api<import("./types").RbacMatrix>("/admin/rbac-matrix", {
+    method: "PUT",
+    body: JSON.stringify({ matrix }),
+  });
+}
+
+export async function updateContact(contactId: string, payload: import("./types").ContactUpdate) {
+  return api<import("./types").Contact>(`/contacts/${contactId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteContact(contactId: string) {
+  return api<{ deleted: boolean }>(`/contacts/${contactId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function reassignDeal(dealId: string, ownerId: string) {
+  return api<import("./types").Deal>(`/deals/${dealId}/reassign`, {
+    method: "POST",
+    body: JSON.stringify({ owner_id: ownerId }),
+  });
+}
+
 export async function getMarketingWorkspace() {
   return api<MarketingWorkspaceAccess>("/marketing/workspace");
 }

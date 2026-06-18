@@ -7,6 +7,7 @@ import {
   closeDeal,
   deleteDealImage,
   listDealImages,
+  reassignDeal,
   sendWhatsAppMedia,
   setPrimaryDealImage,
   uploadDealImages,
@@ -16,6 +17,7 @@ import type { Activity, Contact, Deal, DealImage } from "../api/types";
 type DealScoreResponse = { deal_id: string; close_probability: number; risk_flags: string[]; rationale: string[] };
 type FollowupResponse = { deal_id: string; message: string };
 type LlmFollowupResponse = { deal_id: string; message: string };
+type DealReassignOption = { id: string; email: string; role: string };
 
 function normalizeWhatsAppNumber(value: string | null | undefined) {
   const digits = (value || "").replace(/\D+/g, "");
@@ -73,6 +75,8 @@ export default function DealDetailPage() {
   const [score, setScore] = useState<DealScoreResponse | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [dealImages, setDealImages] = useState<DealImage[]>([]);
+  const [reassignOptions, setReassignOptions] = useState<DealReassignOption[]>([]);
+  const [reassignOwnerId, setReassignOwnerId] = useState("");
   const [whatsAppContactId, setWhatsAppContactId] = useState("");
   const [editing, setEditing] = useState(false);
   const [notesBusy, setNotesBusy] = useState(false);
@@ -136,6 +140,14 @@ export default function DealDetailPage() {
         (d.contact_id && contactRows.some((contact) => contact.id === d.contact_id) ? d.contact_id : "") ||
         contactRows.find((contact) => normalizeWhatsAppNumber(contact.phone))?.id ||
         "";
+      try {
+        const options = await api<DealReassignOption[]>("/deals/reassign-options");
+        setReassignOptions(options);
+        setReassignOwnerId(d.owner_id && options.some((row) => row.id === d.owner_id) ? d.owner_id : options[0]?.id ?? "");
+      } catch {
+        setReassignOptions([]);
+        setReassignOwnerId("");
+      }
       setWhatsAppContactId(preferredContactId);
       setActivities(a);
       setSuccessMessage(null);
@@ -473,6 +485,39 @@ export default function DealDetailPage() {
                 {editing ? "Close editor" : "Edit snapshot"}
               </button>
             </div>
+            {reassignOptions.length > 0 ? (
+              <div className="form" style={{ marginTop: 16 }}>
+                <label>
+                  Reassign deal
+                  <select value={reassignOwnerId} onChange={(event) => setReassignOwnerId(event.target.value)}>
+                    {reassignOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.email} ({option.role || "owner"})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="row right">
+                  <button
+                    className="btn ghost"
+                    type="button"
+                    onClick={async () => {
+                      if (!reassignOwnerId || !deal) return;
+                      setError(null);
+                      try {
+                        const updated = await reassignDeal(deal.id, reassignOwnerId);
+                        setDeal(updated);
+                        setSuccessMessage("Deal reassigned.");
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Could not reassign deal");
+                      }
+                    }}
+                  >
+                    Reassign
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </section>
 
           {editing ? (

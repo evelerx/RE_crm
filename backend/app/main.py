@@ -25,6 +25,7 @@ from .routes import (
     enterprise,
     integrations,
     insights,
+    leaderboard,
     llm,
     meta,
     marketing,
@@ -32,6 +33,7 @@ from .routes import (
     profile,
     public,
     sequences,
+    targets,
     whatsapp,
 )
 from . import runtime_state
@@ -128,8 +130,10 @@ app.include_router(llm.router, dependencies=deps)
 app.include_router(next_actions.router, dependencies=deps)
 app.include_router(csvio.router, dependencies=deps)
 app.include_router(insights.router, dependencies=deps)
+app.include_router(leaderboard.router, dependencies=deps)
 app.include_router(enterprise.router, dependencies=deps)
 app.include_router(sequences.router, dependencies=deps)
+app.include_router(targets.router, dependencies=deps)
 app.include_router(whatsapp.router, dependencies=deps)
 app.include_router(marketing.router, dependencies=deps)
 app.include_router(marketing.payments_router, dependencies=deps)

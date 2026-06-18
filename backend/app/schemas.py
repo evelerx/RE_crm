@@ -891,6 +891,7 @@ class DealUpdate(BaseModel):
 
 class DealRead(BaseModel):
     id: UUID
+    owner_id: UUID
     title: str
     asset_type: str
     stage: str
@@ -944,6 +945,66 @@ class FollowUpSequenceRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class TargetGoalCreate(BaseModel):
+    subject_user_id: Optional[UUID] = None
+    subject_label: str = Field(default="", max_length=160)
+    metric: str = Field(default="deals_closed", max_length=80)
+    target_value: int = Field(default=0, ge=0)
+
+
+class TargetGoalUpdate(BaseModel):
+    subject_user_id: Optional[UUID] = None
+    subject_label: Optional[str] = Field(default=None, max_length=160)
+    metric: Optional[str] = Field(default=None, max_length=80)
+    target_value: Optional[int] = Field(default=None, ge=0)
+
+
+class TargetGoalRead(BaseModel):
+    id: UUID
+    owner_id: UUID
+    enterprise_owner_id: Optional[UUID] = None
+    created_by_user_id: Optional[UUID] = None
+    subject_user_id: Optional[UUID] = None
+    subject_label: str = ""
+    metric: str
+    target_value: int
+    actual_value: int = 0
+    subject_name: str = ""
+    subject_role: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LeaderboardRowRead(BaseModel):
+    user_id: UUID
+    name: str
+    role: str
+    deals_closed: int
+    deals_total: int
+    contacts_total: int
+    activities_total: int
+    site_visits_total: int
+    follow_ups_total: int
+    revenue_inr: int
+    score: int
+
+
+class DealReassignRequest(BaseModel):
+    owner_id: UUID
+
+
+class RbacMatrixRead(BaseModel):
+    matrix: dict[str, dict[str, bool]]
+    updated_at: Optional[datetime] = None
+
+
+class RbacMatrixUpdate(BaseModel):
+    matrix: dict[str, dict[str, bool]]
 
 
 class DealClosureEventRead(BaseModel):

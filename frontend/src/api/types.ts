@@ -3,6 +3,7 @@ export type AssetType = "residential" | "commercial" | "land" | "industrial" | "
 
 export type Deal = {
   id: string;
+  owner_id?: string;
   title: string;
   asset_type: AssetType;
   stage: Stage;
@@ -57,6 +58,8 @@ export type ContactCreate = {
   tags?: string;
   notes?: string;
 };
+
+export type ContactUpdate = Partial<ContactCreate>;
 
 export type Activity = {
   id: string;
@@ -127,6 +130,50 @@ export type WhatsAppConfigStatus = {
   configured: boolean;
   missing_fields: string[];
   detail: string;
+};
+
+export type LeaderboardRow = {
+  user_id: string;
+  name: string;
+  role: string;
+  deals_closed: number;
+  deals_total: number;
+  contacts_total: number;
+  activities_total: number;
+  site_visits_total: number;
+  follow_ups_total: number;
+  revenue_inr: number;
+  score: number;
+};
+
+export type TargetGoal = {
+  id: string;
+  owner_id: string;
+  enterprise_owner_id: string | null;
+  created_by_user_id: string | null;
+  subject_user_id: string | null;
+  subject_label: string;
+  metric: string;
+  target_value: number;
+  actual_value: number;
+  subject_name: string;
+  subject_role: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TargetGoalCreate = {
+  subject_user_id?: string | null;
+  subject_label?: string;
+  metric: string;
+  target_value: number;
+};
+
+export type TargetGoalUpdate = Partial<TargetGoalCreate>;
+
+export type RbacMatrix = {
+  matrix: Record<string, Record<string, boolean>>;
+  updated_at: string | null;
 };
 
 export type DealClosureEvent = {

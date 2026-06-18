@@ -1,6 +1,6 @@
 // MODIFIED: Phase 5 — Admin portal efficiency overhaul — Adds admin navigation, quick stats, user management, debounced search, pagination, and audited support actions.
 import { useEffect, useMemo, useState } from "react";
-import { api, ApiError, setAdminMarketingAccess } from "../api/client";
+import { api, ApiError, getRbacMatrix, saveRbacMatrix, setAdminMarketingAccess } from "../api/client";
 import AdminAccountsPanel from "../components/marketing/AdminAccountsPanel";
 import RevenueGraph from "../components/RevenueGraph";
 import SubscriberDataTable from "../components/SubscriberDataTable";
@@ -502,6 +502,8 @@ export default function AdminPage() {
   const [configBusy, setConfigBusy] = useState(false);
   const [configMsg, setConfigMsg] = useState<string | null>(null);
   const [rbacMatrix, setRbacMatrix] = useState<Record<string, Record<string, boolean>>>(DEFAULT_RBAC_MATRIX);
+  const [rbacBusy, setRbacBusy] = useState(false);
+  const [rbacMsg, setRbacMsg] = useState<string | null>(null);
   const [featureFlags, setFeatureFlags] = useState<FeatureFlagRow[]>(DEFAULT_FEATURE_FLAGS);
   const [configForm, setConfigForm] = useState({
     frontend_origin: "",
@@ -589,14 +591,15 @@ export default function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-        const [users, enterpriseRows, securityPosture, complianceReport, runtime, subscriptionData, demoRows] = await Promise.all([
+        const [users, enterpriseRows, securityPosture, complianceReport, runtime, subscriptionData, demoRows, rbacData] = await Promise.all([
         api<AdminUserRow[]>("/admin/users"),
         api<EnterpriseDetail[]>("/admin/enterprises"),
         api<SecurityPosture>("/admin/security-posture"),
         api<ComplianceReport>("/admin/compliance-report"),
         api<RuntimeConfig>("/admin/runtime-config"),
         api<SubscriptionAnalytics>(`/admin/subscription-analytics?grain=${subscriptionGrain}`),
-        api<DemoRequestRow[]>("/admin/demo-requests")
+        api<DemoRequestRow[]>("/admin/demo-requests"),
+        getRbacMatrix(),
       ]);
       const adminMe = await api<{ is_admin: boolean; email: string }>("/admin/me");
       setRows(users);
@@ -606,6 +609,7 @@ export default function AdminPage() {
       setSubscriptionAnalytics(subscriptionData);
       setDemoRequests(demoRows);
       setRuntimeConfig(runtime);
+      setRbacMatrix(rbacData.matrix || DEFAULT_RBAC_MATRIX);
       setLastKpiRefreshAt(new Date());
       setAdminEmail(adminMe.email || "");
       setConfigForm((prev) => ({
@@ -659,6 +663,21 @@ export default function AdminPage() {
 
   function resetRbacDefaults() {
     setRbacMatrix(DEFAULT_RBAC_MATRIX);
+    setRbacMsg("RBAC reset locally. Save to make it live.");
+  }
+
+  async function persistRbacMatrix(nextMatrix: Record<string, Record<string, boolean>>) {
+    setRbacBusy(true);
+    setRbacMsg(null);
+    try {
+      const saved = await saveRbacMatrix(nextMatrix);
+      setRbacMatrix(saved.matrix || nextMatrix);
+      setRbacMsg("RBAC matrix saved.");
+    } catch (e) {
+      setRbacMsg(e instanceof Error ? e.message : "Could not save RBAC matrix");
+    } finally {
+      setRbacBusy(false);
+    }
   }
 
   function toggleFeatureFlag(key: string) {
@@ -2328,6 +2347,7 @@ export default function AdminPage() {
       <section id="admin-rbac" className="card premiumPanel adminAnchorTarget">
         <div className="cardTitle">RBAC matrix</div>
         <div className="muted small">Adjust visibility and action rights by role. Admin stays locked to full access by default.</div>
+        {rbacMsg ? <div className={rbacMsg.includes("saved") ? "alert ok" : "alert"}>{rbacMsg}</div> : null}
         <div className="tableWrap adminTableOffset">
           <table className="table adminMatrixTable">
             <thead>
@@ -2367,6 +2387,9 @@ export default function AdminPage() {
         </div>
         <div className="row">
           <button className="btn ghost" type="button" onClick={resetRbacDefaults}>Reset to defaults</button>
+          <button className="btn" type="button" onClick={() => void persistRbacMatrix(rbacMatrix)} disabled={rbacBusy}>
+            {rbacBusy ? "Saving..." : "Save RBAC"}
+          </button>
         </div>
       </section>
 

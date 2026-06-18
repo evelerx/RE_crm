@@ -23,7 +23,9 @@ from .models import (
     FollowUpSequence,
     PasswordResetToken,
     Profile,
+    RbacMatrixSetting,
     SupportChatMessage,
+    TargetGoal,
     User,
     WhatsAppMessage,
 )
@@ -362,6 +364,36 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "supportchatmessage", "message VARCHAR DEFAULT ''")
             if "created_at" not in cols:
                 _sqlite_add_column(conn, "supportchatmessage", "created_at DATETIME")
+        if _sqlite_table_exists(conn, "targetgoal"):
+            cols = _sqlite_table_columns(conn, "targetgoal")
+            if "owner_id" not in cols:
+                _sqlite_add_column(conn, "targetgoal", "owner_id VARCHAR")
+            if "enterprise_owner_id" not in cols:
+                _sqlite_add_column(conn, "targetgoal", "enterprise_owner_id VARCHAR")
+            if "created_by_user_id" not in cols:
+                _sqlite_add_column(conn, "targetgoal", "created_by_user_id VARCHAR")
+            if "subject_user_id" not in cols:
+                _sqlite_add_column(conn, "targetgoal", "subject_user_id VARCHAR")
+            if "subject_label" not in cols:
+                _sqlite_add_column(conn, "targetgoal", "subject_label VARCHAR DEFAULT ''")
+            if "metric" not in cols:
+                _sqlite_add_column(conn, "targetgoal", "metric VARCHAR DEFAULT 'deals_closed'")
+            if "target_value" not in cols:
+                _sqlite_add_column(conn, "targetgoal", "target_value INTEGER DEFAULT 0")
+            if "created_at" not in cols:
+                _sqlite_add_column(conn, "targetgoal", "created_at DATETIME")
+            if "updated_at" not in cols:
+                _sqlite_add_column(conn, "targetgoal", "updated_at DATETIME")
+        if _sqlite_table_exists(conn, "rbacmatrixsetting"):
+            cols = _sqlite_table_columns(conn, "rbacmatrixsetting")
+            if "scope_key" not in cols:
+                _sqlite_add_column(conn, "rbacmatrixsetting", "scope_key VARCHAR DEFAULT 'global'")
+            if "matrix_json" not in cols:
+                _sqlite_add_column(conn, "rbacmatrixsetting", "matrix_json VARCHAR DEFAULT '{}'")
+            if "updated_at" not in cols:
+                _sqlite_add_column(conn, "rbacmatrixsetting", "updated_at DATETIME")
+            if "updated_by_user_id" not in cols:
+                _sqlite_add_column(conn, "rbacmatrixsetting", "updated_by_user_id VARCHAR")
 
         if _sqlite_table_exists(conn, "user"):
             cols = _sqlite_table_columns(conn, "user")

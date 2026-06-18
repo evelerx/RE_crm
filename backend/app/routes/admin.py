@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
 from pathlib import Path
 from typing import List, Optional
 from uuid import UUID
@@ -15,7 +16,7 @@ from ..auth import decode_token, get_current_user, hash_password, is_admin_email
 from ..crypto import decrypt_if_configured, encrypt_if_configured
 from ..db import delete_demo_account_tree, get_session
 from ..enterprise_scope import count_org_records, employee_record_counts, org_owner_filter
-from ..models import Activity, AuditEvent, Contact, Deal, MarketingAddonSubscription, Profile, SupportChatMessage, User
+from ..models import Activity, AuditEvent, Contact, Deal, MarketingAddonSubscription, Profile, RbacMatrixSetting, SupportChatMessage, User
 from ..schemas import (
     AdminBlacklistRequest,
     AdminCreateDemoAccountRequest,
@@ -27,6 +28,8 @@ from ..schemas import (
     AdminSetEmployeeLimitRequest,
     AdminSetPlanRequest,
     AdminUnlockUserRequest,
+    RbacMatrixRead,
+    RbacMatrixUpdate,
     ProfileUpsert,
     SupportChatMessageCreate,
     SupportChatMessageRead,
@@ -203,6 +206,55 @@ def _runtime_config_payload() -> AdminRuntimeConfigRead:
         login_lockout_minutes=int(settings.login_lockout_minutes or 15),
         jwt_exp_days=int(settings.jwt_exp_days or 30),
     )
+
+
+def _default_rbac_matrix() -> dict[str, dict[str, bool]]:
+    roles = ["admin", "enterprise_owner", "builder_owner", "manager", "broker", "cp", "employee", "solo"]
+    permissions = {
+        "view_own_records": lambda role: True,
+        "view_team_records": lambda role: role in {"admin", "enterprise_owner", "builder_owner", "manager"},
+        "view_org_records": lambda role: role in {"admin", "enterprise_owner", "builder_owner"},
+        "create_deal": lambda role: role in {"admin", "enterprise_owner", "builder_owner", "manager", "broker", "solo"},
+        "edit_deal": lambda role: role in {"admin", "enterprise_owner", "builder_owner", "manager", "broker", "solo"},
+        "delete_deal": lambda role: role in {"admin", "enterprise_owner", "builder_owner"},
+        "move_deal_stage": lambda role: role in {"admin", "enterprise_owner", "builder_owner", "manager", "broker", "solo"},
+        "reassign_deal": lambda role: role in {"admin", "enterprise_owner", "manager"},
+        "create_contact": lambda role: role in {"admin", "enterprise_owner", "builder_owner", "manager", "broker", "cp", "employee", "solo"},
+        "edit_contact": lambda role: role in {"admin", "enterprise_owner", "builder_owner", "manager", "broker", "employee", "solo"},
+        "delete_contact": lambda role: role in {"admin", "enterprise_owner", "builder_owner", "manager", "solo"},
+        "view_inventory": lambda role: role in {"admin", "enterprise_owner", "builder_owner", "manager", "broker", "cp"},
+        "manage_inventory": lambda role: role in {"admin", "enterprise_owner", "builder_owner"},
+        "set_soft_hold": lambda role: role in {"admin", "enterprise_owner", "builder_owner"},
+        "set_blocked": lambda role: role in {"admin", "enterprise_owner", "builder_owner"},
+        "create_employee": lambda role: role in {"admin", "enterprise_owner", "builder_owner"},
+        "manage_team": lambda role: role in {"admin", "enterprise_owner", "builder_owner"},
+        "view_leaderboard": lambda role: role in {"admin", "enterprise_owner", "builder_owner", "manager"},
+        "set_targets": lambda role: role in {"admin", "enterprise_owner", "builder_owner", "manager", "solo"},
+        "use_ai_followup": lambda role: role in {"admin", "enterprise_owner", "builder_owner", "manager", "broker", "solo"},
+        "use_ai_scoring": lambda role: role in {"admin", "enterprise_owner", "builder_owner", "manager", "broker", "solo"},
+        "use_builder_ai": lambda role: role in {"admin", "builder_owner"},
+        "access_admin_portal": lambda role: role == "admin",
+        "impersonate_user": lambda role: role == "admin",
+        "manage_subscriptions": lambda role: role == "admin",
+        "manage_rbac": lambda role: role == "admin",
+    }
+    matrix: dict[str, dict[str, bool]] = {}
+    for role in roles:
+        matrix[role] = {permission: bool(check(role)) for permission, check in permissions.items()}
+    return matrix
+
+
+def _rbac_payload(session: Session) -> RbacMatrixRead:
+    row = session.exec(select(RbacMatrixSetting).where(RbacMatrixSetting.scope_key == "global")).first()
+    if not row:
+        return RbacMatrixRead(matrix=_default_rbac_matrix(), updated_at=None)
+    try:
+        parsed = json.loads(row.matrix_json or "{}")
+        if not isinstance(parsed, dict):
+            parsed = _default_rbac_matrix()
+    except json.JSONDecodeError:
+        parsed = _default_rbac_matrix()
+    return RbacMatrixRead(matrix=parsed, updated_at=row.updated_at)
 
 
 def require_admin(
@@ -462,6 +514,41 @@ def runtime_config(
     _: User = Depends(require_admin),
 ):
     return _runtime_config_payload()
+
+
+@router.get("/rbac-matrix", response_model=RbacMatrixRead)
+def get_rbac_matrix(
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+):
+    """Return the persisted RBAC matrix used by the admin portal."""
+    return _rbac_payload(session)
+
+
+@router.put("/rbac-matrix", response_model=RbacMatrixRead)
+def save_rbac_matrix(
+    payload: RbacMatrixUpdate,
+    session: Session = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+):
+    """Persist admin-managed RBAC settings for role capability review."""
+    row = session.exec(select(RbacMatrixSetting).where(RbacMatrixSetting.scope_key == "global")).first()
+    if not row:
+        row = RbacMatrixSetting(scope_key="global")
+    row.matrix_json = json.dumps(payload.matrix)
+    row.updated_at = _utc_now_naive()
+    row.updated_by_user_id = admin_user.id
+    session.add(row)
+    log_audit_event(
+        session,
+        actor=admin_user,
+        kind="admin.rbac_matrix_update",
+        summary="Updated RBAC matrix",
+        detail="Persisted role permission changes from admin portal.",
+    )
+    _commit_or_http(session, "Unable to save RBAC matrix")
+    session.refresh(row)
+    return _rbac_payload(session)
 
 
 @router.post("/runtime-config", response_model=AdminRuntimeConfigRead)
