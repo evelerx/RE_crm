@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, apiBlob, apiForm, deleteContact as deleteContactRequest, updateContact as updateContactRequest } from "../api/client";
-import type { Contact, ContactCreate, ContactUpdate } from "../api/types";
+import { api, apiBlob, apiForm, deleteContact as deleteContactRequest, getDefaultSequence, updateContact as updateContactRequest } from "../api/client";
+import type { Contact, ContactCreate, ContactUpdate, FollowUpSequence } from "../api/types";
 import Modal from "../components/Modal";
 
 type CsvFailedRow = {
@@ -30,6 +30,7 @@ function downloadBlob(filename: string, blob: Blob) {
 
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [sequence, setSequence] = useState<FollowUpSequence | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
@@ -57,7 +58,12 @@ export default function ContactsPage() {
     setError(null);
     setLoading(true);
     try {
-      setContacts(await api<Contact[]>("/contacts"));
+      const [contactRows, sequenceRow] = await Promise.all([
+        api<Contact[]>("/contacts"),
+        getDefaultSequence(),
+      ]);
+      setContacts(contactRows);
+      setSequence(sequenceRow);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load contacts");
     } finally {
@@ -123,6 +129,33 @@ export default function ContactsPage() {
         </div>
       </div>
       {error ? <div className="alert">{error}</div> : null}
+      <section className="card card-pad" style={{ marginBottom: 20 }}>
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div className="cardTitle">Default saved sequence</div>
+            <div className="muted">This is the follow-up sequence your team can use while working these contacts.</div>
+          </div>
+          <a className="btn ghost compact" href="/sequences">
+            Open sequence
+          </a>
+        </div>
+        {sequence ? (
+          <div className="sequenceSteps" style={{ marginTop: 16 }}>
+            {sequence.steps.map((step, index) => (
+              <div key={step.id} className="sequenceStepCard">
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                  <div className="sequenceStepBadge">Step {index + 1}</div>
+                  <span className="tag">{step.delay}</span>
+                </div>
+                <div className="tdTitle" style={{ marginTop: 10 }}>{step.subject}</div>
+                <div className="muted" style={{ marginTop: 6 }}>{step.body}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="muted" style={{ marginTop: 16 }}>No saved sequence yet.</div>
+        )}
+      </section>
       {importSummary ? (
         <div className={importSummary.failed_count > 0 ? "alert" : "alert ok"}>
           Imported {importSummary.success_count} records. {importSummary.failed_count} rows failed

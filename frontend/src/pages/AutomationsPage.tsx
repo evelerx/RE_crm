@@ -1,7 +1,8 @@
 // MODIFIED: Enterprise sidebar wiring — Replaces the dead Automations placeholder with a live workspace backed by /next-actions so owners can act on overdue activities and stuck deals.
 import { useEffect, useMemo, useState } from "react";
 
-import { api } from "../api/client";
+import { api, getDefaultSequence } from "../api/client";
+import type { FollowUpSequence } from "../api/types";
 
 type ActivityRow = {
   id: string;
@@ -39,6 +40,7 @@ function fmtDate(value: string | null) {
 
 export default function AutomationsPage() {
   const [data, setData] = useState<NextActionsResponse | null>(null);
+  const [sequence, setSequence] = useState<FollowUpSequence | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,8 +48,12 @@ export default function AutomationsPage() {
     setLoading(true);
     setError(null);
     try {
-      const nextActions = await api<NextActionsResponse>("/next-actions?days=5&stuck_days=7");
+      const [nextActions, savedSequence] = await Promise.all([
+        api<NextActionsResponse>("/next-actions?days=5&stuck_days=7"),
+        getDefaultSequence(),
+      ]);
       setData(nextActions);
+      setSequence(savedSequence);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load automations workspace.");
     } finally {
@@ -135,6 +141,37 @@ export default function AutomationsPage() {
               </tbody>
             </table>
           </div>
+        </section>
+
+        <section className="card card-pad">
+          <div className="cardTitle">Current follow-up sequence</div>
+          <div className="muted" style={{ marginBottom: 12 }}>
+            This saved sequence is what your team can reuse while running manual and stage-based follow-ups.
+          </div>
+          {loading ? (
+            <div className="muted">Loading sequence...</div>
+          ) : sequence ? (
+            <div className="sequenceSteps">
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <strong>{sequence.name}</strong>
+                <a className="btn ghost compact" href="/sequences">
+                  Open sequence
+                </a>
+              </div>
+              {sequence.steps.map((step, index) => (
+                <div key={step.id} className="sequenceStepCard">
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                    <div className="sequenceStepBadge">Step {index + 1}</div>
+                    <span className="tag">{step.delay}</span>
+                  </div>
+                  <div className="tdTitle" style={{ marginTop: 10 }}>{step.subject}</div>
+                  <div className="muted" style={{ marginTop: 6 }}>{step.body}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="muted">No sequence has been saved yet.</div>
+          )}
         </section>
 
         <section className="card card-pad">

@@ -6,18 +6,23 @@ import {
   api,
   closeDeal,
   deleteDealImage,
+  getDefaultSequence,
   listDealImages,
   reassignDeal,
   sendWhatsAppMedia,
   setPrimaryDealImage,
   uploadDealImages,
 } from "../api/client";
-import type { Activity, Contact, Deal, DealImage } from "../api/types";
+import type { Activity, Contact, Deal, DealImage, FollowUpSequence } from "../api/types";
 
 type DealScoreResponse = { deal_id: string; close_probability: number; risk_flags: string[]; rationale: string[] };
 type FollowupResponse = { deal_id: string; message: string };
 type LlmFollowupResponse = { deal_id: string; message: string };
 type DealReassignOption = { id: string; email: string; role: string };
+
+function personalizeSequenceBody(template: string, contactName: string, dealTitle: string) {
+  return template.replaceAll("{{name}}", contactName || "Client").replaceAll("{{deal}}", dealTitle || "this property");
+}
 
 function normalizeWhatsAppNumber(value: string | null | undefined) {
   const digits = (value || "").replace(/\D+/g, "");
@@ -75,6 +80,7 @@ export default function DealDetailPage() {
   const [score, setScore] = useState<DealScoreResponse | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [dealImages, setDealImages] = useState<DealImage[]>([]);
+  const [sequence, setSequence] = useState<FollowUpSequence | null>(null);
   const [reassignOptions, setReassignOptions] = useState<DealReassignOption[]>([]);
   const [reassignOwnerId, setReassignOwnerId] = useState("");
   const [whatsAppContactId, setWhatsAppContactId] = useState("");
@@ -113,13 +119,15 @@ export default function DealDetailPage() {
     if (!dealId) return;
     setError(null);
     try {
-      const [d, contactRows, a, imageRows] = await Promise.all([
+      const [d, contactRows, a, imageRows, sequenceRow] = await Promise.all([
         api<Deal>(`/deals/${dealId}`),
         api<Contact[]>("/contacts"),
         api<Activity[]>(`/activities?deal_id=${encodeURIComponent(dealId)}`),
         listDealImages(dealId),
+        getDefaultSequence(),
       ]);
       setDeal(d);
+      setSequence(sequenceRow);
       setNoteDraft(d.notes ?? "");
       setClosureNote(d.closure_note ?? "");
       setDealImages(imageRows);
@@ -385,6 +393,7 @@ export default function DealDetailPage() {
   const whatsAppContact = contacts.find((contact) => contact.id === whatsAppContactId) || null;
   const whatsAppPhone = whatsAppContact?.phone;
   const canSendWhatsApp = Boolean(normalizeWhatsAppNumber(whatsAppPhone));
+  const linkedContact = contacts.find((contact) => contact.id === deal?.contact_id) || whatsAppContact || null;
 
   return (
     <div className="page">
@@ -436,6 +445,7 @@ export default function DealDetailPage() {
           <a href="#deal-closure">Closure</a>
           <a href="#deal-images">Images</a>
           <a href="#deal-ai">AI Follow-up</a>
+          <a href="#deal-sequence">Sequence</a>
           <a href="#deal-activities">Activities</a>
         </nav>
       ) : null}
@@ -816,6 +826,38 @@ export default function DealDetailPage() {
             {!canSendWhatsApp ? (
               <div className="muted small">Choose a contact with a valid phone or WhatsApp number before sending.</div>
             ) : null}
+          </section>
+
+          <section className="card" id="deal-sequence">
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div className="cardTitle">Saved follow-up sequence</div>
+                <div className="muted">
+                  This deal can use the owner&apos;s default saved sequence. Review it here or open the full sequence builder.
+                </div>
+              </div>
+              <a className="btn ghost compact" href="/sequences">
+                Open sequence builder
+              </a>
+            </div>
+            {sequence ? (
+              <div className="sequenceSteps" style={{ marginTop: 16 }}>
+                {sequence.steps.map((step, index) => (
+                  <div key={step.id} className="sequenceStepCard">
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                      <div className="sequenceStepBadge">Step {index + 1}</div>
+                      <span className="tag">{step.delay}</span>
+                    </div>
+                    <div className="tdTitle" style={{ marginTop: 10 }}>{step.subject}</div>
+                    <div className="muted" style={{ marginTop: 6 }}>
+                      {personalizeSequenceBody(step.body, linkedContact?.name || "Client", deal.title)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="muted" style={{ marginTop: 16 }}>No saved sequence found for this workspace yet.</div>
+            )}
           </section>
 
           <section className="card">
