@@ -1,16 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  ApiError,
+  API_BASE_URL,
   api,
+  listDealImages,
   listWhatsAppInbox,
   sendWhatsAppMedia,
   type WhatsAppConversationSummaryRead,
 } from "../api/client";
 import Modal from "../components/Modal";
-import type { Activity, Contact, ContactCreate, Deal } from "../api/types";
+import type { Activity, Contact, ContactCreate, Deal, DealImage } from "../api/types";
 
-type FollowupResponse = { deal_id: string; message: string };
+async function pullDealContent(selected: Deal[]): Promise<string> {
+  const blocks = await Promise.all(
+    selected.map(async (deal, index) => {
+      let images: DealImage[] = [];
+      try {
+        images = await listDealImages(deal.id);
+      } catch {
+        images = [];
+      }
+      const location = [deal.area, deal.city].filter(Boolean).join(", ");
+      const budget = deal.ticket_size ?? deal.customer_budget;
+      const prefix = selected.length > 1 ? `${index + 1}. ` : "";
+      const lines = [`${prefix}${deal.title}${location ? ` — ${location}` : ""}`];
+      if (budget != null) lines.push(`   Budget: Rs ${budget.toLocaleString("en-IN")}`);
+      if (images.length) lines.push(`   Photos: ${images.map((img) => `${API_BASE_URL}${img.image_url}`).join(" ")}`);
+      return lines.join("\n");
+    }),
+  );
+  return ["Sharing the property details we discussed:", "", blocks.join("\n\n")].join("\n");
+}
 
 function normalizeWhatsAppNumber(value: string | null | undefined) {
   const digits = (value || "").replace(/\D+/g, "");
@@ -53,10 +73,11 @@ export default function WhatsAppPage() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [loadingInbox, setLoadingInbox] = useState(true);
   const [sending, setSending] = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [pulling, setPulling] = useState(false);
   const [activityBusy, setActivityBusy] = useState(false);
   const [reminderBusy, setReminderBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [selectedDealIds, setSelectedDealIds] = useState<string[]>([]);
   const [followupDraft, setFollowupDraft] = useState("");
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string>("");
@@ -102,6 +123,7 @@ export default function WhatsAppPage() {
 
   useEffect(() => {
     setFollowupDraft("");
+    setSelectedDealIds([]);
     setAttachmentFile(null);
     setAttachmentPreviewUrl("");
     setAttachmentError(null);
@@ -169,13 +191,48 @@ export default function WhatsAppPage() {
     [mergedContacts, selectedContactId],
   );
 
-  const linkedDeal = useMemo(() => {
-    const candidates = deals.filter((deal) => deal.contact_id === selectedContactId);
-    if (candidates.length === 0) return null;
-    return candidates.slice().sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0];
-  }, [deals, selectedContactId]);
+  const dealOptions = useMemo(
+    () =>
+      deals
+        .filter((deal) => deal.contact_id === selectedContactId)
+        .slice()
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()),
+    [deals, selectedContactId],
+  );
+
+  const selectedDeals = useMemo(
+    () => dealOptions.filter((deal) => selectedDealIds.includes(deal.id)),
+    [dealOptions, selectedDealIds],
+  );
 
   const canSendWhatsApp = Boolean(normalizeWhatsAppNumber(selectedSummary?.contact_phone));
+
+  function toggleDealSelection(dealId: string) {
+    setSelectedDealIds((prev) => (prev.includes(dealId) ? prev.filter((id) => id !== dealId) : [...prev, dealId]));
+  }
+
+  useEffect(() => {
+    if (selectedDealIds.length === 0) {
+      setFollowupDraft("");
+      return;
+    }
+    let cancelled = false;
+    setPulling(true);
+    pullDealContent(selectedDeals)
+      .then((message) => {
+        if (!cancelled) setFollowupDraft(message);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Could not pull deal content");
+      })
+      .finally(() => {
+        if (!cancelled) setPulling(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDealIds]);
 
   async function addActivity(payload: { summary: string; kind?: string; due_at?: string | null }) {
     if (!selectedContactId) return;
@@ -186,7 +243,7 @@ export default function WhatsAppPage() {
         method: "POST",
         body: JSON.stringify({
           contact_id: selectedContactId,
-          deal_id: linkedDeal?.id ?? null,
+          deal_id: selectedDeals[0]?.id ?? null,
           kind: payload.kind ?? "whatsapp",
           summary: payload.summary,
           due_at: payload.due_at ?? null,
@@ -209,7 +266,7 @@ export default function WhatsAppPage() {
         method: "POST",
         body: JSON.stringify({
           contact_id: selectedContactId,
-          deal_id: linkedDeal?.id ?? null,
+          deal_id: selectedDeals[0]?.id ?? null,
           kind: "call",
           summary: "Follow-up reminder",
           due_at: due.toISOString(),
@@ -220,38 +277,6 @@ export default function WhatsAppPage() {
       setError(e instanceof Error ? e.message : "Could not create reminder");
     } finally {
       setReminderBusy(false);
-    }
-  }
-
-  async function generateFollowup() {
-    if (!linkedDeal) return;
-    setGenerating(true);
-    setError(null);
-    try {
-      const resp = await api<FollowupResponse>("/ai/llm/followup", {
-        method: "POST",
-        body: JSON.stringify({
-          provider: "openrouter",
-          deal_id: linkedDeal.id,
-          objective: "followup",
-          channel: "whatsapp",
-          tone: "professional",
-        }),
-      });
-      setFollowupDraft(resp.message);
-    } catch (e) {
-      try {
-        if (!(e instanceof ApiError) || (e.status !== 400 && e.status !== 404)) throw e;
-        const resp = await api<FollowupResponse>("/ai/followup", {
-          method: "POST",
-          body: JSON.stringify({ deal_id: linkedDeal.id, objective: "followup", channel: "whatsapp", tone: "professional" }),
-        });
-        setFollowupDraft(resp.message);
-      } catch (inner) {
-        setError(inner instanceof Error ? inner.message : "Follow-up generation failed");
-      }
-    } finally {
-      setGenerating(false);
     }
   }
 
@@ -294,7 +319,7 @@ export default function WhatsAppPage() {
       <div className="pageHeader">
         <div>
           <div className="h1">WhatsApp</div>
-          <div className="muted">AI-assisted follow-ups for leads and clients, sent straight to WhatsApp.</div>
+          <div className="muted">Pull deal details and photos into a follow-up, then send straight to WhatsApp.</div>
         </div>
         <button className="btn ghost" type="button" onClick={() => void loadInbox(selectedContactId)}>
           Refresh
@@ -341,7 +366,7 @@ export default function WhatsAppPage() {
           {!selectedSummary ? (
             <div className="emptyStateCard">
               <div className="h2">No conversation selected</div>
-              <div className="muted">Pick a contact from the inbox to draft an AI follow-up.</div>
+              <div className="muted">Pick a contact from the inbox to draft a follow-up.</div>
             </div>
           ) : (
             <>
@@ -354,7 +379,7 @@ export default function WhatsAppPage() {
                   </div>
                 </div>
                 <div className="muted whatsappTiny">
-                  {linkedDeal ? `Linked deal: ${linkedDeal.title}` : "No linked deal"}
+                  {dealOptions.length} deal{dealOptions.length === 1 ? "" : "s"} linked
                 </div>
               </div>
 
@@ -378,14 +403,34 @@ export default function WhatsAppPage() {
 
               <div className="card" style={{ marginTop: 14 }}>
                 <div className="cardTitle">AI Follow-up</div>
-                <div className="muted">Generate a client-ready follow-up, send it to WhatsApp, or log it back into activity history.</div>
+                <div className="muted">Pick deals to pull in their details and photos, send it to WhatsApp, or log it back into activity history.</div>
+
+                <label style={{ marginTop: 10, display: "block" }}>
+                  Deals for {selectedSummary.contact_name}
+                  {dealOptions.length === 0 ? (
+                    <div className="muted small" style={{ marginTop: 6 }}>No deals linked to this contact yet.</div>
+                  ) : (
+                    <div className="stack" style={{ gap: 6, marginTop: 6 }}>
+                      {dealOptions.map((deal) => (
+                        <label key={deal.id} className="row" style={{ gap: 8, alignItems: "center", fontWeight: 400 }}>
+                          <input type="checkbox" checked={selectedDealIds.includes(deal.id)} onChange={() => toggleDealSelection(deal.id)} />
+                          <span>
+                            {deal.title} — {deal.stage}
+                            {deal.area ? `, ${deal.area}` : ""}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </label>
+                {pulling ? <div className="muted small" style={{ marginTop: 6 }}>Pulling deal content...</div> : null}
 
                 <textarea
                   className="textarea"
                   style={{ marginTop: 10 }}
                   value={followupDraft}
                   onChange={(e) => setFollowupDraft(e.target.value)}
-                  placeholder="Generate a follow-up message to begin."
+                  placeholder="Select a deal above, or type a message to begin."
                 />
 
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
@@ -425,15 +470,6 @@ export default function WhatsAppPage() {
                 <div className="row" style={{ marginTop: 10 }}>
                   <button
                     className="btn"
-                    type="button"
-                    disabled={generating || !linkedDeal}
-                    title={linkedDeal ? undefined : "Link a deal to this contact to enable AI generation"}
-                    onClick={() => void generateFollowup()}
-                  >
-                    {generating ? "Generating..." : "Generate"}
-                  </button>
-                  <button
-                    className="btn ghost"
                     type="button"
                     disabled={sending || !followupDraft.trim() || (!attachmentFile && !canSendWhatsApp)}
                     onClick={() => void sendFollowup()}
