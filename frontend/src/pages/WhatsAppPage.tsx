@@ -3,17 +3,29 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   api,
-  getWhatsAppConfigStatus,
   listWhatsAppInbox,
   sendWhatsAppMedia,
-  sendWhatsAppMessage,
-  type WhatsAppConfigStatusRead,
   type WhatsAppConversationSummaryRead,
 } from "../api/client";
 import Modal from "../components/Modal";
 import type { Activity, Contact, ContactCreate, Deal } from "../api/types";
 
 type FollowupResponse = { deal_id: string; message: string };
+
+function normalizeWhatsAppNumber(value: string | null | undefined) {
+  const digits = (value || "").replace(/\D+/g, "");
+  if (digits.length < 10) return "";
+  return digits;
+}
+
+function openWhatsApp(message: string, phone: string | null | undefined) {
+  const target = normalizeWhatsAppNumber(phone);
+  if (!target) {
+    throw new Error("This contact needs a valid phone or WhatsApp number before sending.");
+  }
+  const url = `https://wa.me/${target}?text=${encodeURIComponent(message)}`;
+  window.open(url, "_blank");
+}
 
 function formatTimestamp(value: string) {
   return new Date(value).toLocaleString([], {
@@ -45,7 +57,6 @@ export default function WhatsAppPage() {
   const [activityBusy, setActivityBusy] = useState(false);
   const [reminderBusy, setReminderBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [whatsAppConfig, setWhatsAppConfig] = useState<WhatsAppConfigStatusRead | null>(null);
   const [followupDraft, setFollowupDraft] = useState("");
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string>("");
@@ -54,16 +65,6 @@ export default function WhatsAppPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
-
-  async function loadConfigStatus() {
-    try {
-      const config = await getWhatsAppConfigStatus();
-      setWhatsAppConfig(config);
-    } catch (e) {
-      setWhatsAppConfig(null);
-      setError(e instanceof Error ? e.message : "Failed to load WhatsApp configuration status");
-    }
-  }
 
   async function loadInbox(preferredContactId?: string | null) {
     setLoadingInbox(true);
@@ -93,7 +94,6 @@ export default function WhatsAppPage() {
 
   useEffect(() => {
     void loadInbox();
-    void loadConfigStatus();
     const timer = window.setInterval(() => {
       void loadInbox(selectedContactId);
     }, 30000);
@@ -175,6 +175,8 @@ export default function WhatsAppPage() {
     return candidates.slice().sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0];
   }, [deals, selectedContactId]);
 
+  const canSendWhatsApp = Boolean(normalizeWhatsAppNumber(selectedSummary?.contact_phone));
+
   async function addActivity(payload: { summary: string; kind?: string; due_at?: string | null }) {
     if (!selectedContactId) return;
     setActivityBusy(true);
@@ -254,21 +256,26 @@ export default function WhatsAppPage() {
   }
 
   async function sendFollowup() {
-    if (!selectedContactId || !followupDraft.trim() || whatsAppConfig?.configured === false) return;
-    setSending(true);
+    if (!selectedContactId || !followupDraft.trim()) return;
     setError(null);
     setAttachmentError(null);
     setSuccessMessage(null);
-    try {
-      if (attachmentFile) {
-        await sendWhatsAppMedia(selectedContactId, followupDraft.trim(), attachmentFile);
-      } else {
-        await sendWhatsAppMessage(selectedContactId, followupDraft.trim());
+
+    if (!attachmentFile) {
+      try {
+        openWhatsApp(followupDraft.trim(), selectedSummary?.contact_phone);
+        await addActivity({ kind: "whatsapp", summary: followupDraft.trim() });
+        setFollowupDraft("");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "WhatsApp send failed");
       }
-      await addActivity({
-        kind: "whatsapp",
-        summary: attachmentFile ? `WhatsApp follow-up sent: ${attachmentFile.name}` : followupDraft.trim(),
-      });
+      return;
+    }
+
+    setSending(true);
+    try {
+      await sendWhatsAppMedia(selectedContactId, followupDraft.trim(), attachmentFile);
+      await addActivity({ kind: "whatsapp", summary: `WhatsApp follow-up sent: ${attachmentFile.name}` });
       setFollowupDraft("");
       setAttachmentFile(null);
       setAttachmentPreviewUrl("");
@@ -276,7 +283,7 @@ export default function WhatsAppPage() {
       setSuccessMessage("Sent");
       await loadInbox(selectedContactId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to send WhatsApp follow-up");
+      setAttachmentError(e instanceof Error ? e.message : "WhatsApp media send failed");
     } finally {
       setSending(false);
     }
@@ -293,13 +300,6 @@ export default function WhatsAppPage() {
           Refresh
         </button>
       </div>
-
-      {whatsAppConfig?.configured === false ? (
-        <div className="alert">
-          {whatsAppConfig.detail} Add these variables on the backend service and redeploy:{" "}
-          <strong>{whatsAppConfig.missing_fields.join(", ")}</strong>
-        </div>
-      ) : null}
 
       {error ? <div className="alert">{error}</div> : null}
 
@@ -435,9 +435,8 @@ export default function WhatsAppPage() {
                   <button
                     className="btn ghost"
                     type="button"
-                    disabled={sending || !followupDraft.trim() || whatsAppConfig?.configured === false}
+                    disabled={sending || !followupDraft.trim() || (!attachmentFile && !canSendWhatsApp)}
                     onClick={() => void sendFollowup()}
-                    title={whatsAppConfig?.configured === false ? whatsAppConfig.detail : undefined}
                   >
                     {sending ? "Sending..." : "Send on WhatsApp"}
                   </button>
@@ -455,13 +454,8 @@ export default function WhatsAppPage() {
                 </div>
 
                 {successMessage ? <div className="muted small">{successMessage}</div> : null}
-                {whatsAppConfig?.configured === false ? (
-                  <div className="muted whatsappTiny">
-                    Live outbound WhatsApp sending stays disabled until the backend gets valid Meta Cloud API credentials.
-                  </div>
-                ) : null}
-                {!selectedSummary.contact_phone ? (
-                  <div className="muted whatsappTiny">Add a phone number to this contact before sending outbound WhatsApp messages.</div>
+                {!canSendWhatsApp ? (
+                  <div className="muted whatsappTiny">Add a valid phone number to this contact before sending outbound WhatsApp messages.</div>
                 ) : null}
               </div>
             </>
