@@ -2,17 +2,19 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from ..audit import log_audit_event
 from ..auth import get_or_create_user, get_user_by_email, hash_password, normalize_email
 from ..db import get_session
-from ..models import BuilderWebsite, BuilderWebsiteProperty, Profile, User
+from ..models import BuilderWebsite, BuilderWebsiteProperty, Payment, Profile, User
 from ..services.builder_websites import builder_website_image_list, ensure_builder_website, public_url_for_slug
 from ..schemas import (
     BuilderWebsitePropertyRead,
@@ -223,34 +225,13 @@ def public_builder_site(slug: str, session: Session = Depends(get_session)):
     return _public_builder_website_payload(website, properties)
 
 
-@router.post("/checkout-order", response_model=PublicCheckoutOrderRead)
-async def checkout_order(payload: PublicCheckoutOrderRequest):
+async def create_razorpay_order(amount_paise: int, receipt: str, notes: dict[str, str]) -> dict:
     key_id = (settings.razorpay_key_id or "").strip()
     key_secret = (settings.razorpay_key_secret or "").strip()
     if not key_id or not key_secret:
         raise HTTPException(status_code=503, detail="Online payment is not configured yet.")
 
-    quote = _verify_requested_amount(
-        payload.product_plan,
-        payload.billing_cycle,
-        payload.seats,
-        payload.amount_inr,
-        payload.marketing_package,
-    )
-    amount_paise = int(quote["amount_inr"]) * 100
-    receipt = f"northstone-{payload.product_plan}-{normalize_email(payload.email).replace('@', '-')}-{int(datetime.now().timestamp())}"
-    order_payload = {
-        "amount": amount_paise,
-        "currency": "INR",
-        "receipt": receipt[:40],
-        "notes": {
-            "plan": payload.product_plan,
-            "marketing_package": payload.marketing_package,
-            "billing_cycle": payload.billing_cycle,
-            "seats": str(int(quote["seats"])),
-            "company_name": payload.company_name,
-        },
-    }
+    order_payload = {"amount": amount_paise, "currency": "INR", "receipt": receipt[:40], "notes": notes}
     try:
         async with httpx.AsyncClient(auth=(key_id, key_secret), timeout=15.0) as client:
             response = await client.post("https://api.razorpay.com/v1/orders", json=order_payload)
@@ -262,13 +243,39 @@ async def checkout_order(payload: PublicCheckoutOrderRequest):
         detail = body.get("error", {}).get("description") if isinstance(body, dict) else ""
         raise HTTPException(status_code=502, detail=detail or "Could not start Razorpay checkout.")
 
-    return PublicCheckoutOrderRead(
-        enabled=True,
-        order_id=str(body.get("id", "")),
-        amount_paise=int(body.get("amount", amount_paise) or amount_paise),
-        currency=str(body.get("currency", "INR")),
-        key_id=key_id,
+    return {
+        "order_id": str(body.get("id", "")),
+        "amount_paise": int(body.get("amount", amount_paise) or amount_paise),
+        "currency": str(body.get("currency", "INR")),
+        "key_id": key_id,
+    }
+
+
+@router.post("/checkout-order", response_model=PublicCheckoutOrderRead)
+async def checkout_order(payload: PublicCheckoutOrderRequest):
+    quote = _verify_requested_amount(
+        payload.product_plan,
+        payload.billing_cycle,
+        payload.seats,
+        payload.amount_inr,
+        payload.marketing_package,
     )
+    amount_paise = int(quote["amount_inr"]) * 100
+    receipt = f"northstone-{payload.product_plan}-{normalize_email(payload.email).replace('@', '-')}-{int(datetime.now().timestamp())}"
+    order = await create_razorpay_order(
+        amount_paise,
+        receipt,
+        notes={
+            "plan": payload.product_plan,
+            "marketing_package": payload.marketing_package,
+            "billing_cycle": payload.billing_cycle,
+            "seats": str(int(quote["seats"])),
+            "company_name": payload.company_name,
+            "email": normalize_email(payload.email),
+            "kind": "signup",
+        },
+    )
+    return PublicCheckoutOrderRead(enabled=True, **order)
 
 
 @router.post("/payment-link-request", response_model=PublicPaymentLinkResponse)
@@ -373,6 +380,25 @@ def subscribe(payload: PublicSubscriptionRequest, session: Session = Depends(get
     profile.updated_at = now
     session.add(profile)
 
+    if amount_inr > 0 and payload.payment_id:
+        existing_payment = session.exec(select(Payment).where(Payment.razorpay_payment_id == payload.payment_id)).first()
+        if not existing_payment:
+            session.add(
+                Payment(
+                    user_id=user.id,
+                    kind="signup",
+                    razorpay_order_id=payload.payment_order_id,
+                    razorpay_payment_id=payload.payment_id,
+                    status="captured",
+                    product_plan=payload.product_plan,
+                    billing_cycle=payload.billing_cycle,
+                    seats=normalized_seats,
+                    marketing_package=payload.marketing_package,
+                    amount_inr=amount_inr,
+                    description=f"{payload.product_plan.title()} plan signup",
+                )
+            )
+
     log_audit_event(
         session,
         actor=user,
@@ -422,3 +448,73 @@ def request_demo(payload: PublicDemoRequest, session: Session = Depends(get_sess
     )
     _commit_or_http(session, "Could not store the demo request")
     return PublicDemoResponse(ok=True, email=email)
+
+
+@router.post("/webhooks/razorpay")
+async def razorpay_webhook(request: Request, session: Session = Depends(get_session)):
+    """Async backstop for payment events. Configure this URL + a webhook secret in the Razorpay
+    Dashboard (Settings -> Webhooks) so payments still get recorded if the browser redirect drops."""
+    raw_body = await request.body()
+    secret = (settings.razorpay_webhook_secret or "").strip()
+    if secret:
+        signature = request.headers.get("X-Razorpay-Signature", "")
+        expected = hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected, signature.strip()):
+            raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    try:
+        payload = json.loads(raw_body) if raw_body else {}
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid webhook payload")
+
+    event = str(payload.get("event", ""))
+    entity = ((payload.get("payload") or {}).get("payment") or {}).get("entity") or {}
+    payment_id = str(entity.get("id", ""))
+    if not payment_id or not event.startswith("payment."):
+        return {"ok": True, "ignored": True}
+
+    order_id = str(entity.get("order_id", ""))
+    amount_inr = int(entity.get("amount", 0) or 0) // 100
+    status = "captured" if event == "payment.captured" else "failed" if event == "payment.failed" else str(entity.get("status", ""))
+    notes = entity.get("notes") or {}
+
+    existing = session.exec(select(Payment).where(Payment.razorpay_payment_id == payment_id)).first()
+    if existing:
+        existing.status = status or existing.status
+        session.add(existing)
+        _commit_or_http(session, "Could not update payment record")
+        return {"ok": True, "updated": True}
+
+    user = None
+    user_id_note = str(notes.get("user_id", "")).strip()
+    if user_id_note:
+        try:
+            user = session.get(User, UUID(user_id_note))
+        except ValueError:
+            user = None
+    if not user:
+        email_note = str(notes.get("email", "")).strip()
+        if email_note:
+            user = get_user_by_email(email=normalize_email(email_note), session=session)
+    if not user:
+        # Most likely arrived before /public/subscribe created the account - the synchronous
+        # flow already records this payment, so it's safe to skip rather than guess.
+        return {"ok": True, "unattributed": True}
+
+    session.add(
+        Payment(
+            user_id=user.id,
+            enterprise_owner_id=getattr(user, "enterprise_owner_id", None),
+            kind=str(notes.get("kind", "signup")),
+            razorpay_order_id=order_id,
+            razorpay_payment_id=payment_id,
+            status=status or "captured",
+            product_plan=str(notes.get("plan", user.subscription_plan or "")),
+            billing_cycle=str(notes.get("billing_cycle", user.subscription_cycle or "")),
+            seats=int(notes.get("seats", user.subscription_seats or 1) or 1),
+            amount_inr=amount_inr,
+            description="Recorded via Razorpay webhook",
+        )
+    )
+    _commit_or_http(session, "Could not record payment from webhook")
+    return {"ok": True}

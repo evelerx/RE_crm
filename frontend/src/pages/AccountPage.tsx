@@ -57,6 +57,78 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
+type BillingSummary = {
+  product_plan: string;
+  billing_cycle: string;
+  seats: number;
+  amount_inr: number;
+  started_at: string | null;
+  expires_at: string | null;
+  is_owner: boolean;
+};
+
+type PaymentRow = {
+  id: string;
+  kind: string;
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  status: string;
+  product_plan: string;
+  billing_cycle: string;
+  seats: number;
+  amount_inr: number;
+  currency: string;
+  description: string;
+  created_at: string;
+};
+
+type RazorpayCheckoutResponse = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void;
+      on: (event: string, handler: (response: { error?: { description?: string } }) => void) => void;
+    };
+  }
+}
+
+function ensureRazorpayScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.Razorpay) {
+      resolve();
+      return;
+    }
+    const existing = document.querySelector('script[data-razorpay-checkout="true"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Razorpay checkout failed to load.")), { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.dataset.razorpayCheckout = "true";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Razorpay checkout failed to load."));
+    document.body.appendChild(script);
+  });
+}
+
+function formatBillingDate(value: string | null | undefined) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function formatInr(value: number) {
+  return `₹${value.toLocaleString("en-IN")}`;
+}
+
 function scopeLabel(scope: string | undefined, companyName: string | undefined) {
   if (scope === "inherited_enterprise") return companyName ? `Inherited from ${companyName}` : "Inherited from enterprise owner";
   if (scope === "direct") return "Assigned directly by admin";
@@ -77,6 +149,12 @@ export default function AccountPage() {
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
   const [profileErr, setProfileErr] = useState<string | null>(null);
+
+  const [billing, setBilling] = useState<BillingSummary | null>(null);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [renewBusy, setRenewBusy] = useState(false);
+  const [renewMsg, setRenewMsg] = useState<string | null>(null);
+  const [renewError, setRenewError] = useState<string | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -108,6 +186,18 @@ export default function AccountPage() {
         // Ignore initial read issues here; route-level auth already handles access.
       }
     })();
+    (async () => {
+      try {
+        const [summary, paymentRows] = await Promise.all([
+          api<BillingSummary>("/billing/summary"),
+          api<PaymentRow[]>("/billing/payments"),
+        ]);
+        setBilling(summary);
+        setPayments(paymentRows);
+      } catch {
+        // Billing is supplementary here; leave panel in its empty state on failure.
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -119,6 +209,71 @@ export default function AccountPage() {
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
   }, []);
+
+  async function renewSubscription() {
+    setRenewBusy(true);
+    setRenewError(null);
+    setRenewMsg(null);
+    try {
+      const order = await api<{ order_id: string; amount_paise: number; currency: string; key_id: string; amount_inr: number }>(
+        "/billing/renew-order",
+        { method: "POST" },
+      );
+      await ensureRazorpayScript();
+      if (!window.Razorpay) throw new Error("Razorpay checkout is unavailable right now.");
+
+      const rzp = new window.Razorpay({
+        key: order.key_id,
+        order_id: order.order_id,
+        amount: order.amount_paise,
+        currency: order.currency,
+        name: "Northstone CRM",
+        description: `${formatPlanLabel(me)} plan renewal`,
+        prefill: { email: me?.email || "" },
+        theme: { color: "#1f5de0" },
+        modal: {
+          ondismiss: () => {
+            setRenewBusy(false);
+            setRenewError("Renewal checkout was cancelled.");
+          },
+        },
+        handler: (response: RazorpayCheckoutResponse) => {
+          void (async () => {
+            try {
+              const result = await api<{ ok: boolean; expires_at: string | null; amount_inr: number }>("/billing/renew-verify", {
+                method: "POST",
+                body: JSON.stringify({
+                  amount_inr: order.amount_inr,
+                  payment_order_id: response.razorpay_order_id,
+                  payment_id: response.razorpay_payment_id,
+                  payment_signature: response.razorpay_signature,
+                }),
+              });
+              setRenewMsg(`Renewed. New expiry: ${formatBillingDate(result.expires_at)}`);
+              const [summary, paymentRows] = await Promise.all([
+                api<BillingSummary>("/billing/summary"),
+                api<PaymentRow[]>("/billing/payments"),
+              ]);
+              setBilling(summary);
+              setPayments(paymentRows);
+            } catch (e) {
+              setRenewError(e instanceof Error ? e.message : "Payment received but renewal could not be confirmed. Contact support.");
+            } finally {
+              setRenewBusy(false);
+            }
+          })();
+        },
+      });
+      rzp.on("payment.failed", (response) => {
+        setRenewBusy(false);
+        setRenewError(response?.error?.description || "Payment failed. Please try again.");
+      });
+      rzp.open();
+    } catch (e) {
+      setRenewBusy(false);
+      setRenewError(e instanceof Error ? e.message : "Could not start renewal checkout.");
+    }
+  }
 
   return (
     <div className="page">
@@ -303,6 +458,72 @@ export default function AccountPage() {
           </div>
         </section>
       ) : null}
+
+      <section className="card premiumPanel" id="billing">
+        <div className="cardTitle">Billing &amp; Payments</div>
+        <div className="muted small">Your subscription status and payment history for this workspace.</div>
+
+        <div className="statsGrid" style={{ marginTop: 14 }}>
+          <div className="statCard">
+            <div className="statLabel">Plan</div>
+            <div className="statValue" style={{ textTransform: "capitalize" }}>{formatPlanLabel(me)}</div>
+            <div className="statHint">
+              {(billing?.billing_cycle || "monthly").replace(/_/g, " ")} billing · {billing?.seats || 1} seat{(billing?.seats || 1) === 1 ? "" : "s"}
+            </div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">Active since</div>
+            <div className="statValue">{formatBillingDate(billing?.started_at)}</div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">
+              {billing?.expires_at && new Date(billing.expires_at) < new Date() ? "Expired on" : "Renews on"}
+            </div>
+            <div
+              className="statValue"
+              style={billing?.expires_at && new Date(billing.expires_at) < new Date() ? { color: "#e06464" } : undefined}
+            >
+              {formatBillingDate(billing?.expires_at)}
+            </div>
+          </div>
+        </div>
+
+        {billing?.is_owner && billing?.product_plan ? (
+          <div className="row" style={{ marginTop: 16 }}>
+            <button className="btn" type="button" disabled={renewBusy} onClick={() => void renewSubscription()}>
+              {renewBusy ? "Processing..." : "Renew now"}
+            </button>
+          </div>
+        ) : null}
+        {renewMsg ? <div className="alert ok" style={{ marginTop: 12 }}>{renewMsg}</div> : null}
+        {renewError ? <div className="alert" style={{ marginTop: 12 }}>{renewError}</div> : null}
+
+        <div className="cardTitle" style={{ marginTop: 20 }}>Payment history</div>
+        <div className="list" style={{ marginTop: 8 }}>
+          {payments.length === 0 ? (
+            <div className="muted small">No payments recorded yet.</div>
+          ) : (
+            payments.map((payment) => (
+              <div key={payment.id} className="listItem">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div>
+                    <b style={{ textTransform: "capitalize" }}>{payment.product_plan}</b> plan {payment.kind === "renewal" ? "renewal" : "signup"}
+                    <div className="muted small">
+                      {formatBillingDate(payment.created_at)} · {payment.razorpay_payment_id || "—"}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div>
+                      <b>{formatInr(payment.amount_inr)}</b>
+                    </div>
+                    <div className={payment.status === "captured" ? "pill adminPill" : "pill"}>{payment.status}</div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
 
       <section className="card">
         <div className="cardTitle">Profile</div>

@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     # REMOVED: ZOOM — no active Zoom OAuth settings are loaded.
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""
     payment_link_solo: str = ""
     payment_link_enterprise: str = ""
     payment_link_builder: str = ""

@@ -55,6 +55,21 @@ type AdminUserRow = {
   is_admin_account?: boolean;
 };
 
+type AdminPaymentRow = {
+  id: string;
+  user_email: string;
+  company_name: string;
+  kind: string;
+  razorpay_payment_id: string;
+  status: string;
+  product_plan: string;
+  billing_cycle: string;
+  seats: number;
+  amount_inr: number;
+  currency: string;
+  created_at: string;
+};
+
 type EnterpriseEmployeeRow = {
   id: string;
   email: string;
@@ -406,6 +421,7 @@ export default function AdminPage() {
     typeof window !== "undefined" && window.location.hash ? window.location.hash : "#admin-dashboard",
   );
   const [rows, setRows] = useState<AdminUserRow[]>([]);
+  const [paymentRows, setPaymentRows] = useState<AdminPaymentRow[]>([]);
   const [enterprises, setEnterprises] = useState<EnterpriseDetail[]>([]);
   const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string>("");
   const [selectedEnterprise, setSelectedEnterprise] = useState<EnterpriseDetail | null>(null);
@@ -591,7 +607,7 @@ export default function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-        const [users, enterpriseRows, securityPosture, complianceReport, runtime, subscriptionData, demoRows, rbacData] = await Promise.all([
+        const [users, enterpriseRows, securityPosture, complianceReport, runtime, subscriptionData, demoRows, rbacData, paymentData] = await Promise.all([
         api<AdminUserRow[]>("/admin/users"),
         api<EnterpriseDetail[]>("/admin/enterprises"),
         api<SecurityPosture>("/admin/security-posture"),
@@ -600,9 +616,11 @@ export default function AdminPage() {
         api<SubscriptionAnalytics>(`/admin/subscription-analytics?grain=${subscriptionGrain}`),
         api<DemoRequestRow[]>("/admin/demo-requests"),
         getRbacMatrix(),
+        api<AdminPaymentRow[]>("/admin/payments"),
       ]);
       const adminMe = await api<{ is_admin: boolean; email: string }>("/admin/me");
       setRows(users);
+      setPaymentRows(paymentData);
       setEnterprises(enterpriseRows);
       setSecurity(securityPosture);
       setCompliance(complianceReport);
@@ -886,14 +904,15 @@ export default function AdminPage() {
   const newSignupsToday = displayRows.filter((row) => new Date(row.created_at).toDateString() === todayKey).length;
   const recentActivityRows = displayAuditRows.slice(0, 10);
   const kpiAgeSeconds = lastKpiRefreshAt ? Math.max(0, Math.round((Date.now() - lastKpiRefreshAt.getTime()) / 1000)) : 0;
-  const transactionRows = activeSubscriptions.map((row) => ({
+  const transactionRows = paymentRows.map((row) => ({
     id: row.id,
-    orgName: row.company || row.email,
-    plan: row.subscription_plan || row.plan,
-    amount: row.subscription_amount_inr || (row.plan === "builder" ? 11999 : row.plan === "enterprise" ? 6999 : 1199),
-    currency: "INR",
-    date: row.subscription_started_at || row.created_at,
-    status: row.is_blacklisted ? "cancelled" : "captured",
+    paymentId: row.razorpay_payment_id || "—",
+    orgName: row.company_name || row.user_email,
+    plan: row.product_plan,
+    amount: row.amount_inr,
+    currency: row.currency,
+    date: row.created_at,
+    status: row.status,
   }));
   const leadSources = [
     { source: "Facebook Lead Ads", status: featureFlags.find((flag) => flag.key === "facebook_lead_ingest")?.enabled ? "active" : "inactive", leads24h: 0, lastReceived: "No leads yet", webhook: "/webhooks/facebook-leads" },
@@ -2536,7 +2555,7 @@ export default function AdminPage() {
               ) : (
                 transactionRows.map((row) => (
                   <tr key={row.id}>
-                    <td className="tdTitle">{row.id}</td>
+                    <td className="tdTitle">{row.paymentId}</td>
                     <td>{row.orgName}</td>
                     <td>{row.plan}</td>
                     <td>{formatRupees(row.amount)}</td>

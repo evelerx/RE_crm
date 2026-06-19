@@ -19,6 +19,7 @@ from .routes import (
     agency_manager,
     ai,
     auth,
+    billing,
     contacts,
     csvio,
     deals,
@@ -123,6 +124,7 @@ deps = [Depends(require_api_key)]
 app.include_router(contacts.router, dependencies=deps)
 app.include_router(deals.router, dependencies=deps)
 app.include_router(activities.router, dependencies=deps)
+app.include_router(billing.router, dependencies=deps)
 app.include_router(ai.router, dependencies=deps)
 app.include_router(admin.router, dependencies=deps)
 app.include_router(profile.router, dependencies=deps)

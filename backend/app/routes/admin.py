@@ -16,10 +16,11 @@ from ..auth import decode_token, get_current_user, hash_password, is_admin_email
 from ..crypto import decrypt_if_configured, encrypt_if_configured
 from ..db import delete_demo_account_tree, get_session
 from ..enterprise_scope import count_org_records, employee_record_counts, org_owner_filter
-from ..models import Activity, AuditEvent, Contact, Deal, MarketingAddonSubscription, Profile, RbacMatrixSetting, SupportChatMessage, User
+from ..models import Activity, AuditEvent, Contact, Deal, MarketingAddonSubscription, Payment, Profile, RbacMatrixSetting, SupportChatMessage, User
 from ..schemas import (
     AdminBlacklistRequest,
     AdminCreateDemoAccountRequest,
+    AdminPaymentRead,
     AdminResetPasswordRequest,
     AdminRevealSecretRequest,
     AdminRuntimeConfigRead,
@@ -730,6 +731,43 @@ def compliance_report(
             for row in recent_audit
         ],
     }
+
+
+@router.get("/payments", response_model=List[AdminPaymentRead])
+def admin_payments(
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+):
+    rows = session.exec(select(Payment).order_by(col(Payment.created_at).desc()).limit(500)).all()
+    user_ids = list({row.user_id for row in rows})
+    users_by_id = {u.id: u for u in session.exec(select(User).where(User.id.in_(user_ids))).all()} if user_ids else {}
+    profiles_by_owner = (
+        {p.owner_id: p for p in session.exec(select(Profile).where(Profile.owner_id.in_(user_ids))).all()}
+        if user_ids
+        else {}
+    )
+
+    out: List[AdminPaymentRead] = []
+    for row in rows:
+        owner = users_by_id.get(row.user_id)
+        profile = profiles_by_owner.get(row.user_id)
+        out.append(
+            AdminPaymentRead(
+                id=row.id,
+                user_email=owner.email if owner else "",
+                company_name=profile.company if profile and profile.company else "",
+                kind=row.kind,
+                razorpay_payment_id=row.razorpay_payment_id,
+                status=row.status,
+                product_plan=row.product_plan,
+                billing_cycle=row.billing_cycle,
+                seats=row.seats,
+                amount_inr=row.amount_inr,
+                currency=row.currency,
+                created_at=row.created_at,
+            )
+        )
+    return out
 
 
 @router.get("/users")

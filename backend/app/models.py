@@ -338,6 +338,24 @@ class MarketingAddonSubscription(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
+class Payment(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    user_id: UUID = Field(foreign_key="user.id", index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    kind: str = Field(default="signup", index=True)  # signup | renewal
+    razorpay_order_id: str = ""
+    razorpay_payment_id: str = Field(default="", index=True)
+    status: str = Field(default="captured", index=True)  # captured | failed
+    product_plan: str = ""
+    billing_cycle: str = ""
+    seats: int = 1
+    marketing_package: str = "none"
+    amount_inr: int = 0
+    currency: str = "INR"
+    description: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
 class MarketingAgency(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     name: str

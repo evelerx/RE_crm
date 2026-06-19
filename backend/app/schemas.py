@@ -99,6 +99,67 @@ class PublicSubscriptionResponse(BaseModel):
     app_login_url: str
 
 
+class PaymentRead(BaseModel):
+    id: UUID
+    kind: str
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    status: str
+    product_plan: str
+    billing_cycle: str
+    seats: int
+    amount_inr: int
+    currency: str
+    description: str
+    created_at: datetime
+
+
+class AdminPaymentRead(BaseModel):
+    id: UUID
+    user_email: str
+    company_name: str
+    kind: str
+    razorpay_payment_id: str
+    status: str
+    product_plan: str
+    billing_cycle: str
+    seats: int
+    amount_inr: int
+    currency: str
+    created_at: datetime
+
+
+class BillingSummaryRead(BaseModel):
+    product_plan: str
+    billing_cycle: str
+    seats: int
+    amount_inr: int
+    started_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    is_owner: bool
+
+
+class BillingRenewOrderRead(BaseModel):
+    order_id: str
+    amount_paise: int
+    currency: str = "INR"
+    key_id: str
+    amount_inr: int
+
+
+class BillingRenewVerifyRequest(BaseModel):
+    amount_inr: int = Field(ge=0, le=50000000)
+    payment_order_id: str
+    payment_id: str
+    payment_signature: str
+
+
+class BillingRenewVerifyResponse(BaseModel):
+    ok: bool
+    expires_at: Optional[datetime] = None
+    amount_inr: int
+
+
 class PublicPaymentLinkRequest(BaseModel):
     full_name: str = Field(min_length=2, max_length=120)
     email: str
