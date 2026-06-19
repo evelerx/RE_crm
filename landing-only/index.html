@@ -637,6 +637,52 @@ New sections added:
     .form-message.success { color: #027a48; }
     .form-message.error { color: #b42318; }
 
+    .checkout-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(16, 24, 40, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 200;
+    }
+    .checkout-overlay[hidden] { display: none; }
+    .checkout-modal {
+      position: relative;
+      background: #fff;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      max-width: 480px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 32px;
+      display: grid;
+      gap: 16px;
+    }
+    .checkout-modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      border: none;
+      background: var(--surface-strong);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      color: var(--ink);
+    }
+    .checkout-modal-summary {
+      background: var(--accent-soft);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      font-weight: 800;
+      color: #03665f;
+    }
+
     .footer {
       padding: 48px 0;
       border-top: 1px solid var(--line);
@@ -1182,6 +1228,40 @@ New sections added:
     </section>
   </main>
 
+  <div class="checkout-overlay" id="checkoutOverlay" hidden>
+    <div class="checkout-modal" role="dialog" aria-modal="true" aria-labelledby="checkoutModalTitle">
+      <button class="checkout-modal-close" type="button" id="checkoutModalClose" aria-label="Close">×</button>
+      <h3 id="checkoutModalTitle">Create your account</h3>
+      <div class="checkout-modal-summary" id="checkoutModalSummary"></div>
+      <form class="form-card" id="checkoutForm" novalidate>
+        <div class="honeypot" aria-hidden="true">
+          <label for="checkoutWebsite">Website</label>
+          <input id="checkoutWebsite" name="website" type="text" tabindex="-1" autocomplete="off">
+        </div>
+        <div class="field-grid">
+          <div class="floating-field"><input id="checkoutName" name="name" type="text" autocomplete="name" required maxlength="90"><label for="checkoutName">Full Name</label></div>
+          <div class="floating-field"><input id="checkoutEmail" name="email" type="email" autocomplete="email" required maxlength="120"><label for="checkoutEmail">Email</label></div>
+        </div>
+        <div class="field-grid">
+          <div class="floating-field"><input id="checkoutPassword" name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="72"><label for="checkoutPassword">Password (min 8 characters)</label></div>
+          <div class="floating-field"><input id="checkoutPhone" name="phone" type="tel" autocomplete="tel" required maxlength="24"><label for="checkoutPhone">Phone</label></div>
+        </div>
+        <div class="field-grid">
+          <div class="floating-field"><input id="checkoutCompany" name="company" type="text" autocomplete="organization" required maxlength="160"><label for="checkoutCompany">Company name</label></div>
+          <div class="floating-field"><input id="checkoutCity" name="city" type="text" autocomplete="address-level2" required maxlength="120"><label for="checkoutCity">City</label></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit" id="checkoutSubmitBtn">Continue to payment</button>
+        </div>
+        <p class="form-message" id="checkoutMessageState" aria-live="polite"></p>
+      </form>
+      <div id="checkoutSuccessPanel" hidden>
+        <p class="form-message success" id="checkoutSuccessMessage"></p>
+        <a class="btn btn-primary" id="checkoutLoginLink" href="https://app.northstonecrm.com/login" target="_blank" rel="noopener noreferrer">Go to login →</a>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer">
     <div class="container footer-grid">
       <div>
@@ -1211,19 +1291,9 @@ New sections added:
       const API_BASE = "https://api.northstonecrm.com"; // SECURITY FIX: HTTPS-only production endpoint prevents insecure form submission.
       const menuButton = document.querySelector(".menu-toggle");
       const mobileMenu = document.getElementById("mobileMenu");
-      const razorpayKey =
-        (globalThis.process && globalThis.process.env && globalThis.process.env.VITE_RAZORPAY_KEY_ID) ||
-        globalThis.VITE_RAZORPAY_KEY_ID ||
-        "YOUR_RAZORPAY_KEY_ID";
       const pricingState = {
         enterpriseExtraIds: 0,
         builderExtraIds: 0
-      };
-      const amountMap = {
-        Solo: 119900,
-        "Growth Marketing": 1800000,
-        "Scale Marketing": 2500000,
-        "AI Brand Launch": 1600000
       };
 
       function cleanText(value, maxLength) {
@@ -1308,29 +1378,201 @@ New sections added:
         });
       }
 
-      async function openRazorpayCheckout(planName, amountInPaise) {
+      async function postJson(path, payload) {
+        // SECURITY FIX: All checkout calls go through this fixed HTTPS API base; no credentials ever live in this file.
+        const response = await fetch(`${API_BASE}${path}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(typeof body.detail === "string" ? body.detail : "Request failed. Please try again.");
+        }
+        return body;
+      }
+
+      async function getJson(path) {
+        const response = await fetch(`${API_BASE}${path}`);
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error("Request failed. Please try again.");
+        return body;
+      }
+
+      async function launchRazorpayCheckout({ keyId, orderId, amountInPaise, planName, prefill, onSuccess, onDismiss, onFailure }) {
         await ensureRazorpayScript();
         if (!globalThis.Razorpay) throw new Error("Razorpay checkout is unavailable right now.");
-        const options = {
-          key: razorpayKey,
+        const rzp = new globalThis.Razorpay({
+          key: keyId,
+          order_id: orderId,
           amount: amountInPaise,
           currency: "INR",
           name: "Northstone CRM",
           description: `${planName} Subscription`,
-          prefill: {
-            name: "",
-            email: "",
-            contact: ""
-          },
-          theme: {
-            color: "#3B7DD8"
-          },
-          handler: function (response) {
-            alert("Payment successful. ID: " + response.razorpay_payment_id);
-          }
-        };
-        const rzp = new globalThis.Razorpay(options);
+          prefill,
+          theme: { color: "#1257d6" },
+          modal: { ondismiss: onDismiss },
+          handler: onSuccess
+        });
+        rzp.on("payment.failed", onFailure);
         rzp.open();
+      }
+
+      function planLabel(planKey) {
+        return planKey === "builder" ? "Builder" : "Solo";
+      }
+
+      function planQuote(planKey) {
+        if (planKey === "builder") {
+          const extra = pricingState.builderExtraIds;
+          return { amountInr: 11999 + extra * 999, seats: 5 + extra };
+        }
+        return { amountInr: 1199, seats: 1 };
+      }
+
+      const checkoutOverlay = document.getElementById("checkoutOverlay");
+      const checkoutForm = document.getElementById("checkoutForm");
+      const checkoutMessageState = document.getElementById("checkoutMessageState");
+      const checkoutSummary = document.getElementById("checkoutModalSummary");
+      const checkoutSubmitBtn = document.getElementById("checkoutSubmitBtn");
+      const checkoutSuccessPanel = document.getElementById("checkoutSuccessPanel");
+      const checkoutSuccessMessage = document.getElementById("checkoutSuccessMessage");
+      const checkoutLoginLink = document.getElementById("checkoutLoginLink");
+      let checkoutPlanKey = "solo";
+
+      function resetCheckoutSubmitBtn() {
+        if (!checkoutSubmitBtn) return;
+        checkoutSubmitBtn.disabled = false;
+        checkoutSubmitBtn.textContent = "Continue to payment";
+      }
+
+      function openCheckoutModal(planKey) {
+        if (!checkoutOverlay || !checkoutForm) return;
+        checkoutPlanKey = planKey;
+        const quote = planQuote(planKey);
+        if (checkoutSummary) {
+          checkoutSummary.textContent = `${planLabel(planKey)} plan — ${formatInr(quote.amountInr)}/mo for ${quote.seats} ID${quote.seats > 1 ? "s" : ""}`;
+        }
+        checkoutForm.reset();
+        checkoutForm.hidden = false;
+        if (checkoutSuccessPanel) checkoutSuccessPanel.hidden = true;
+        setMessage(checkoutMessageState, "", "");
+        resetCheckoutSubmitBtn();
+        checkoutOverlay.hidden = false;
+        document.body.classList.add("drawer-open");
+      }
+
+      function closeCheckoutModal() {
+        if (!checkoutOverlay) return;
+        checkoutOverlay.hidden = true;
+        document.body.classList.remove("drawer-open");
+      }
+
+      document.getElementById("checkoutModalClose")?.addEventListener("click", closeCheckoutModal);
+      checkoutOverlay?.addEventListener("click", (event) => {
+        if (event.target === checkoutOverlay) closeCheckoutModal();
+      });
+
+      if (checkoutForm) {
+        checkoutForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const trap = checkoutForm.querySelector('input[name="website"]');
+          if (trap && trap.value) return;
+
+          const fullName = cleanText(checkoutForm.name.value, 90);
+          const email = cleanText(checkoutForm.email.value, 120);
+          const password = String(checkoutForm.password.value || "");
+          const phone = cleanText(checkoutForm.phone.value, 24);
+          const company = cleanText(checkoutForm.company.value, 160);
+          const city = cleanText(checkoutForm.city.value, 120);
+
+          if (fullName.length < 2) return setMessage(checkoutMessageState, "Enter your full name.", "error");
+          if (!validEmail(email)) return setMessage(checkoutMessageState, "Enter a valid email address.", "error");
+          if (password.length < 8) return setMessage(checkoutMessageState, "Password must be at least 8 characters.", "error");
+          if (phone.length < 6) return setMessage(checkoutMessageState, "Enter a valid phone number.", "error");
+          if (company.length < 2) return setMessage(checkoutMessageState, "Enter your company name.", "error");
+          if (city.length < 2) return setMessage(checkoutMessageState, "Enter your city.", "error");
+
+          const quote = planQuote(checkoutPlanKey);
+          const signupFields = {
+            full_name: fullName,
+            email,
+            phone,
+            company_name: company,
+            city,
+            product_plan: checkoutPlanKey,
+            marketing_package: "none",
+            billing_cycle: "monthly",
+            amount_inr: quote.amountInr,
+            seats: quote.seats
+          };
+
+          setMessage(checkoutMessageState, "", "");
+          checkoutSubmitBtn.disabled = true;
+          checkoutSubmitBtn.textContent = "Starting checkout...";
+
+          try {
+            const config = await getJson("/public/checkout-config");
+            if (!config.enabled) {
+              throw new Error("Online payment isn't available right now. Please use the contact form below and we'll set you up.");
+            }
+
+            if (config.provider === "payment_link") {
+              const linkResult = await postJson("/public/payment-link-request", { ...signupFields, notes: "" });
+              window.location.href = linkResult.payment_url;
+              return;
+            }
+
+            const order = await postJson("/public/checkout-order", signupFields);
+
+            await launchRazorpayCheckout({
+              keyId: order.key_id || config.key_id,
+              orderId: order.order_id,
+              amountInPaise: order.amount_paise,
+              planName: planLabel(checkoutPlanKey),
+              prefill: { name: fullName, email, contact: phone },
+              onDismiss: () => {
+                resetCheckoutSubmitBtn();
+                setMessage(checkoutMessageState, "Checkout was cancelled. You can try again.", "error");
+              },
+              onFailure: (response) => {
+                resetCheckoutSubmitBtn();
+                setMessage(checkoutMessageState, response?.error?.description || "Payment failed. Please try again.", "error");
+              },
+              onSuccess: async (response) => {
+                try {
+                  checkoutSubmitBtn.textContent = "Confirming payment...";
+                  const result = await postJson("/public/subscribe", {
+                    ...signupFields,
+                    password,
+                    notes: "",
+                    payment_provider: "razorpay",
+                    payment_order_id: response.razorpay_order_id,
+                    payment_id: response.razorpay_payment_id,
+                    payment_signature: response.razorpay_signature
+                  });
+                  checkoutForm.hidden = true;
+                  if (checkoutSuccessPanel) checkoutSuccessPanel.hidden = false;
+                  if (checkoutSuccessMessage) {
+                    checkoutSuccessMessage.textContent = `Payment received. Your ${planLabel(checkoutPlanKey)} account is ready for ${result.email}.`;
+                  }
+                  if (checkoutLoginLink && result.app_login_url) checkoutLoginLink.href = result.app_login_url;
+                } catch (error) {
+                  resetCheckoutSubmitBtn();
+                  setMessage(
+                    checkoutMessageState,
+                    `Payment was received but we could not finish setting up your account (${error.message}). ` +
+                      `Contact us with payment ID ${response.razorpay_payment_id} and we'll fix this right away.`,
+                    "error"
+                  );
+                }
+              }
+            });
+          } catch (error) {
+            resetCheckoutSubmitBtn();
+            setMessage(checkoutMessageState, error instanceof Error ? error.message : "Checkout could not be started. Please try again.", "error");
+          }
+        });
       }
 
       function closeDrawer() {
@@ -1380,25 +1622,17 @@ New sections added:
       updateEstimatorUi();
 
       document.querySelectorAll(".pricing-pay-btn").forEach((button) => {
-        button.addEventListener("click", async () => {
-          const plan = cleanText(button.getAttribute("data-plan"), 40);
-          try {
-            const amountInPaise = plan === "Builder" ? builderMonthlyTotal() * 100 : amountMap[plan];
-            await openRazorpayCheckout(plan, amountInPaise);
-          } catch (error) {
-            alert(error instanceof Error ? error.message : "Checkout could not be opened right now.");
-          }
+        button.addEventListener("click", () => {
+          const planKey = button.getAttribute("data-plan") === "Builder" ? "builder" : "solo";
+          openCheckoutModal(planKey);
         });
       });
 
       document.querySelectorAll(".marketing-pay-btn").forEach((button) => {
-        button.addEventListener("click", async () => {
-          const addon = cleanText(button.getAttribute("data-addon"), 40);
-          try {
-            await openRazorpayCheckout(addon, amountMap[addon]);
-          } catch (error) {
-            alert(error instanceof Error ? error.message : "Checkout could not be opened right now.");
-          }
+        button.addEventListener("click", () => {
+          // Marketing add-ons attach to an existing CRM subscription, so purchase happens from inside the app, not anonymously here.
+          alert("Marketing add-ons are added from inside your Northstone CRM account. Log in (or start a Solo/Builder plan above), then add this from Settings → Marketing.");
+          window.open("https://app.northstonecrm.com/login", "_blank", "noopener,noreferrer");
         });
       });
 

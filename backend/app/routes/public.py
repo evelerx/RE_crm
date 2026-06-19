@@ -36,7 +36,7 @@ router = APIRouter(prefix="/public", tags=["public"])
 PLAN_RULES = {
     "solo": {"monthly": 1199, "included_seats": 1, "extra_seat_monthly": 0, "mapped_plan": "free"},
     "enterprise": {"monthly": 6999, "included_seats": 5, "extra_seat_monthly": 899, "mapped_plan": "enterprise"},
-    "builder": {"monthly": 11999, "included_seats": 5, "extra_seat_monthly": 1499, "mapped_plan": "builder"},
+    "builder": {"monthly": 11999, "included_seats": 5, "extra_seat_monthly": 999, "mapped_plan": "builder"},
     "custom": {"monthly": 0, "included_seats": 10, "extra_seat_monthly": 0, "mapped_plan": "free"},
 }
 
