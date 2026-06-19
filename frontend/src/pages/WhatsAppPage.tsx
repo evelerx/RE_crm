@@ -78,6 +78,7 @@ export default function WhatsAppPage() {
   const [reminderBusy, setReminderBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedDealIds, setSelectedDealIds] = useState<string[]>([]);
+  const [dealSearch, setDealSearch] = useState("");
   const [followupDraft, setFollowupDraft] = useState("");
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string>("");
@@ -124,6 +125,7 @@ export default function WhatsAppPage() {
   useEffect(() => {
     setFollowupDraft("");
     setSelectedDealIds([]);
+    setDealSearch("");
     setAttachmentFile(null);
     setAttachmentPreviewUrl("");
     setAttachmentError(null);
@@ -191,18 +193,27 @@ export default function WhatsAppPage() {
     [mergedContacts, selectedContactId],
   );
 
-  const dealOptions = useMemo(
-    () =>
-      deals
-        .filter((deal) => deal.contact_id === selectedContactId)
-        .slice()
-        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()),
-    [deals, selectedContactId],
+  const sortedDeals = useMemo(
+    () => deals.slice().sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()),
+    [deals],
   );
 
+  const dealOptions = useMemo(() => {
+    const term = dealSearch.trim().toLowerCase();
+    if (!term) return sortedDeals;
+    return sortedDeals.filter((deal) =>
+      [deal.title, deal.area, deal.city, deal.stage].filter(Boolean).join(" ").toLowerCase().includes(term),
+    );
+  }, [sortedDeals, dealSearch]);
+
   const selectedDeals = useMemo(
-    () => dealOptions.filter((deal) => selectedDealIds.includes(deal.id)),
-    [dealOptions, selectedDealIds],
+    () => sortedDeals.filter((deal) => selectedDealIds.includes(deal.id)),
+    [sortedDeals, selectedDealIds],
+  );
+
+  const linkedDealCount = useMemo(
+    () => deals.filter((deal) => deal.contact_id === selectedContactId).length,
+    [deals, selectedContactId],
   );
 
   const canSendWhatsApp = Boolean(normalizeWhatsAppNumber(selectedSummary?.contact_phone));
@@ -379,7 +390,7 @@ export default function WhatsAppPage() {
                   </div>
                 </div>
                 <div className="muted whatsappTiny">
-                  {dealOptions.length} deal{dealOptions.length === 1 ? "" : "s"} linked
+                  {linkedDealCount} deal{linkedDealCount === 1 ? "" : "s"} linked to this contact
                 </div>
               </div>
 
@@ -405,24 +416,31 @@ export default function WhatsAppPage() {
                 <div className="cardTitle">AI Follow-up</div>
                 <div className="muted">Pick deals to pull in their details and photos, send it to WhatsApp, or log it back into activity history.</div>
 
-                <label style={{ marginTop: 10, display: "block" }}>
-                  Deals for {selectedSummary.contact_name}
+                <div style={{ marginTop: 10 }}>
+                  <div>Select deals to share</div>
+                  <input
+                    value={dealSearch}
+                    onChange={(e) => setDealSearch(e.target.value)}
+                    placeholder="Search deals by title, area, city, or stage"
+                    style={{ marginTop: 6 }}
+                  />
                   {dealOptions.length === 0 ? (
-                    <div className="muted small" style={{ marginTop: 6 }}>No deals linked to this contact yet.</div>
+                    <div className="muted small" style={{ marginTop: 6 }}>No deals found.</div>
                   ) : (
-                    <div className="stack" style={{ gap: 6, marginTop: 6 }}>
+                    <div className="stack" style={{ gap: 6, marginTop: 6, maxHeight: 220, overflowY: "auto" }}>
                       {dealOptions.map((deal) => (
                         <label key={deal.id} className="row" style={{ gap: 8, alignItems: "center", fontWeight: 400 }}>
                           <input type="checkbox" checked={selectedDealIds.includes(deal.id)} onChange={() => toggleDealSelection(deal.id)} />
                           <span>
                             {deal.title} — {deal.stage}
                             {deal.area ? `, ${deal.area}` : ""}
+                            {deal.contact_id === selectedContactId ? " · linked" : ""}
                           </span>
                         </label>
                       ))}
                     </div>
                   )}
-                </label>
+                </div>
                 {pulling ? <div className="muted small" style={{ marginTop: 6 }}>Pulling deal content...</div> : null}
 
                 <textarea
