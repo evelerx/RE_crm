@@ -99,6 +99,7 @@ export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getToken()));
   const [isAdmin, setIsAdmin] = useState(false);
   const [enterpriseBadge, setEnterpriseBadge] = useState<string | null>(null);
+  const [isOwnerLikeAccount, setIsOwnerLikeAccount] = useState(false);
   const [userName, setUserName] = useState("Northstone user");
   const [userRole, setUserRole] = useState("CRM access");
   const [reraCompleted, setReraCompleted] = useState(true);
@@ -112,6 +113,7 @@ export default function App() {
         setAuthed(false);
         setIsAdmin(false);
         setEnterpriseBadge(null);
+        setIsOwnerLikeAccount(false);
         setUserName("Northstone user");
         setUserRole("CRM access");
         setReraCompleted(true);
@@ -125,6 +127,7 @@ export default function App() {
     if (!authed) {
       setIsAdmin(false);
       setEnterpriseBadge(null);
+      setIsOwnerLikeAccount(false);
       setUserName("Northstone user");
       setUserRole("CRM access");
       setReraCompleted(true);
@@ -155,6 +158,7 @@ export default function App() {
 
         setIsAdmin(Boolean(me.is_admin));
         setEnterpriseBadge(derivedBadge);
+        setIsOwnerLikeAccount(ownerMode);
         setUserName(me.full_name?.trim() || getEmail() || me.email || "Northstone user");
         setUserRole(
           me.is_admin
@@ -172,6 +176,7 @@ export default function App() {
         if (cancelled) return;
         setIsAdmin(false);
         setEnterpriseBadge(null);
+        setIsOwnerLikeAccount(false);
         setUserName(getEmail() || "Northstone user");
         setUserRole("CRM access");
         setReraCompleted(true);
@@ -188,6 +193,7 @@ export default function App() {
     setAuthed(false);
     setIsAdmin(false);
     setEnterpriseBadge(null);
+    setIsOwnerLikeAccount(false);
     setUserName("Northstone user");
     setUserRole("CRM access");
     setReraCompleted(true);
@@ -246,7 +252,7 @@ export default function App() {
     );
   }
 
-  const isOwnerLike = isAdmin || Boolean(enterpriseBadge && ["Enterprise", "Builder"].includes(enterpriseBadge));
+  const isOwnerLike = isAdmin || isOwnerLikeAccount;
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   if (isAdminRoute) {
