@@ -26,13 +26,13 @@ function validateRera(rera: string): string | null {
   const v = rera.trim().toUpperCase();
   if (!v) return null;
   if (v.length < 8) return "RERA ID looks too short.";
-  if (!/^[A-Z0-9/\-]+$/.test(v)) return "RERA ID contains invalid characters (only A-Z, 0-9, / and - allowed).";
+  if (!/^[A-Z0-9/-]+$/.test(v)) return "RERA ID contains invalid characters (only A-Z, 0-9, / and - allowed).";
   // Maharashtra (MahaRERA): P/A/L/O + 51800 + 6 digits (projects, agents, layout, organizations)
   if (/^[PALO]51800\d{6}$/.test(v)) return null;
   // Haryana RERA formats
   if (/^(RC\/REP\/HARERA|RERA\/GGN|RERA\/GURUGRAM|RERA\/FARIDABAD|RERA\/SONIPAT|HARERA)/i.test(v)) return null;
   // Generic slash-separated state RERA format
-  if (/^[A-Z]{2,6}\/[A-Z0-9]{1,8}\/[A-Z0-9\-\/]{4,}$/i.test(v)) return null;
+  if (/^[A-Z]{2,6}\/[A-Z0-9]{1,8}\/[A-Z0-9-/]{4,}$/i.test(v)) return null;
   return "RERA ID format not recognised. MahaRERA: P51800XXXXXX · Haryana: RC/REP/HARERA/... or RERA/GGN/...";
 }
 

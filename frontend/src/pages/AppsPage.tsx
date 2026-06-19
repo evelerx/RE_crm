@@ -1,9 +1,7 @@
-// MODIFIED: Phase 4 — Added Hotstar ad upload and removed Zoom UI wiring — Keeps ads managed in-product and eliminates deprecated Zoom paths.
 import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { ApiError, api } from "../api/client";
-import HotstarAdUpload from "../components/HotstarAdUpload";
 
 type ProviderStatus = {
   key: string;
@@ -118,50 +116,10 @@ const providerCards = [
   }
 ];
 
-const adPlatforms = [
-  {
-    name: "Google Ads",
-    tab: "ads",
-    iconUrl: "https://img.icons8.com/color/48/google-ads.png",
-    category: "Search and display",
-    description:
-      "Create campaigns for property launches, lead capture, project awareness, branded search, and location-targeted buyer demand.",
-    url: "https://ads.google.com/"
-  },
-  {
-    name: "Meta Ads",
-    tab: "ads",
-    iconUrl: "https://img.icons8.com/color/48/facebook-new.png",
-    category: "Facebook and Instagram",
-    description:
-      "Run visual campaigns for builders, broker teams, and luxury inventory across Facebook and Instagram audiences.",
-    url: "https://www.facebook.com/adsmanager/"
-  },
-  {
-    name: "Hotstar / Disney+",
-    tab: "ads",
-    iconUrl: "https://img.icons8.com/color/48/disney-plus.png",
-    category: "Video and display",
-    description:
-      "Upload Hotstar creative, define regional audiences, and prepare premium video/display campaigns for property launches.",
-    url: "https://ads.hotstar.com/"
-  },
-  {
-    name: "TikTok Ads",
-    tab: "ads",
-    iconUrl: "https://img.icons8.com/color/48/tiktok--v1.png",
-    category: "Short-form discovery",
-    description:
-      "Promote projects, walkthroughs, and branded launch content with short-form campaign distribution for newer audiences.",
-    url: "https://ads.tiktok.com/"
-  }
-];
-
 const appTabs = [
   { key: "communication", label: "Communication", iconUrl: "https://img.icons8.com/color/48/gmail-new.png" },
   { key: "meetings", label: "Meetings", iconUrl: "https://img.icons8.com/color/48/google-meet.png" },
   { key: "calendar", label: "App", iconUrl: "https://img.icons8.com/color/48/google-calendar--v2.png" },
-  { key: "ads", label: "Ads", iconUrl: "https://img.icons8.com/color/48/google-ads.png" },
 ] as const;
 
 const comingSoonApps: Array<{
@@ -327,7 +285,6 @@ export default function AppsPage() {
   const googlePrimary = providerByKey.get("gmail");
   const microsoftPrimary = providerByKey.get("outlook");
   const visibleProviderCards = providerCards.filter((provider) => provider.tab === selectedTab);
-  const visibleAdPlatforms = adPlatforms.filter((platform) => platform.tab === selectedTab);
   const visibleComingSoonApps = comingSoonApps.filter((app) => app.tab === selectedTab);
 
   async function connectGoogle() {
@@ -535,7 +492,7 @@ export default function AppsPage() {
           <div>
             <div className="sectionTitle">Apps</div>
             <div className="sectionSub">
-              Connect communication, meetings, ads, documents, and workflow tools from one Northstone integrations hub.
+              Connect communication, meetings, documents, and workflow tools from one Northstone integrations hub.
             </div>
           </div>
         </div>
@@ -552,7 +509,7 @@ export default function AppsPage() {
         <aside className="card" style={{ position: "sticky", top: 18 }}>
           <div className="sectionTitle" style={{ fontSize: 20 }}>Apps library</div>
           <div className="sectionSub" style={{ marginTop: 8 }}>
-            Browse every tool by business domain, with separate options for Gmail, Calendar, Meet, and ads.
+            Browse every tool by business domain, with separate options for Gmail, Calendar, and Meet.
           </div>
           <div className="stack" style={{ gap: 10, marginTop: 16 }}>
             {appTabs.map((tab) => {
@@ -590,9 +547,7 @@ export default function AppsPage() {
                     ? "Email and direct client messaging tools for follow-ups, updates, and relationship management."
                     : selectedTab === "meetings"
                       ? "Meeting platforms for walkthroughs, sales calls, investor reviews, and partner coordination."
-                      : selectedTab === "calendar"
-                        ? "Calendar and scheduling tools for visits, callbacks, launch planning, and client review slots."
-                        : "Campaign launch surfaces for buyer demand, project awareness, and broker-led marketing."}
+                      : "Calendar and scheduling tools for visits, callbacks, launch planning, and client review slots."}
                 </div>
               </div>
               <div className="pill enterprisePill">Apps</div>
@@ -1008,44 +963,6 @@ export default function AppsPage() {
             </div>
           ) : null}
 
-          {visibleAdPlatforms.length > 0 ? (
-            <>
-              <div className="grid cols3">
-                {visibleAdPlatforms.map((platform) => (
-                  <article key={platform.name} className="card">
-                    <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                      <div className="row" style={{ gap: 12, alignItems: "center" }}>
-                        <img
-                          src={platform.iconUrl}
-                          alt={`${platform.name} icon`}
-                          width={28}
-                          height={28}
-                          style={{ borderRadius: 8, background: "#fff", padding: 4 }}
-                        />
-                        <div>
-                          <div className="sectionTitle" style={{ fontSize: 22 }}>{platform.name}</div>
-                          <div className="muted" style={{ marginTop: 6 }}>{platform.category}</div>
-                        </div>
-                      </div>
-                      <div className="pill adminPill">{platform.name.includes("Hotstar") ? "Upload" : "Publish"}</div>
-                    </div>
-                    <p className="muted" style={{ lineHeight: 1.7, marginTop: 14 }}>{platform.description}</p>
-                    <a
-                      className="btn"
-                      href={platform.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ marginTop: 8, textDecoration: "none" }}
-                    >
-                      Open {platform.name}
-                    </a>
-                  </article>
-                ))}
-              </div>
-              <HotstarAdUpload />
-            </>
-          ) : null}
-
           {visibleComingSoonApps.length > 0 ? (
             <div className="grid cols2">
               {visibleComingSoonApps.map((app) => (
@@ -1072,11 +989,6 @@ export default function AppsPage() {
             </div>
           ) : null}
 
-          {selectedTab === "ads" ? (
-            <div className="bannerInfo">
-              Hotstar campaigns can now be prepared inside Northstone with validation, preview, progress, status, and launch metrics.
-            </div>
-          ) : null}
         </div>
       </section>
     </div>

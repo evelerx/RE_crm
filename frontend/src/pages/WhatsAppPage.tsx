@@ -1,17 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  ApiError,
   api,
   getWhatsAppConfigStatus,
-  getWhatsAppConversation,
   listWhatsAppInbox,
+  sendWhatsAppMedia,
   sendWhatsAppMessage,
   type WhatsAppConfigStatusRead,
-  type WhatsAppConversationRead,
   type WhatsAppConversationSummaryRead,
 } from "../api/client";
 import Modal from "../components/Modal";
-import type { Contact, ContactCreate } from "../api/types";
+import type { Activity, Contact, ContactCreate, Deal } from "../api/types";
+
+type FollowupResponse = { deal_id: string; message: string };
 
 function formatTimestamp(value: string) {
   return new Date(value).toLocaleString([], {
@@ -26,19 +28,32 @@ function formatOptionalTimestamp(value: string | null) {
   return value ? formatTimestamp(value) : "No activity yet";
 }
 
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
 export default function WhatsAppPage() {
   const [conversations, setConversations] = useState<WhatsAppConversationSummaryRead[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [deals, setDeals] = useState<Deal[]>([]);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
-  const [thread, setThread] = useState<WhatsAppConversationRead | null>(null);
   const [loadingInbox, setLoadingInbox] = useState(true);
-  const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [activityBusy, setActivityBusy] = useState(false);
+  const [reminderBusy, setReminderBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [whatsAppConfig, setWhatsAppConfig] = useState<WhatsAppConfigStatusRead | null>(null);
-  const [draft, setDraft] = useState("");
+  const [followupDraft, setFollowupDraft] = useState("");
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string>("");
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
   async function loadConfigStatus() {
     try {
@@ -53,9 +68,14 @@ export default function WhatsAppPage() {
   async function loadInbox(preferredContactId?: string | null) {
     setLoadingInbox(true);
     try {
-      const [rows, contactRows] = await Promise.all([listWhatsAppInbox(), api<Contact[]>("/contacts")]);
+      const [rows, contactRows, dealRows] = await Promise.all([
+        listWhatsAppInbox(),
+        api<Contact[]>("/contacts"),
+        api<Deal[]>("/deals"),
+      ]);
       setConversations(rows);
       setContacts(contactRows);
+      setDeals(dealRows);
       setSelectedContactId((current) => {
         const fallbackId = rows[0]?.contact_id ?? contactRows[0]?.id ?? null;
         const target = preferredContactId ?? current ?? fallbackId;
@@ -71,20 +91,6 @@ export default function WhatsAppPage() {
     }
   }
 
-  async function loadThread(contactId: string) {
-    setLoadingThread(true);
-    try {
-      const response = await getWhatsAppConversation(contactId);
-      setThread(response);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load conversation");
-      setThread(null);
-    } finally {
-      setLoadingThread(false);
-    }
-  }
-
   useEffect(() => {
     void loadInbox();
     void loadConfigStatus();
@@ -95,16 +101,22 @@ export default function WhatsAppPage() {
   }, [selectedContactId]);
 
   useEffect(() => {
-    if (!selectedContactId) {
-      setThread(null);
+    setFollowupDraft("");
+    setAttachmentFile(null);
+    setAttachmentPreviewUrl("");
+    setAttachmentError(null);
+    setSuccessMessage(null);
+  }, [selectedContactId]);
+
+  useEffect(() => {
+    if (!attachmentFile || !attachmentFile.type.startsWith("image/")) {
+      setAttachmentPreviewUrl("");
       return;
     }
-    void loadThread(selectedContactId);
-    const timer = window.setInterval(() => {
-      void loadThread(selectedContactId);
-    }, 15000);
-    return () => window.clearInterval(timer);
-  }, [selectedContactId]);
+    const url = URL.createObjectURL(attachmentFile);
+    setAttachmentPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [attachmentFile]);
 
   const mergedContacts = useMemo(() => {
     const byId = new Map<string, WhatsAppConversationSummaryRead>();
@@ -157,16 +169,114 @@ export default function WhatsAppPage() {
     [mergedContacts, selectedContactId],
   );
 
-  async function handleSend() {
-    if (!selectedContactId || !draft.trim() || whatsAppConfig?.configured === false) return;
-    setSending(true);
+  const linkedDeal = useMemo(() => {
+    const candidates = deals.filter((deal) => deal.contact_id === selectedContactId);
+    if (candidates.length === 0) return null;
+    return candidates.slice().sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0];
+  }, [deals, selectedContactId]);
+
+  async function addActivity(payload: { summary: string; kind?: string; due_at?: string | null }) {
+    if (!selectedContactId) return;
+    setActivityBusy(true);
+    setError(null);
     try {
-      await sendWhatsAppMessage(selectedContactId, draft.trim());
-      setDraft("");
-      await Promise.all([loadInbox(selectedContactId), loadThread(selectedContactId)]);
-      setError(null);
+      await api<Activity>("/activities", {
+        method: "POST",
+        body: JSON.stringify({
+          contact_id: selectedContactId,
+          deal_id: linkedDeal?.id ?? null,
+          kind: payload.kind ?? "whatsapp",
+          summary: payload.summary,
+          due_at: payload.due_at ?? null,
+        }),
+      });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to send message");
+      setError(e instanceof Error ? e.message : "Could not add activity");
+    } finally {
+      setActivityBusy(false);
+    }
+  }
+
+  async function addReminderInDays(days: number) {
+    if (!selectedContactId) return;
+    const due = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    setReminderBusy(true);
+    setError(null);
+    try {
+      await api<Activity>("/activities", {
+        method: "POST",
+        body: JSON.stringify({
+          contact_id: selectedContactId,
+          deal_id: linkedDeal?.id ?? null,
+          kind: "call",
+          summary: "Follow-up reminder",
+          due_at: due.toISOString(),
+        }),
+      });
+      setSuccessMessage("Reminder added");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create reminder");
+    } finally {
+      setReminderBusy(false);
+    }
+  }
+
+  async function generateFollowup() {
+    if (!linkedDeal) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      const resp = await api<FollowupResponse>("/ai/llm/followup", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "openrouter",
+          deal_id: linkedDeal.id,
+          objective: "followup",
+          channel: "whatsapp",
+          tone: "professional",
+        }),
+      });
+      setFollowupDraft(resp.message);
+    } catch (e) {
+      try {
+        if (!(e instanceof ApiError) || (e.status !== 400 && e.status !== 404)) throw e;
+        const resp = await api<FollowupResponse>("/ai/followup", {
+          method: "POST",
+          body: JSON.stringify({ deal_id: linkedDeal.id, objective: "followup", channel: "whatsapp", tone: "professional" }),
+        });
+        setFollowupDraft(resp.message);
+      } catch (inner) {
+        setError(inner instanceof Error ? inner.message : "Follow-up generation failed");
+      }
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function sendFollowup() {
+    if (!selectedContactId || !followupDraft.trim() || whatsAppConfig?.configured === false) return;
+    setSending(true);
+    setError(null);
+    setAttachmentError(null);
+    setSuccessMessage(null);
+    try {
+      if (attachmentFile) {
+        await sendWhatsAppMedia(selectedContactId, followupDraft.trim(), attachmentFile);
+      } else {
+        await sendWhatsAppMessage(selectedContactId, followupDraft.trim());
+      }
+      await addActivity({
+        kind: "whatsapp",
+        summary: attachmentFile ? `WhatsApp follow-up sent: ${attachmentFile.name}` : followupDraft.trim(),
+      });
+      setFollowupDraft("");
+      setAttachmentFile(null);
+      setAttachmentPreviewUrl("");
+      if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+      setSuccessMessage("Sent");
+      await loadInbox(selectedContactId);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to send WhatsApp follow-up");
     } finally {
       setSending(false);
     }
@@ -177,7 +287,7 @@ export default function WhatsAppPage() {
       <div className="pageHeader">
         <div>
           <div className="h1">WhatsApp</div>
-          <div className="muted">Follow up with leads and clients from one inbox.</div>
+          <div className="muted">AI-assisted follow-ups for leads and clients, sent straight to WhatsApp.</div>
         </div>
         <button className="btn ghost" type="button" onClick={() => void loadInbox(selectedContactId)}>
           Refresh
@@ -231,75 +341,127 @@ export default function WhatsAppPage() {
           {!selectedSummary ? (
             <div className="emptyStateCard">
               <div className="h2">No conversation selected</div>
-              <div className="muted">Pick a contact from the inbox to view and send messages.</div>
+              <div className="muted">Pick a contact from the inbox to draft an AI follow-up.</div>
             </div>
           ) : (
             <>
               <div className="whatsappThreadHeader">
                 <div>
-                  <div className="h2">{thread?.contact_name || selectedSummary.contact_name}</div>
+                  <div className="h2">{selectedSummary.contact_name}</div>
                   <div className="muted">
-                    {(thread?.contact_phone ?? selectedSummary.contact_phone) || "No phone"}{" "}
-                    {(thread?.contact_email ?? selectedSummary.contact_email)
-                      ? `· ${thread?.contact_email ?? selectedSummary.contact_email}`
-                      : ""}
+                    {selectedSummary.contact_phone || "No phone"}
+                    {selectedSummary.contact_email ? ` · ${selectedSummary.contact_email}` : ""}
                   </div>
                 </div>
-                <div className="muted whatsappTiny">Latest update {formatOptionalTimestamp(selectedSummary.latest_timestamp)}</div>
+                <div className="muted whatsappTiny">
+                  {linkedDeal ? `Linked deal: ${linkedDeal.title}` : "No linked deal"}
+                </div>
               </div>
 
-              <div className="whatsappMessages">
-                {loadingThread ? <div className="muted">Loading messages...</div> : null}
-                {!loadingThread && thread && thread.messages.length === 0 ? (
-                  <div className="muted">No messages yet. Start the conversation below.</div>
-                ) : null}
-                {!loadingThread &&
-                  thread?.messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`whatsappBubble ${message.direction === "outbound" ? "outbound" : "inbound"}`}
-                    >
-                      <div>{message.message_body}</div>
-                      <div className="whatsappBubbleMeta">
-                        <span>{formatTimestamp(message.timestamp)}</span>
-                        {message.direction === "outbound" ? <span>{message.status}</span> : null}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-
-              <div className="whatsappComposer">
-                <textarea
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  placeholder={
-                    whatsAppConfig?.configured === false
-                      ? "WhatsApp Cloud API is not configured on the backend yet."
-                      : "Type a WhatsApp message..."
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                hidden
+                accept="image/*,video/mp4,application/pdf,audio/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  if (!file) return;
+                  if (file.size > 16 * 1024 * 1024) {
+                    setAttachmentError("File too large (max 16MB)");
+                    e.target.value = "";
+                    return;
                   }
-                  rows={3}
-                  disabled={whatsAppConfig?.configured === false}
+                  setAttachmentError(null);
+                  setAttachmentFile(file);
+                }}
+              />
+
+              <div className="card" style={{ marginTop: 14 }}>
+                <div className="cardTitle">AI Follow-up</div>
+                <div className="muted">Generate a client-ready follow-up, send it to WhatsApp, or log it back into activity history.</div>
+
+                <textarea
+                  className="textarea"
+                  style={{ marginTop: 10 }}
+                  value={followupDraft}
+                  onChange={(e) => setFollowupDraft(e.target.value)}
+                  placeholder="Generate a follow-up message to begin."
                 />
-                <div className="whatsappComposerActions">
+
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                  <button className="btn ghost" onClick={() => attachmentInputRef.current?.click()} type="button">
+                    Attach file
+                  </button>
+                  {attachmentFile ? <div className="muted small">Attachment ready</div> : null}
+                </div>
+
+                {attachmentFile ? (
+                  <div className="attachmentPreview">
+                    {attachmentPreviewUrl ? (
+                      <img src={attachmentPreviewUrl} alt={attachmentFile.name} className="attachmentThumb" />
+                    ) : (
+                      <div className="attachmentFileIcon">FILE</div>
+                    )}
+                    <div className="attachmentMeta">
+                      <div>{attachmentFile.name}</div>
+                      <div className="muted small">{formatFileSize(attachmentFile.size)}</div>
+                    </div>
+                    <button
+                      className="btn ghost compact"
+                      onClick={() => {
+                        setAttachmentFile(null);
+                        setAttachmentPreviewUrl("");
+                        setAttachmentError(null);
+                        if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+                      }}
+                      type="button"
+                    >
+                      X
+                    </button>
+                  </div>
+                ) : null}
+                {attachmentError ? <div className="muted small">{attachmentError}</div> : null}
+
+                <div className="row" style={{ marginTop: 10 }}>
                   <button
                     className="btn"
                     type="button"
-                    disabled={sending || !draft.trim() || whatsAppConfig?.configured === false}
-                    onClick={() => void handleSend()}
+                    disabled={generating || !linkedDeal}
+                    title={linkedDeal ? undefined : "Link a deal to this contact to enable AI generation"}
+                    onClick={() => void generateFollowup()}
+                  >
+                    {generating ? "Generating..." : "Generate"}
+                  </button>
+                  <button
+                    className="btn ghost"
+                    type="button"
+                    disabled={sending || !followupDraft.trim() || whatsAppConfig?.configured === false}
+                    onClick={() => void sendFollowup()}
                     title={whatsAppConfig?.configured === false ? whatsAppConfig.detail : undefined}
                   >
-                    {sending ? "Sending..." : "Send"}
+                    {sending ? "Sending..." : "Send on WhatsApp"}
+                  </button>
+                  <button
+                    className="btn ghost"
+                    type="button"
+                    disabled={activityBusy || !followupDraft.trim()}
+                    onClick={() => void addActivity({ kind: "whatsapp", summary: followupDraft || "Follow-up sent" })}
+                  >
+                    {activityBusy ? "Logging..." : "Log activity"}
+                  </button>
+                  <button className="btn ghost" type="button" disabled={reminderBusy} onClick={() => void addReminderInDays(2)}>
+                    {reminderBusy ? "Adding reminder..." : "Remind in 2 days"}
                   </button>
                 </div>
+
+                {successMessage ? <div className="muted small">{successMessage}</div> : null}
                 {whatsAppConfig?.configured === false ? (
                   <div className="muted whatsappTiny">
                     Live outbound WhatsApp sending stays disabled until the backend gets valid Meta Cloud API credentials.
                   </div>
                 ) : null}
                 {!selectedSummary.contact_phone ? (
-                  <div className="muted whatsappTiny">
-                    Add a phone number to this contact before sending outbound WhatsApp messages.
-                  </div>
+                  <div className="muted whatsappTiny">Add a phone number to this contact before sending outbound WhatsApp messages.</div>
                 ) : null}
               </div>
             </>
