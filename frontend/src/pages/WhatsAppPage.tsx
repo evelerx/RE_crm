@@ -11,6 +11,18 @@ import {
 import Modal from "../components/Modal";
 import type { Activity, Contact, ContactCreate, Deal, DealImage } from "../api/types";
 
+function formatDealMoney(value: number | null | undefined) {
+  if (value == null) return null;
+  return `Rs ${value.toLocaleString("en-IN")}`;
+}
+
+function formatDealDate(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
 async function pullDealContent(selected: Deal[]): Promise<string> {
   const blocks = await Promise.all(
     selected.map(async (deal, index) => {
@@ -21,11 +33,30 @@ async function pullDealContent(selected: Deal[]): Promise<string> {
         images = [];
       }
       const location = [deal.area, deal.city].filter(Boolean).join(", ");
-      const budget = deal.ticket_size ?? deal.customer_budget;
       const prefix = selected.length > 1 ? `${index + 1}. ` : "";
       const lines = [`${prefix}${deal.title}${location ? ` — ${location}` : ""}`];
-      if (budget != null) lines.push(`   Budget: Rs ${budget.toLocaleString("en-IN")}`);
-      if (images.length) lines.push(`   Photos: ${images.map((img) => `${API_BASE_URL}${img.image_url}`).join(" ")}`);
+
+      const typeParts = [deal.asset_type, deal.typology].filter(Boolean);
+      if (typeParts.length) lines.push(`   Type: ${typeParts.join(" · ")}`);
+      if (deal.stage) lines.push(`   Stage: ${deal.stage}`);
+
+      const budget = formatDealMoney(deal.ticket_size ?? deal.customer_budget);
+      if (budget) lines.push(`   Budget: ${budget}`);
+
+      if (deal.expected_yield_pct != null) lines.push(`   Expected yield: ${deal.expected_yield_pct}%`);
+      if (deal.expected_roi_pct != null) lines.push(`   Expected ROI: ${deal.expected_roi_pct}%`);
+      if (deal.liquidity_days_est != null) lines.push(`   Liquidity: ~${deal.liquidity_days_est} days`);
+
+      const visitDate = formatDealDate(deal.visit_date);
+      if (visitDate) lines.push(`   Visit date: ${visitDate}`);
+
+      if (deal.notes?.trim()) lines.push(`   Notes: ${deal.notes.trim().slice(0, 200)}`);
+
+      if (images.length) {
+        lines.push(`   Photos:`);
+        images.forEach((img) => lines.push(`   ${API_BASE_URL}${img.image_url}`));
+      }
+
       return lines.join("\n");
     }),
   );
@@ -79,6 +110,7 @@ export default function WhatsAppPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedDealIds, setSelectedDealIds] = useState<string[]>([]);
   const [dealSearch, setDealSearch] = useState("");
+  const [dealPickerOpen, setDealPickerOpen] = useState(false);
   const [followupDraft, setFollowupDraft] = useState("");
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string>("");
@@ -87,6 +119,7 @@ export default function WhatsAppPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const dealPickerRef = useRef<HTMLDivElement | null>(null);
 
   async function loadInbox(preferredContactId?: string | null) {
     setLoadingInbox(true);
@@ -126,6 +159,7 @@ export default function WhatsAppPage() {
     setFollowupDraft("");
     setSelectedDealIds([]);
     setDealSearch("");
+    setDealPickerOpen(false);
     setAttachmentFile(null);
     setAttachmentPreviewUrl("");
     setAttachmentError(null);
@@ -141,6 +175,15 @@ export default function WhatsAppPage() {
     setAttachmentPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [attachmentFile]);
+
+  useEffect(() => {
+    if (!dealPickerOpen) return;
+    function handleOutside(e: MouseEvent) {
+      if (dealPickerRef.current && !dealPickerRef.current.contains(e.target as Node)) setDealPickerOpen(false);
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [dealPickerOpen]);
 
   const mergedContacts = useMemo(() => {
     const byId = new Map<string, WhatsAppConversationSummaryRead>();
@@ -416,30 +459,68 @@ export default function WhatsAppPage() {
                 <div className="cardTitle">AI Follow-up</div>
                 <div className="muted">Pick deals to pull in their details and photos, send it to WhatsApp, or log it back into activity history.</div>
 
-                <div style={{ marginTop: 10 }}>
-                  <div>Select deals to share</div>
-                  <input
-                    value={dealSearch}
-                    onChange={(e) => setDealSearch(e.target.value)}
-                    placeholder="Search deals by title, area, city, or stage"
-                    style={{ marginTop: 6 }}
-                  />
-                  {dealOptions.length === 0 ? (
-                    <div className="muted small" style={{ marginTop: 6 }}>No deals found.</div>
-                  ) : (
-                    <div className="stack" style={{ gap: 6, marginTop: 6, maxHeight: 220, overflowY: "auto" }}>
-                      {dealOptions.map((deal) => (
-                        <label key={deal.id} className="row" style={{ gap: 8, alignItems: "center", fontWeight: 400 }}>
-                          <input type="checkbox" checked={selectedDealIds.includes(deal.id)} onChange={() => toggleDealSelection(deal.id)} />
-                          <span>
-                            {deal.title} — {deal.stage}
-                            {deal.area ? `, ${deal.area}` : ""}
-                            {deal.contact_id === selectedContactId ? " · linked" : ""}
+                <div className="dealPickerField" ref={dealPickerRef} style={{ marginTop: 10 }}>
+                  <button
+                    type="button"
+                    className="dealPickerTrigger"
+                    onClick={() => setDealPickerOpen((v) => !v)}
+                  >
+                    <span>
+                      {selectedDeals.length === 0
+                        ? "Select deals to share"
+                        : `${selectedDeals.length} deal${selectedDeals.length === 1 ? "" : "s"} selected`}
+                    </span>
+                    <span className="dealPickerChevron">{dealPickerOpen ? "▲" : "▼"}</span>
+                  </button>
+
+                  {dealPickerOpen ? (
+                    <div className="dealPickerPanel">
+                      <input
+                        autoFocus
+                        value={dealSearch}
+                        onChange={(e) => setDealSearch(e.target.value)}
+                        placeholder="Search deals by title, area, city, or stage"
+                      />
+                      <div className="dealPickerList">
+                        {dealOptions.length === 0 ? (
+                          <div className="dealPickerEmpty">No deals found.</div>
+                        ) : (
+                          dealOptions.map((deal) => (
+                            <label key={deal.id} className="dealPickerOption">
+                              <input
+                                type="checkbox"
+                                checked={selectedDealIds.includes(deal.id)}
+                                onChange={() => toggleDealSelection(deal.id)}
+                              />
+                              <span>
+                                {deal.title} — {deal.stage}
+                                {deal.area ? `, ${deal.area}` : ""}
+                                {deal.contact_id === selectedContactId ? " · linked" : ""}
+                              </span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {selectedDeals.length > 0 ? (
+                    <div className="dealPickerChips">
+                      {selectedDeals.map((deal) => (
+                        <span key={deal.id} className="dealPickerChip">
+                          {deal.title}
+                          <span
+                            className="dealPickerChipRemove"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => toggleDealSelection(deal.id)}
+                          >
+                            ×
                           </span>
-                        </label>
+                        </span>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </div>
                 {pulling ? <div className="muted small" style={{ marginTop: 6 }}>Pulling deal content...</div> : null}
 
