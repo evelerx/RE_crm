@@ -43,6 +43,15 @@ class User(SQLModel, table=True):
     subscription_expires_at: Optional[datetime] = None
     marketing_portal_enabled: bool = False
     marketing_portal_enabled_at: Optional[datetime] = None
+    team_id: Optional[UUID] = Field(default=None, foreign_key="team.id", index=True)
+
+
+class Team(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    enterprise_owner_id: UUID = Field(foreign_key="user.id", index=True)
+    name: str
+    description: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
 class Profile(SQLModel, table=True):
@@ -125,9 +134,10 @@ class Activity(SQLModel, table=True):
     owner_id: UUID = Field(foreign_key="user.id", index=True)
     enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
     created_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    assigned_by_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
     deal_id: Optional[UUID] = Field(default=None, foreign_key="deal.id", index=True)
     contact_id: Optional[UUID] = Field(default=None, foreign_key="contact.id", index=True)
-    kind: str = "whatsapp"  # call | whatsapp | meeting | site_visit | email | other
+    kind: str = "whatsapp"  # call | whatsapp | meeting | site_visit | email | other | task
     summary: str = ""
     due_at: Optional[datetime] = None
     completed: bool = False

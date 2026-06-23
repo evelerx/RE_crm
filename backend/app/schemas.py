@@ -309,11 +309,57 @@ class EnterpriseEmployeeCreateRequest(BaseModel):
     full_name: str = ""
     company: str = ""
     role_label: str = Field(default="broker", pattern="^(broker|cp|employee)$")
+    team_id: Optional[UUID] = None
 
 
 class EnterpriseEmployeeBlacklistRequest(BaseModel):
     reason: str = ""
     blacklisted: bool = True
+
+
+class TeamCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=400)
+
+
+class TeamUpdateRequest(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    description: Optional[str] = Field(default=None, max_length=400)
+
+
+class TeamRead(BaseModel):
+    id: UUID
+    name: str
+    description: str = ""
+    member_count: int = 0
+    created_at: datetime
+
+
+class TeamAssignRequest(BaseModel):
+    team_id: Optional[UUID] = None
+
+
+class EnterpriseTaskCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    assigned_to_id: UUID
+    deal_id: Optional[UUID] = None
+    due_at: Optional[datetime] = None
+
+
+class EnterpriseTaskRead(BaseModel):
+    id: UUID
+    title: str
+    assigned_to_id: UUID
+    assigned_to_name: str = ""
+    assigned_by_id: Optional[UUID] = None
+    assigned_by_name: str = ""
+    team_id: Optional[UUID] = None
+    team_name: str = ""
+    deal_id: Optional[UUID] = None
+    due_at: Optional[datetime] = None
+    completed: bool
+    status: str  # overdue | due_today | pending | completed
+    created_at: datetime
 
 
 class ProfileUpsert(BaseModel):
@@ -344,6 +390,8 @@ class EnterpriseEmployeeRead(BaseModel):
     full_name: str = ""
     company: str = ""
     role_label: str = "employee"
+    team_id: Optional[UUID] = None
+    team_name: str = ""
     created_at: datetime
     is_blacklisted: bool
     blacklist_reason: str = ""

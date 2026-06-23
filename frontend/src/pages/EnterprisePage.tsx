@@ -48,6 +48,8 @@ type EnterpriseEmployeeRow = {
   full_name: string;
   company: string;
   role_label: string;
+  team_id: string | null;
+  team_name: string;
   created_at: string;
   is_blacklisted: boolean;
   blacklist_reason: string;
@@ -60,6 +62,30 @@ type EnterpriseEmployeeRow = {
     contacts: number;
     activities: number;
   };
+};
+
+type TeamRow = {
+  id: string;
+  name: string;
+  description: string;
+  member_count: number;
+  created_at: string;
+};
+
+type TeamTaskRow = {
+  id: string;
+  title: string;
+  assigned_to_id: string;
+  assigned_to_name: string;
+  assigned_by_id: string | null;
+  assigned_by_name: string;
+  team_id: string | null;
+  team_name: string;
+  deal_id: string | null;
+  due_at: string | null;
+  completed: boolean;
+  status: "overdue" | "due_today" | "pending" | "completed";
+  created_at: string;
 };
 
 type EnterpriseOverview = {
@@ -221,8 +247,24 @@ export default function EnterprisePage() {
   const [employeeName, setEmployeeName] = useState("");
   const [employeeCompany, setEmployeeCompany] = useState("");
   const [employeeRole, setEmployeeRole] = useState<"broker" | "cp" | "employee">("broker");
+  const [employeeTeamId, setEmployeeTeamId] = useState("");
   const [employeeBusy, setEmployeeBusy] = useState(false);
   const [employeeMsg, setEmployeeMsg] = useState<string | null>(null);
+
+  const [teams, setTeams] = useState<TeamRow[]>([]);
+  const [teamName, setTeamName] = useState("");
+  const [teamDescription, setTeamDescription] = useState("");
+  const [teamBusy, setTeamBusy] = useState(false);
+  const [teamMsg, setTeamMsg] = useState<string | null>(null);
+
+  const [teamTasks, setTeamTasks] = useState<TeamTaskRow[]>([]);
+  const [taskFilterTeamId, setTaskFilterTeamId] = useState("");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskAssigneeId, setTaskAssigneeId] = useState("");
+  const [taskDealId, setTaskDealId] = useState("");
+  const [taskDueAt, setTaskDueAt] = useState("");
+  const [taskBusy, setTaskBusy] = useState(false);
+  const [taskMsg, setTaskMsg] = useState<string | null>(null);
   const [companyBusy, setCompanyBusy] = useState(false);
   const [companyMsg, setCompanyMsg] = useState<string | null>(null);
   const visibleGovernanceRows = governanceExpanded ? auditRows : auditRows.slice(0, 1);
@@ -290,7 +332,7 @@ export default function EnterprisePage() {
         }
         throw e;
       }
-      const [o, profile, marketResp, portfolioResp, dealsResp, auditResp, chatResp, docsResp] = await Promise.all([
+      const [o, profile, marketResp, portfolioResp, dealsResp, auditResp, chatResp, docsResp, teamsResp, tasksResp] = await Promise.all([
         api<EnterpriseOverview>("/enterprise/overview"),
         api<Profile>("/profile"),
         api<MarketInsightsResponse>("/enterprise/market-insights?window_days=90"),
@@ -298,7 +340,9 @@ export default function EnterprisePage() {
         api<DealRow[]>("/deals"),
         api<AuditRow[]>("/enterprise/audit?limit=20"),
         api<SupportChatRow[]>("/enterprise/support-chat"),
-        api<BuilderDocumentRow[]>("/enterprise/builder-documents")
+        api<BuilderDocumentRow[]>("/enterprise/builder-documents"),
+        api<TeamRow[]>("/enterprise/teams"),
+        api<TeamTaskRow[]>("/enterprise/tasks")
       ]);
       setEnterpriseContext(context);
       setOverview(o);
@@ -309,6 +353,8 @@ export default function EnterprisePage() {
       setAuditRows(auditResp);
       setChatRows(chatResp);
       setBuilderDocuments(docsResp);
+      setTeams(teamsResp);
+      setTeamTasks(tasksResp);
       if (!dealId && dealsResp.length) setDealId(dealsResp[0].id);
       setDocForm((prev) => ({
         ...prev,
@@ -667,6 +713,7 @@ export default function EnterprisePage() {
       {showOrganizationFeatures ? (
         <>
       {isEnterpriseOwner ? (
+      <>
       <section id="team-ids" className="card">
         <div className="cardTitle">Create broker / CP / employee ID</div>
         <div className="muted">These users get the normal CRM interface, and all of their data rolls up into this enterprise account.</div>
@@ -685,7 +732,8 @@ export default function EnterprisePage() {
                   password: employeePassword,
                   full_name: employeeName,
                   company: employeeCompany,
-                  role_label: employeeRole
+                  role_label: employeeRole,
+                  team_id: employeeTeamId || null
                 })
               });
               setEmployeeMsg("Employee ID created.");
@@ -694,6 +742,7 @@ export default function EnterprisePage() {
               setEmployeeName("");
               setEmployeeCompany("");
               setEmployeeRole("broker");
+              setEmployeeTeamId("");
               await load();
             } catch (err) {
               setEmployeeMsg(err instanceof Error ? err.message : "Could not create employee");
@@ -722,20 +771,108 @@ export default function EnterprisePage() {
               <input value={employeeCompany} onChange={(e) => setEmployeeCompany(e.target.value)} placeholder="Organization name" />
             </label>
           </div>
-          <label>
-            Role
-            <select value={employeeRole} onChange={(e) => setEmployeeRole((e.target.value as "broker" | "cp" | "employee") ?? "broker")}>
-              <option value="broker">Broker</option>
-              <option value="cp">CP</option>
-              <option value="employee">Employee</option>
-            </select>
-          </label>
+          <div className="grid2">
+            <label>
+              Role
+              <select value={employeeRole} onChange={(e) => setEmployeeRole((e.target.value as "broker" | "cp" | "employee") ?? "broker")}>
+                <option value="broker">Broker</option>
+                <option value="cp">CP</option>
+                <option value="employee">Employee</option>
+              </select>
+            </label>
+            <label>
+              Team (optional)
+              <select value={employeeTeamId} onChange={(e) => setEmployeeTeamId(e.target.value)}>
+                <option value="">No team</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>{team.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           {employeeMsg ? <div className="alert ok">{employeeMsg}</div> : null}
           <button className="btn" type="submit" disabled={employeeBusy || !employeeEmail.trim() || employeePassword.length < 8}>
             {employeeBusy ? "Creating..." : "Create employee ID"}
           </button>
         </form>
       </section>
+
+      <section id="teams" className="card">
+        <div className="cardTitle">Teams</div>
+        <div className="muted">Group your broker/CP/employee IDs into teams so you can assign and track work at the team level.</div>
+        <form
+          className="form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!teamName.trim()) return;
+            setTeamBusy(true);
+            setTeamMsg(null);
+            try {
+              await api<TeamRow>("/enterprise/teams", {
+                method: "POST",
+                body: JSON.stringify({ name: teamName.trim(), description: teamDescription.trim() })
+              });
+              setTeamMsg("Team created.");
+              setTeamName("");
+              setTeamDescription("");
+              await load();
+            } catch (err) {
+              setTeamMsg(err instanceof Error ? err.message : "Could not create team");
+            } finally {
+              setTeamBusy(false);
+            }
+          }}
+        >
+          <div className="grid2">
+            <label>
+              Team name
+              <input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. Sales Team A" />
+            </label>
+            <label>
+              Description (optional)
+              <input value={teamDescription} onChange={(e) => setTeamDescription(e.target.value)} placeholder="What this team covers" />
+            </label>
+          </div>
+          {teamMsg ? <div className="alert ok">{teamMsg}</div> : null}
+          <button className="btn" type="submit" disabled={teamBusy || !teamName.trim()}>
+            {teamBusy ? "Creating..." : "Create team"}
+          </button>
+        </form>
+        <div className="list" style={{ marginTop: 12 }}>
+          {teams.length === 0 ? (
+            <div className="muted small">No teams yet.</div>
+          ) : (
+            teams.map((team) => (
+              <div key={team.id} className="listItem">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div>
+                    <b>{team.name}</b>
+                    {team.description ? <div className="muted small">{team.description}</div> : null}
+                    <div className="muted small">{team.member_count} member{team.member_count === 1 ? "" : "s"}</div>
+                  </div>
+                  <button
+                    className="btn ghost"
+                    type="button"
+                    onClick={async () => {
+                      const confirmed = window.confirm(`Delete team "${team.name}"? Members keep their IDs but lose this team grouping.`);
+                      if (!confirmed) return;
+                      try {
+                        await api(`/enterprise/teams/${team.id}`, { method: "DELETE" });
+                        await load();
+                      } catch (err) {
+                        setTeamMsg(err instanceof Error ? err.message : "Could not delete team");
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+      </>
       ) : (
       <section id="team-ids" className="card">
         <div className="cardTitle">Create broker / CP / employee ID</div>
@@ -759,6 +896,7 @@ export default function EnterprisePage() {
                 <th>Email</th>
                 <th>Company</th>
                 <th>Role</th>
+                <th>Team</th>
                 <th>Status</th>
                 <th>Deals</th>
                 <th>Closed</th>
@@ -777,6 +915,32 @@ export default function EnterprisePage() {
                   <td>{employee.email}</td>
                   <td>{employee.company || overview?.company || "-"}</td>
                   <td>{employee.role_label}</td>
+                  <td>
+                    {isEnterpriseOwner ? (
+                      <select
+                        value={employee.team_id || ""}
+                        onChange={async (e) => {
+                          const newTeamId = e.target.value || null;
+                          try {
+                            await api(`/enterprise/employees/${employee.id}/team`, {
+                              method: "POST",
+                              body: JSON.stringify({ team_id: newTeamId })
+                            });
+                            await load();
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Could not update team");
+                          }
+                        }}
+                      >
+                        <option value="">No team</option>
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>{team.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      employee.team_name || "-"
+                    )}
+                  </td>
                   <td>{employee.is_blacklisted ? `Blacklisted${employee.blacklist_reason ? `: ${employee.blacklist_reason}` : ""}` : "Active"}</td>
                   <td>{employee.counts.deals}</td>
                   <td>{employee.counts.closed_deals ?? 0}</td>
@@ -833,13 +997,130 @@ export default function EnterprisePage() {
               ))}
               {!overview?.employees.length && !loading ? (
                 <tr>
-                  <td colSpan={13} className="muted">
+                  <td colSpan={14} className="muted">
                     {publicPreviewMode ? "Upgrade to Enterprise or Builder to unlock employee rollups, blacklist controls, and organization-wide visibility." : "No employee IDs created yet."}
                   </td>
                 </tr>
               ) : null}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section id="team-tasks" className="card">
+        <div className="cardTitle">Team tasks</div>
+        <div className="muted">
+          {isEnterpriseOwner ? "Assign tasks to your team members and track status here." : "Tasks assigned to you by your manager."}
+        </div>
+
+        {isEnterpriseOwner ? (
+          <form
+            className="form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!taskTitle.trim() || !taskAssigneeId) return;
+              setTaskBusy(true);
+              setTaskMsg(null);
+              try {
+                await api<TeamTaskRow>("/enterprise/tasks", {
+                  method: "POST",
+                  body: JSON.stringify({
+                    title: taskTitle.trim(),
+                    assigned_to_id: taskAssigneeId,
+                    deal_id: taskDealId || null,
+                    due_at: taskDueAt ? new Date(taskDueAt).toISOString() : null
+                  })
+                });
+                setTaskMsg("Task assigned.");
+                setTaskTitle("");
+                setTaskAssigneeId("");
+                setTaskDealId("");
+                setTaskDueAt("");
+                await load();
+              } catch (err) {
+                setTaskMsg(err instanceof Error ? err.message : "Could not assign task");
+              } finally {
+                setTaskBusy(false);
+              }
+            }}
+          >
+            <div className="grid2">
+              <label>
+                Task title
+                <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="e.g. Follow up with client X" />
+              </label>
+              <label>
+                Assign to
+                <select value={taskAssigneeId} onChange={(e) => setTaskAssigneeId(e.target.value)}>
+                  <option value="">Choose employee</option>
+                  {overview?.employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.full_name || employee.email}
+                      {employee.team_name ? ` (${employee.team_name})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="grid2">
+              <label>
+                Related deal (optional)
+                <select value={taskDealId} onChange={(e) => setTaskDealId(e.target.value)}>
+                  <option value="">No deal</option>
+                  {dealOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Due date (optional)
+                <input type="date" value={taskDueAt} onChange={(e) => setTaskDueAt(e.target.value)} />
+              </label>
+            </div>
+            {taskMsg ? <div className="alert ok">{taskMsg}</div> : null}
+            <button className="btn" type="submit" disabled={taskBusy || !taskTitle.trim() || !taskAssigneeId}>
+              {taskBusy ? "Assigning..." : "Assign task"}
+            </button>
+          </form>
+        ) : null}
+
+        {isEnterpriseOwner && teams.length > 0 ? (
+          <label style={{ marginTop: 12, display: "block", maxWidth: 280 }}>
+            Filter by team
+            <select value={taskFilterTeamId} onChange={(e) => setTaskFilterTeamId(e.target.value)}>
+              <option value="">All teams</option>
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>{team.name}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
+        <div className="list" style={{ marginTop: 12 }}>
+          {(() => {
+            const visibleTasks = taskFilterTeamId ? teamTasks.filter((task) => task.team_id === taskFilterTeamId) : teamTasks;
+            if (visibleTasks.length === 0) return <div className="muted small">No tasks assigned yet.</div>;
+            return visibleTasks.map((task) => (
+              <div key={task.id} className="listItem">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div>
+                    <b>{task.title}</b>
+                    <div className="muted small">
+                      {isEnterpriseOwner ? `Assigned to ${task.assigned_to_name}` : `Assigned by ${task.assigned_by_name}`}
+                      {task.team_name ? ` · ${task.team_name}` : ""}
+                      {task.due_at ? ` · Due ${fmtDt(task.due_at)}` : ""}
+                    </div>
+                  </div>
+                  <span
+                    className={`pill ${task.status === "completed" ? "adminPill" : ""}`}
+                    style={task.status === "overdue" ? { color: "#e06464", borderColor: "#e06464" } : undefined}
+                  >
+                    {task.status.replace("_", " ")}
+                  </span>
+                </div>
+              </div>
+            ));
+          })()}
         </div>
       </section>
 
