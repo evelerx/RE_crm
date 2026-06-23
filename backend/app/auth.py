@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from .db import delete_demo_account_tree, get_session
+from .enterprise_scope import get_enterprise_owner_id
 from .models import Profile, User
 from .settings import settings
 
@@ -160,7 +161,10 @@ def get_current_user(
     if not is_admin and path not in rera_exempt_paths:
         uid = str(user_id)
         if _rera_cache.get(uid, 0) < time.monotonic():
-            profile = session.exec(select(Profile).where(Profile.owner_id == user.id)).first()
+            # Brokers/CPs/employees inherit RERA status from their enterprise owner -
+            # the registration is the brokerage's, not each individual team member's.
+            rera_owner_id = get_enterprise_owner_id(user) or user.id
+            profile = session.exec(select(Profile).where(Profile.owner_id == rera_owner_id)).first()
             rera_id = (profile.rera_id if profile else "") or ""
             if not rera_id.strip():
                 raise HTTPException(status_code=403, detail="RERA ID required. Complete your profile to continue.")

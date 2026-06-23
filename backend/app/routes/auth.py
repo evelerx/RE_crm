@@ -26,6 +26,7 @@ from ..auth import (
 from ..audit import log_audit_event
 from ..db import DATABASE_URL, delete_demo_account_tree, get_session
 from ..auth import get_current_user
+from ..enterprise_scope import get_enterprise_owner_id
 from ..models import PasswordResetToken, Profile, User
 from ..schemas import (
     ChangePasswordRequest,
@@ -107,7 +108,10 @@ async def _notify_password_reset_request(email: str, reset_url: str) -> None:
 
 
 def _rera_completed(session: Session, user: User) -> bool:
-    profile = session.exec(select(Profile).where(Profile.owner_id == user.id)).first()
+    # Brokers/CPs/employees inherit RERA status from their enterprise owner -
+    # the registration is the brokerage's, not each individual team member's.
+    rera_owner_id = get_enterprise_owner_id(user) or user.id
+    profile = session.exec(select(Profile).where(Profile.owner_id == rera_owner_id)).first()
     return bool(profile and (profile.rera_id or "").strip())
 
 
