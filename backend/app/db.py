@@ -26,6 +26,8 @@ from .models import (
     RbacMatrixSetting,
     SupportChatMessage,
     TargetGoal,
+    Team,
+    TeamMembership,
     User,
     WhatsAppMessage,
 )
@@ -332,6 +334,8 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "activity", "created_by_user_id VARCHAR")
             if "assigned_by_id" not in cols:
                 _sqlite_add_column(conn, "activity", "assigned_by_id VARCHAR")
+            if "team_id" not in cols:
+                _sqlite_add_column(conn, "activity", "team_id VARCHAR")
         if _sqlite_table_exists(conn, "dealstageevent"):
             cols = _sqlite_table_columns(conn, "dealstageevent")
             if "enterprise_owner_id" not in cols:
@@ -510,6 +514,7 @@ def _postgres_best_effort_migrate() -> None:
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS team_id UUID;
                   IF to_regclass('activity') IS NOT NULL THEN
                     ALTER TABLE activity ADD COLUMN IF NOT EXISTS assigned_by_id UUID;
+                    ALTER TABLE activity ADD COLUMN IF NOT EXISTS team_id UUID;
                   END IF;
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'open';
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS inventory_status VARCHAR DEFAULT 'available';
@@ -531,6 +536,20 @@ def _postgres_best_effort_migrate() -> None:
 _db_initialized = False
 
 
+def _migrate_single_team_to_membership(session: Session) -> None:
+    """One-time backfill: the original Team design had a single User.team_id column
+    before teams became many-to-many. Carry forward any rows that still only have that."""
+    rows = session.exec(text('SELECT id, team_id FROM "user" WHERE team_id IS NOT NULL')).all()
+    for user_id, team_id in rows:
+        existing = session.exec(
+            select(TeamMembership).where(TeamMembership.team_id == team_id, TeamMembership.user_id == user_id)
+        ).first()
+        if not existing:
+            session.add(TeamMembership(team_id=team_id, user_id=user_id))
+    if rows:
+        session.commit()
+
+
 def init_db() -> None:
     global _db_initialized, _last_purge
     if _db_initialized:
@@ -540,6 +559,7 @@ def init_db() -> None:
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         normalize_existing_enterprise_data(session)
+        _migrate_single_team_to_membership(session)
         purge_expired_demo_accounts(session)
     _last_purge = _utc_now_naive()
     _db_initialized = True

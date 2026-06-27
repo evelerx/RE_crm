@@ -49,6 +49,19 @@ def next_actions(
     overdue = [a for a in due if a.due_at and a.due_at < now]
     upcoming = [a for a in due if not (a.due_at and a.due_at < now)]
 
+    # Newly assigned tasks that wouldn't otherwise surface (no due date set, or due date
+    # past the lookahead window) - purely additive so existing consumers are unaffected.
+    due_ids = {a.id for a in due}
+    assigned_stmt = (
+        select(Activity)
+        .where(user_read_filter(Activity, user))
+        .where(Activity.completed == False)  # noqa: E712
+        .where(Activity.assigned_by_id.is_not(None))
+        .order_by(col(Activity.created_at).desc())
+        .limit(20)
+    )
+    assigned_pending = [a for a in session.exec(assigned_stmt).all() if a.id not in due_ids]
+
     # Stuck deals: no activity in N days and not closed/lost
     cutoff = now - timedelta(days=stuck_days)
     deals_stmt = (
@@ -66,4 +79,5 @@ def next_actions(
         "overdue": overdue,
         "upcoming": upcoming,
         "stuck_deals": stuck,
+        "assigned_pending": assigned_pending,
     }

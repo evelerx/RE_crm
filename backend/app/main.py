@@ -20,6 +20,7 @@ from .routes import (
     ai,
     auth,
     billing,
+    chat,
     contacts,
     csvio,
     deals,
@@ -125,6 +126,7 @@ app.include_router(contacts.router, dependencies=deps)
 app.include_router(deals.router, dependencies=deps)
 app.include_router(activities.router, dependencies=deps)
 app.include_router(billing.router, dependencies=deps)
+app.include_router(chat.router, dependencies=deps)
 app.include_router(ai.router, dependencies=deps)
 app.include_router(admin.router, dependencies=deps)
 app.include_router(profile.router, dependencies=deps)

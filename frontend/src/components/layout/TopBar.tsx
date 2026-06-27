@@ -4,7 +4,12 @@ import { NavLink } from "react-router-dom";
 import { api } from "../../api/client";
 
 type NotifActivity = { id: string; summary: string; due_at: string | null; kind: string; overdue: boolean };
-type NextActionsSnippet = { overdue: Omit<NotifActivity, "overdue">[]; upcoming: Omit<NotifActivity, "overdue">[] };
+type NextActionsSnippet = {
+  overdue: Omit<NotifActivity, "overdue">[];
+  upcoming: Omit<NotifActivity, "overdue">[];
+  assigned_pending?: Omit<NotifActivity, "overdue">[];
+};
+type ChatUnreadSummary = { unread_count: number; contacts_with_unread: number };
 
 type TopBarProps = {
   title: string;
@@ -17,6 +22,7 @@ export default function TopBar({ title, breadcrumb, admin = false, actions }: To
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifItems, setNotifItems] = useState<NotifActivity[]>([]);
   const [overdueCount, setOverdueCount] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,8 +32,12 @@ export default function TopBar({ title, breadcrumb, admin = false, actions }: To
         setNotifItems([
           ...data.overdue.map((a) => ({ ...a, overdue: true })),
           ...data.upcoming.map((a) => ({ ...a, overdue: false })),
+          ...(data.assigned_pending || []).map((a) => ({ ...a, overdue: false })),
         ].slice(0, 20));
       })
+      .catch(() => {});
+    api<ChatUnreadSummary>("/enterprise/chat/unread-count")
+      .then((data) => setUnreadMessages(data.unread_count))
       .catch(() => {});
   }, []);
 
@@ -67,7 +77,11 @@ export default function TopBar({ title, breadcrumb, admin = false, actions }: To
         <button
           className="shellIconButton"
           type="button"
-          title={overdueCount > 0 ? `${overdueCount} overdue task${overdueCount > 1 ? "s" : ""}` : "Notifications"}
+          title={
+            overdueCount + unreadMessages > 0
+              ? `${overdueCount} overdue task${overdueCount === 1 ? "" : "s"} · ${unreadMessages} unread message${unreadMessages === 1 ? "" : "s"}`
+              : "Notifications"
+          }
           onClick={() => setNotifOpen((v) => !v)}
           style={{ position: "relative" }}
         >
@@ -75,7 +89,7 @@ export default function TopBar({ title, breadcrumb, admin = false, actions }: To
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
-          {overdueCount > 0 ? (
+          {overdueCount + unreadMessages > 0 ? (
             <span style={{
               position: "absolute", top: -4, right: -4,
               minWidth: 16, height: 16, padding: "0 3px",
@@ -84,7 +98,7 @@ export default function TopBar({ title, breadcrumb, admin = false, actions }: To
               alignItems: "center", justifyContent: "center", lineHeight: 1,
               pointerEvents: "none",
             }}>
-              {overdueCount > 9 ? "9+" : overdueCount}
+              {overdueCount + unreadMessages > 9 ? "9+" : overdueCount + unreadMessages}
             </span>
           ) : null}
         </button>
@@ -104,6 +118,19 @@ export default function TopBar({ title, breadcrumb, admin = false, actions }: To
 
         {notifOpen ? (
           <div className="notifPanel">
+            {unreadMessages > 0 ? (
+              <>
+                <div className="notifPanelHeader">
+                  Messages
+                  <NavLink to="/inbox" className="notifViewAll" onClick={() => setNotifOpen(false)}>Open Inbox →</NavLink>
+                </div>
+                <NavLink to="/inbox" className="notifItem" onClick={() => setNotifOpen(false)}>
+                  <div className="notifItemSummary">
+                    {unreadMessages} unread message{unreadMessages === 1 ? "" : "s"}
+                  </div>
+                </NavLink>
+              </>
+            ) : null}
             <div className="notifPanelHeader">
               Tasks &amp; Deadlines
               <NavLink to="/today" className="notifViewAll" onClick={() => setNotifOpen(false)}>View all →</NavLink>

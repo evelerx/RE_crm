@@ -332,16 +332,18 @@ class TeamRead(BaseModel):
     name: str
     description: str = ""
     member_count: int = 0
+    member_ids: list[UUID] = []
     created_at: datetime
 
 
-class TeamAssignRequest(BaseModel):
-    team_id: Optional[UUID] = None
+class TeamMemberAddRequest(BaseModel):
+    user_id: UUID
 
 
 class EnterpriseTaskCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     assigned_to_id: UUID
+    team_id: Optional[UUID] = None
     deal_id: Optional[UUID] = None
     due_at: Optional[datetime] = None
 
@@ -360,6 +362,33 @@ class EnterpriseTaskRead(BaseModel):
     completed: bool
     status: str  # overdue | due_today | pending | completed
     created_at: datetime
+
+
+class ChatContactRead(BaseModel):
+    user_id: UUID
+    name: str
+    email: str
+    role_label: str
+    last_message: str = ""
+    last_message_at: Optional[datetime] = None
+    unread_count: int = 0
+
+
+class ChatMessageRead(BaseModel):
+    id: UUID
+    sender_id: UUID
+    recipient_id: UUID
+    body: str
+    attachment_url: str = ""
+    attachment_filename: str = ""
+    is_mine: bool
+    read_at: Optional[datetime] = None
+    created_at: datetime
+
+
+class ChatUnreadSummary(BaseModel):
+    unread_count: int
+    contacts_with_unread: int
 
 
 class ProfileUpsert(BaseModel):
@@ -390,8 +419,8 @@ class EnterpriseEmployeeRead(BaseModel):
     full_name: str = ""
     company: str = ""
     role_label: str = "employee"
-    team_id: Optional[UUID] = None
-    team_name: str = ""
+    team_ids: list[UUID] = []
+    team_names: list[str] = []
     created_at: datetime
     is_blacklisted: bool
     blacklist_reason: str = ""

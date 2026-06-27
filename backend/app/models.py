@@ -54,6 +54,25 @@ class Team(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
+class TeamMembership(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    team_id: UUID = Field(foreign_key="team.id", index=True)
+    user_id: UUID = Field(foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ChatMessage(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    enterprise_owner_id: UUID = Field(foreign_key="user.id", index=True)
+    sender_id: UUID = Field(foreign_key="user.id", index=True)
+    recipient_id: UUID = Field(foreign_key="user.id", index=True)
+    body: str = ""
+    attachment_url: str = ""
+    attachment_filename: str = ""
+    read_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
 class Profile(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     owner_id: UUID = Field(foreign_key="user.id", index=True, unique=True)
@@ -135,6 +154,7 @@ class Activity(SQLModel, table=True):
     enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
     created_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
     assigned_by_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    team_id: Optional[UUID] = Field(default=None, foreign_key="team.id", index=True)
     deal_id: Optional[UUID] = Field(default=None, foreign_key="deal.id", index=True)
     contact_id: Optional[UUID] = Field(default=None, foreign_key="contact.id", index=True)
     kind: str = "whatsapp"  # call | whatsapp | meeting | site_visit | email | other | task

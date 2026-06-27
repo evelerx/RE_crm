@@ -19,6 +19,7 @@ import ContactsPage from "./pages/ContactsPage";
 import DealDetailPage from "./pages/DealDetailPage";
 import DealsGridPage from "./pages/DealsGridPage";
 import EnterprisePage from "./pages/EnterprisePage";
+import InboxPage from "./pages/InboxPage";
 import InsightsPage from "./pages/InsightsPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import LoginPage from "./pages/LoginPage";
@@ -56,7 +57,7 @@ function CrmRoutes({ isAdmin }: { isAdmin: boolean }) {
       <Route path="/properties" element={<PropertiesPage />} />
       <Route path="/inventory" element={<PropertiesPage />} />
       <Route path="/whatsapp" element={<WhatsAppPage />} />
-      <Route path="/inbox" element={<Navigate to="/whatsapp" replace />} />
+      <Route path="/inbox" element={<InboxPage />} />
       <Route path="/calls" element={<CallsPage />} />
       <Route path="/ads" element={<MarketingPage />} />
       <Route path="/automations" element={<AutomationsPage />} />

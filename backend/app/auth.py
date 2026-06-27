@@ -209,6 +209,16 @@ def require_enterprise(user: User = Depends(get_current_user)) -> User:
     return user
 
 
+def require_enterprise_member(user: User = Depends(get_current_user)) -> User:
+    """Looser than require_enterprise: lets every role (including plain 'employee')
+    participate in org-wide features like teams, task tracking, and internal chat."""
+    if is_admin_email(user.email):
+        return user
+    if get_enterprise_owner_id(user) is not None:
+        return user
+    raise HTTPException(status_code=403, detail="Organization feature")
+
+
 def get_or_create_user(*, email: str, session: Session) -> User:
     email_n = normalize_email(email)
     user = session.exec(select(User).where(User.email == email_n)).first()

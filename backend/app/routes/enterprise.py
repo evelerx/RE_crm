@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, select
 
 from ..audit import log_audit_event
-from ..auth import get_or_create_user, hash_password, normalize_email, require_enterprise
+from ..auth import get_or_create_user, hash_password, normalize_email, require_enterprise, require_enterprise_member
 from ..crypto import decrypt_if_configured
 from ..db import get_session
 from ..enterprise_scope import (
@@ -34,6 +34,7 @@ from ..models import (
     Profile,
     SupportChatMessage,
     Team,
+    TeamMembership,
     User,
 )
 from ..schemas import (
@@ -57,8 +58,8 @@ from ..schemas import (
     IntegrationProviderRead,
     SupportChatMessageCreate,
     SupportChatMessageRead,
-    TeamAssignRequest,
     TeamCreateRequest,
+    TeamMemberAddRequest,
     TeamRead,
     TeamUpdateRequest,
 )
@@ -124,11 +125,21 @@ def _employee_rows(session: Session, enterprise_owner_id: UUID) -> list[Enterpri
     profile_by_owner = {profile.owner_id: profile for profile in profiles}
     teams = session.exec(select(Team).where(Team.enterprise_owner_id == enterprise_owner_id)).all()
     team_by_id = {team.id: team for team in teams}
+    memberships = (
+        session.exec(select(TeamMembership).where(TeamMembership.team_id.in_(team_by_id.keys()))).all()
+        if team_by_id
+        else []
+    )
+    teams_by_user: dict[UUID, list[Team]] = {}
+    for membership in memberships:
+        team = team_by_id.get(membership.team_id)
+        if team:
+            teams_by_user.setdefault(membership.user_id, []).append(team)
 
     rows: list[EnterpriseEmployeeRead] = []
     for employee in employees:
         profile = profile_by_owner.get(employee.id)
-        team = team_by_id.get(getattr(employee, "team_id", None))
+        member_teams = teams_by_user.get(employee.id, [])
         rows.append(
             EnterpriseEmployeeRead(
                 id=employee.id,
@@ -136,8 +147,8 @@ def _employee_rows(session: Session, enterprise_owner_id: UUID) -> list[Enterpri
                 full_name=profile.full_name if profile else "",
                 company=profile.company if profile else "",
                 role_label=(getattr(employee, "enterprise_member_role", "") or "employee"),
-                team_id=team.id if team else None,
-                team_name=team.name if team else "",
+                team_ids=[team.id for team in member_teams],
+                team_names=[team.name for team in member_teams],
                 created_at=employee.created_at,
                 is_blacklisted=bool(getattr(employee, "is_blacklisted", False)),
                 blacklist_reason=getattr(employee, "blacklist_reason", "") or "",
@@ -1181,7 +1192,6 @@ def create_employee(
     employee.password_hash = hash_password(payload.password)
     employee.enterprise_owner_id = user.id
     employee.enterprise_member_role = payload.role_label
-    employee.team_id = team_id
     employee.plan = "free"
     employee.enterprise_enabled_at = None
     employee.is_blacklisted = False
@@ -1190,6 +1200,12 @@ def create_employee(
     session.add(employee)
     session.commit()
     session.refresh(employee)
+
+    if team_id and not session.exec(
+        select(TeamMembership).where(TeamMembership.team_id == team_id, TeamMembership.user_id == employee.id)
+    ).first():
+        session.add(TeamMembership(team_id=team_id, user_id=employee.id))
+        session.commit()
 
     profile = session.exec(select(Profile).where(Profile.owner_id == employee.id)).first()
     if not profile:
@@ -1220,19 +1236,20 @@ def _team_rows(session: Session, enterprise_owner_id: UUID) -> list[TeamRead]:
     teams = session.exec(
         select(Team).where(Team.enterprise_owner_id == enterprise_owner_id).order_by(Team.created_at.desc())
     ).all()
-    member_counts: dict[UUID, int] = {}
+    members_by_team: dict[UUID, list[UUID]] = {}
     if teams:
-        members = session.exec(
-            select(User.team_id).where(User.enterprise_owner_id == enterprise_owner_id, User.team_id.is_not(None))
+        memberships = session.exec(
+            select(TeamMembership).where(TeamMembership.team_id.in_([team.id for team in teams]))
         ).all()
-        for team_id in members:
-            member_counts[team_id] = member_counts.get(team_id, 0) + 1
+        for membership in memberships:
+            members_by_team.setdefault(membership.team_id, []).append(membership.user_id)
     return [
         TeamRead(
             id=team.id,
             name=team.name,
             description=team.description,
-            member_count=member_counts.get(team.id, 0),
+            member_count=len(members_by_team.get(team.id, [])),
+            member_ids=members_by_team.get(team.id, []),
             created_at=team.created_at,
         )
         for team in teams
@@ -1242,7 +1259,7 @@ def _team_rows(session: Session, enterprise_owner_id: UUID) -> list[TeamRead]:
 @router.get("/teams", response_model=list[TeamRead])
 def list_teams(
     session: Session = Depends(get_session),
-    user: User = Depends(require_enterprise),
+    user: User = Depends(require_enterprise_member),
 ):
     owner_id = get_enterprise_owner_id(user)
     if not owner_id:
@@ -1302,10 +1319,9 @@ def delete_team(
     team = session.get(Team, team_id)
     if not team or team.enterprise_owner_id != user.id:
         raise HTTPException(status_code=404, detail="Team not found")
-    members = session.exec(select(User).where(User.team_id == team_id)).all()
-    for member in members:
-        member.team_id = None
-        session.add(member)
+    memberships = session.exec(select(TeamMembership).where(TeamMembership.team_id == team_id)).all()
+    for membership in memberships:
+        session.delete(membership)
     session.delete(team)
     log_audit_event(
         session,
@@ -1319,28 +1335,53 @@ def delete_team(
     return {"deleted": True}
 
 
-@router.post("/employees/{employee_id}/team", response_model=EnterpriseEmployeeRead)
-def assign_employee_team(
-    employee_id: UUID,
-    payload: TeamAssignRequest,
+@router.post("/teams/{team_id}/members", response_model=TeamRead)
+def add_team_member(
+    team_id: UUID,
+    payload: TeamMemberAddRequest,
     session: Session = Depends(get_session),
     user: User = Depends(require_enterprise_owner),
 ):
-    employee = session.get(User, employee_id)
+    team = session.get(Team, team_id)
+    if not team or team.enterprise_owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Team not found")
+    employee = session.get(User, payload.user_id)
     if not employee or employee.enterprise_owner_id != user.id:
         raise HTTPException(status_code=404, detail="Employee not found")
-    if payload.team_id:
-        team = session.get(Team, payload.team_id)
-        if not team or team.enterprise_owner_id != user.id:
-            raise HTTPException(status_code=404, detail="Team not found")
-    employee.team_id = payload.team_id
-    session.add(employee)
-    session.commit()
-    employees = _employee_rows(session, user.id)
-    for row in employees:
-        if row.id == employee.id:
+    existing = session.exec(
+        select(TeamMembership).where(TeamMembership.team_id == team_id, TeamMembership.user_id == employee.id)
+    ).first()
+    if not existing:
+        session.add(TeamMembership(team_id=team_id, user_id=employee.id))
+        session.commit()
+    rows = _team_rows(session, user.id)
+    for row in rows:
+        if row.id == team.id:
             return row
-    raise HTTPException(status_code=500, detail="Employee updated but could not be loaded")
+    raise HTTPException(status_code=500, detail="Team updated but could not be loaded")
+
+
+@router.delete("/teams/{team_id}/members/{employee_id}", response_model=TeamRead)
+def remove_team_member(
+    team_id: UUID,
+    employee_id: UUID,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_enterprise_owner),
+):
+    team = session.get(Team, team_id)
+    if not team or team.enterprise_owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Team not found")
+    membership = session.exec(
+        select(TeamMembership).where(TeamMembership.team_id == team_id, TeamMembership.user_id == employee_id)
+    ).first()
+    if membership:
+        session.delete(membership)
+        session.commit()
+    rows = _team_rows(session, user.id)
+    for row in rows:
+        if row.id == team.id:
+            return row
+    raise HTTPException(status_code=500, detail="Team updated but could not be loaded")
 
 
 def _task_status(due_at: datetime | None, completed: bool) -> str:
@@ -1360,7 +1401,7 @@ def _task_status(due_at: datetime | None, completed: bool) -> str:
 def list_team_tasks(
     team_id: UUID | None = Query(default=None),
     session: Session = Depends(get_session),
-    user: User = Depends(require_enterprise),
+    user: User = Depends(require_enterprise_member),
 ):
     owner_id = get_enterprise_owner_id(user)
     if not owner_id:
@@ -1372,6 +1413,8 @@ def list_team_tasks(
     )
     if not is_enterprise_owner(user):
         stmt = stmt.where(Activity.owner_id == user.id)
+    if team_id:
+        stmt = stmt.where(Activity.team_id == team_id)
     tasks = session.exec(stmt).all()
     if not tasks:
         return []
@@ -1386,13 +1429,10 @@ def list_team_tasks(
     rows: list[EnterpriseTaskRead] = []
     for task in tasks:
         assignee = users_by_id.get(task.owner_id)
-        assignee_team_id = getattr(assignee, "team_id", None) if assignee else None
-        if team_id and assignee_team_id != team_id:
-            continue
         assignee_profile = profiles_by_owner.get(task.owner_id)
         assigner = users_by_id.get(task.assigned_by_id) if task.assigned_by_id else None
         assigner_profile = profiles_by_owner.get(task.assigned_by_id) if task.assigned_by_id else None
-        team = teams_by_id.get(assignee_team_id) if assignee_team_id else None
+        team = teams_by_id.get(task.team_id) if task.team_id else None
         rows.append(
             EnterpriseTaskRead(
                 id=task.id,
@@ -1401,7 +1441,7 @@ def list_team_tasks(
                 assigned_to_name=(assignee_profile.full_name if assignee_profile and assignee_profile.full_name else (assignee.email if assignee else "")),
                 assigned_by_id=task.assigned_by_id,
                 assigned_by_name=(assigner_profile.full_name if assigner_profile and assigner_profile.full_name else (assigner.email if assigner else "")),
-                team_id=assignee_team_id,
+                team_id=task.team_id,
                 team_name=team.name if team else "",
                 deal_id=task.deal_id,
                 due_at=task.due_at,
@@ -1426,12 +1466,18 @@ def create_team_task(
         deal = session.get(Deal, payload.deal_id)
         if not deal or not user_can_access_record(deal, user):
             raise HTTPException(status_code=404, detail="Deal not found")
+    team = None
+    if payload.team_id:
+        team = session.get(Team, payload.team_id)
+        if not team or team.enterprise_owner_id != user.id:
+            raise HTTPException(status_code=404, detail="Team not found")
 
     task = Activity(
         owner_id=employee.id,
         enterprise_owner_id=user.id,
         created_by_user_id=user.id,
         assigned_by_id=user.id,
+        team_id=team.id if team else None,
         deal_id=payload.deal_id,
         kind="task",
         summary=payload.title.strip(),
@@ -1452,7 +1498,6 @@ def create_team_task(
 
     employee_profile = session.exec(select(Profile).where(Profile.owner_id == employee.id)).first()
     owner_profile = session.exec(select(Profile).where(Profile.owner_id == user.id)).first()
-    team = session.get(Team, employee.team_id) if employee.team_id else None
     return EnterpriseTaskRead(
         id=task.id,
         title=task.summary,
@@ -1460,7 +1505,7 @@ def create_team_task(
         assigned_to_name=employee_profile.full_name if employee_profile and employee_profile.full_name else employee.email,
         assigned_by_id=user.id,
         assigned_by_name=owner_profile.full_name if owner_profile and owner_profile.full_name else user.email,
-        team_id=employee.team_id,
+        team_id=task.team_id,
         team_name=team.name if team else "",
         deal_id=task.deal_id,
         due_at=task.due_at,

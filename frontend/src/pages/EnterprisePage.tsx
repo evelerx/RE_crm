@@ -48,8 +48,8 @@ type EnterpriseEmployeeRow = {
   full_name: string;
   company: string;
   role_label: string;
-  team_id: string | null;
-  team_name: string;
+  team_ids: string[];
+  team_names: string[];
   created_at: string;
   is_blacklisted: boolean;
   blacklist_reason: string;
@@ -69,6 +69,7 @@ type TeamRow = {
   name: string;
   description: string;
   member_count: number;
+  member_ids: string[];
   created_at: string;
 };
 
@@ -256,6 +257,9 @@ export default function EnterprisePage() {
   const [teamDescription, setTeamDescription] = useState("");
   const [teamBusy, setTeamBusy] = useState(false);
   const [teamMsg, setTeamMsg] = useState<string | null>(null);
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  const [addMemberId, setAddMemberId] = useState("");
+  const [memberBusy, setMemberBusy] = useState(false);
 
   const [teamTasks, setTeamTasks] = useState<TeamTaskRow[]>([]);
   const [taskFilterTeamId, setTaskFilterTeamId] = useState("");
@@ -842,33 +846,115 @@ export default function EnterprisePage() {
           {teams.length === 0 ? (
             <div className="muted small">No teams yet.</div>
           ) : (
-            teams.map((team) => (
-              <div key={team.id} className="listItem">
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <div>
-                    <b>{team.name}</b>
-                    {team.description ? <div className="muted small">{team.description}</div> : null}
-                    <div className="muted small">{team.member_count} member{team.member_count === 1 ? "" : "s"}</div>
+            teams.map((team) => {
+              const isExpanded = expandedTeamId === team.id;
+              const members = (overview?.employees || []).filter((employee) => team.member_ids.includes(employee.id));
+              const nonMembers = (overview?.employees || []).filter((employee) => !team.member_ids.includes(employee.id));
+              return (
+                <div key={team.id} className="listItem">
+                  <div className="row" style={{ justifyContent: "space-between" }}>
+                    <div>
+                      <b>{team.name}</b>
+                      {team.description ? <div className="muted small">{team.description}</div> : null}
+                      <div className="muted small">{team.member_count} member{team.member_count === 1 ? "" : "s"}</div>
+                    </div>
+                    <div className="row">
+                      <button
+                        className="btn ghost"
+                        type="button"
+                        onClick={() => {
+                          setExpandedTeamId(isExpanded ? null : team.id);
+                          setAddMemberId("");
+                        }}
+                      >
+                        {isExpanded ? "Close" : "Manage members"}
+                      </button>
+                      <button
+                        className="btn ghost"
+                        type="button"
+                        onClick={async () => {
+                          const confirmed = window.confirm(`Delete team "${team.name}"? Members keep their IDs but lose this team grouping.`);
+                          if (!confirmed) return;
+                          try {
+                            await api(`/enterprise/teams/${team.id}`, { method: "DELETE" });
+                            await load();
+                          } catch (err) {
+                            setTeamMsg(err instanceof Error ? err.message : "Could not delete team");
+                          }
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    className="btn ghost"
-                    type="button"
-                    onClick={async () => {
-                      const confirmed = window.confirm(`Delete team "${team.name}"? Members keep their IDs but lose this team grouping.`);
-                      if (!confirmed) return;
-                      try {
-                        await api(`/enterprise/teams/${team.id}`, { method: "DELETE" });
-                        await load();
-                      } catch (err) {
-                        setTeamMsg(err instanceof Error ? err.message : "Could not delete team");
-                      }
-                    }}
-                  >
-                    Delete
-                  </button>
+
+                  {isExpanded ? (
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+                      <div className="muted small" style={{ marginBottom: 8 }}>Current members</div>
+                      {members.length === 0 ? (
+                        <div className="muted small">No members yet.</div>
+                      ) : (
+                        <div className="stack" style={{ gap: 6 }}>
+                          {members.map((employee) => (
+                            <div key={employee.id} className="row" style={{ justifyContent: "space-between" }}>
+                              <span>{employee.full_name || employee.email}</span>
+                              <button
+                                className="btn ghost compact"
+                                type="button"
+                                disabled={memberBusy}
+                                onClick={async () => {
+                                  setMemberBusy(true);
+                                  try {
+                                    await api(`/enterprise/teams/${team.id}/members/${employee.id}`, { method: "DELETE" });
+                                    await load();
+                                  } catch (err) {
+                                    setTeamMsg(err instanceof Error ? err.message : "Could not remove member");
+                                  } finally {
+                                    setMemberBusy(false);
+                                  }
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="row" style={{ marginTop: 12 }}>
+                        <select value={addMemberId} onChange={(e) => setAddMemberId(e.target.value)}>
+                          <option value="">Choose employee to add</option>
+                          {nonMembers.map((employee) => (
+                            <option key={employee.id} value={employee.id}>{employee.full_name || employee.email}</option>
+                          ))}
+                        </select>
+                        <button
+                          className="btn"
+                          type="button"
+                          disabled={memberBusy || !addMemberId}
+                          onClick={async () => {
+                            setMemberBusy(true);
+                            try {
+                              await api(`/enterprise/teams/${team.id}/members`, {
+                                method: "POST",
+                                body: JSON.stringify({ user_id: addMemberId })
+                              });
+                              setAddMemberId("");
+                              await load();
+                            } catch (err) {
+                              setTeamMsg(err instanceof Error ? err.message : "Could not add member");
+                            } finally {
+                              setMemberBusy(false);
+                            }
+                          }}
+                        >
+                          {memberBusy ? "Saving..." : "Add"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </section>
@@ -915,32 +1001,7 @@ export default function EnterprisePage() {
                   <td>{employee.email}</td>
                   <td>{employee.company || overview?.company || "-"}</td>
                   <td>{employee.role_label}</td>
-                  <td>
-                    {isEnterpriseOwner ? (
-                      <select
-                        value={employee.team_id || ""}
-                        onChange={async (e) => {
-                          const newTeamId = e.target.value || null;
-                          try {
-                            await api(`/enterprise/employees/${employee.id}/team`, {
-                              method: "POST",
-                              body: JSON.stringify({ team_id: newTeamId })
-                            });
-                            await load();
-                          } catch (err) {
-                            setError(err instanceof Error ? err.message : "Could not update team");
-                          }
-                        }}
-                      >
-                        <option value="">No team</option>
-                        {teams.map((team) => (
-                          <option key={team.id} value={team.id}>{team.name}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      employee.team_name || "-"
-                    )}
-                  </td>
+                  <td>{employee.team_names.length > 0 ? employee.team_names.join(", ") : "-"}</td>
                   <td>{employee.is_blacklisted ? `Blacklisted${employee.blacklist_reason ? `: ${employee.blacklist_reason}` : ""}` : "Active"}</td>
                   <td>{employee.counts.deals}</td>
                   <td>{employee.counts.closed_deals ?? 0}</td>
@@ -1027,6 +1088,7 @@ export default function EnterprisePage() {
                   body: JSON.stringify({
                     title: taskTitle.trim(),
                     assigned_to_id: taskAssigneeId,
+                    team_id: taskFilterTeamId || null,
                     deal_id: taskDealId || null,
                     due_at: taskDueAt ? new Date(taskDueAt).toISOString() : null
                   })
@@ -1050,19 +1112,36 @@ export default function EnterprisePage() {
                 <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="e.g. Follow up with client X" />
               </label>
               <label>
-                Assign to
-                <select value={taskAssigneeId} onChange={(e) => setTaskAssigneeId(e.target.value)}>
-                  <option value="">Choose employee</option>
-                  {overview?.employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.full_name || employee.email}
-                      {employee.team_name ? ` (${employee.team_name})` : ""}
-                    </option>
+                Assign team
+                <select
+                  value={taskFilterTeamId}
+                  onChange={(e) => {
+                    setTaskFilterTeamId(e.target.value);
+                    setTaskAssigneeId("");
+                  }}
+                >
+                  <option value="">All employees</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>{team.name}</option>
                   ))}
                 </select>
               </label>
             </div>
             <div className="grid2">
+              <label>
+                Assign to
+                <select value={taskAssigneeId} onChange={(e) => setTaskAssigneeId(e.target.value)}>
+                  <option value="">Choose employee</option>
+                  {(overview?.employees || [])
+                    .filter((employee) => !taskFilterTeamId || employee.team_ids.includes(taskFilterTeamId))
+                    .map((employee) => (
+                      <option key={employee.id} value={employee.id}>
+                        {employee.full_name || employee.email}
+                        {employee.team_names.length ? ` (${employee.team_names.join(", ")})` : ""}
+                      </option>
+                    ))}
+                </select>
+              </label>
               <label>
                 Related deal (optional)
                 <select value={taskDealId} onChange={(e) => setTaskDealId(e.target.value)}>
@@ -1072,28 +1151,16 @@ export default function EnterprisePage() {
                   ))}
                 </select>
               </label>
-              <label>
-                Due date (optional)
-                <input type="date" value={taskDueAt} onChange={(e) => setTaskDueAt(e.target.value)} />
-              </label>
             </div>
+            <label>
+              Due date (optional)
+              <input type="date" value={taskDueAt} onChange={(e) => setTaskDueAt(e.target.value)} />
+            </label>
             {taskMsg ? <div className="alert ok">{taskMsg}</div> : null}
             <button className="btn" type="submit" disabled={taskBusy || !taskTitle.trim() || !taskAssigneeId}>
               {taskBusy ? "Assigning..." : "Assign task"}
             </button>
           </form>
-        ) : null}
-
-        {isEnterpriseOwner && teams.length > 0 ? (
-          <label style={{ marginTop: 12, display: "block", maxWidth: 280 }}>
-            Filter by team
-            <select value={taskFilterTeamId} onChange={(e) => setTaskFilterTeamId(e.target.value)}>
-              <option value="">All teams</option>
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>{team.name}</option>
-              ))}
-            </select>
-          </label>
         ) : null}
 
         <div className="list" style={{ marginTop: 12 }}>
