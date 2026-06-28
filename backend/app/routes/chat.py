@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -14,6 +15,8 @@ from ..db import get_session
 from ..enterprise_scope import get_enterprise_owner_id
 from ..models import ChatMessage, Profile, User
 from ..schemas import ChatContactRead, ChatMessageRead, ChatUnreadSummary
+from ..services.notifications import create_notification
+from .enterprise import require_enterprise_owner
 
 
 router = APIRouter(prefix="/enterprise/chat", tags=["chat"])
@@ -152,6 +155,20 @@ def get_chat_thread(
     return [_message_read(message, user.id) for message in messages]
 
 
+async def _save_attachment(file: UploadFile, owner_id: UUID) -> tuple[str, str]:
+    if (file.content_type or "") not in ALLOWED_ATTACHMENT_TYPES:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+    content = await file.read()
+    if len(content) > MAX_ATTACHMENT_SIZE:
+        raise HTTPException(status_code=413, detail="File too large (max 16MB)")
+    message_dir = UPLOAD_ROOT / str(owner_id)
+    message_dir.mkdir(parents=True, exist_ok=True)
+    suffix = Path(file.filename or "").suffix or ""
+    safe_name = f"{uuid4().hex}{suffix}"
+    (message_dir / safe_name).write_bytes(content)
+    return f"/uploads/chat_attachments/{owner_id}/{safe_name}", (file.filename or safe_name)
+
+
 @router.post("/messages", response_model=ChatMessageRead)
 async def send_chat_message(
     recipient_id: UUID = Form(...),
@@ -176,18 +193,7 @@ async def send_chat_message(
     attachment_url = ""
     attachment_filename = ""
     if file:
-        if (file.content_type or "") not in ALLOWED_ATTACHMENT_TYPES:
-            raise HTTPException(status_code=400, detail="Unsupported file type")
-        content = await file.read()
-        if len(content) > MAX_ATTACHMENT_SIZE:
-            raise HTTPException(status_code=413, detail="File too large (max 16MB)")
-        message_dir = UPLOAD_ROOT / str(owner_id)
-        message_dir.mkdir(parents=True, exist_ok=True)
-        suffix = Path(file.filename or "").suffix or ""
-        safe_name = f"{uuid4().hex}{suffix}"
-        (message_dir / safe_name).write_bytes(content)
-        attachment_url = f"/uploads/chat_attachments/{owner_id}/{safe_name}"
-        attachment_filename = file.filename or safe_name
+        attachment_url, attachment_filename = await _save_attachment(file, owner_id)
 
     message = ChatMessage(
         enterprise_owner_id=owner_id,
@@ -198,9 +204,89 @@ async def send_chat_message(
         attachment_filename=attachment_filename,
     )
     session.add(message)
+
+    sender_profile = session.exec(select(Profile).where(Profile.owner_id == user.id)).first()
+    sender_name = sender_profile.full_name if sender_profile and sender_profile.full_name else user.email
+    create_notification(
+        session,
+        user_id=recipient_id,
+        enterprise_owner_id=owner_id,
+        kind="message",
+        title=f"New message from {sender_name}",
+        body=body_text or attachment_filename or "Sent an attachment",
+        link="/conversations",
+    )
+
     session.commit()
     session.refresh(message)
     return _message_read(message, user.id)
+
+
+@router.post("/broadcast", response_model=List[ChatMessageRead])
+async def send_broadcast_message(
+    recipient_ids: str = Form(...),
+    body: str = Form(""),
+    file: Optional[UploadFile] = File(None),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_enterprise_owner),
+):
+    """Send the same message (with one shared attachment, if any) to several
+    teammates at once - e.g. a manager messaging a whole team or a hand-picked group."""
+    owner_id = get_enterprise_owner_id(user)
+    if not owner_id:
+        raise HTTPException(status_code=403, detail="Enterprise access required")
+
+    try:
+        raw_ids = json.loads(recipient_ids)
+        ids = [UUID(item) for item in raw_ids]
+    except (ValueError, TypeError, json.JSONDecodeError):
+        raise HTTPException(status_code=400, detail="Invalid recipient list")
+    if not ids:
+        raise HTTPException(status_code=400, detail="Select at least one recipient")
+
+    body_text = (body or "").strip()
+    if not body_text and not file:
+        raise HTTPException(status_code=400, detail="Message body or attachment required")
+
+    candidates = session.exec(select(User).where(User.id.in_(ids))).all()
+    recipients = [row for row in candidates if row.id != user.id and get_enterprise_owner_id(row) == owner_id]
+    if not recipients:
+        raise HTTPException(status_code=404, detail="No valid recipients found")
+
+    attachment_url = ""
+    attachment_filename = ""
+    if file:
+        attachment_url, attachment_filename = await _save_attachment(file, owner_id)
+
+    sender_profile = session.exec(select(Profile).where(Profile.owner_id == user.id)).first()
+    sender_name = sender_profile.full_name if sender_profile and sender_profile.full_name else user.email
+
+    created: list[ChatMessage] = []
+    for recipient in recipients:
+        message = ChatMessage(
+            enterprise_owner_id=owner_id,
+            sender_id=user.id,
+            recipient_id=recipient.id,
+            body=body_text,
+            attachment_url=attachment_url,
+            attachment_filename=attachment_filename,
+        )
+        session.add(message)
+        created.append(message)
+        create_notification(
+            session,
+            user_id=recipient.id,
+            enterprise_owner_id=owner_id,
+            kind="message",
+            title=f"New message from {sender_name}",
+            body=body_text or attachment_filename or "Sent an attachment",
+            link="/conversations",
+        )
+
+    session.commit()
+    for message in created:
+        session.refresh(message)
+    return [_message_read(message, user.id) for message in created]
 
 
 @router.get("/unread-count", response_model=ChatUnreadSummary)

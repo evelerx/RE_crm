@@ -30,12 +30,9 @@ def _subject_users(session: Session, user: User) -> list[User]:
     return [user]
 
 
-@router.get("", response_model=list[LeaderboardRowRead])
-def get_leaderboard(
-    session: Session = Depends(get_session),
-    user: User = Depends(get_current_user),
-):
-    """Return a live leaderboard for the current solo user or enterprise scope."""
+def compute_leaderboard_rows(session: Session, user: User) -> list[LeaderboardRowRead]:
+    """Shared scoring logic - used by the leaderboard route and the lazy
+    rank/score-change notification check in routes/notifications.py."""
     users = [row for row in _subject_users(session, user) if row is not None]
     profile_by_owner = {
         profile.owner_id: profile
@@ -73,3 +70,12 @@ def get_leaderboard(
 
     rows.sort(key=lambda row: (row.score, row.revenue_inr, row.deals_closed, row.activities_total), reverse=True)
     return rows
+
+
+@router.get("", response_model=list[LeaderboardRowRead])
+def get_leaderboard(
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Return a live leaderboard for the current solo user or enterprise scope."""
+    return compute_leaderboard_rows(session, user)

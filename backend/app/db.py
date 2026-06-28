@@ -336,6 +336,12 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "activity", "assigned_by_id VARCHAR")
             if "team_id" not in cols:
                 _sqlite_add_column(conn, "activity", "team_id VARCHAR")
+        if _sqlite_table_exists(conn, "builderwebsiteproperty"):
+            cols = _sqlite_table_columns(conn, "builderwebsiteproperty")
+            if "sort_order" not in cols:
+                _sqlite_add_column(conn, "builderwebsiteproperty", "sort_order INTEGER DEFAULT 0")
+            if "created_at" not in cols:
+                _sqlite_add_column(conn, "builderwebsiteproperty", "created_at DATETIME")
         if _sqlite_table_exists(conn, "dealstageevent"):
             cols = _sqlite_table_columns(conn, "dealstageevent")
             if "enterprise_owner_id" not in cols:
@@ -467,6 +473,10 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "user", "marketing_portal_enabled_at DATETIME")
             if "team_id" not in cols:
                 _sqlite_add_column(conn, "user", "team_id VARCHAR")
+            if "last_leaderboard_score" not in cols:
+                _sqlite_add_column(conn, "user", "last_leaderboard_score INTEGER DEFAULT 0")
+            if "last_leaderboard_rank" not in cols:
+                _sqlite_add_column(conn, "user", "last_leaderboard_rank INTEGER DEFAULT 0")
 
 
 def _postgres_best_effort_migrate() -> None:
@@ -512,9 +522,15 @@ def _postgres_best_effort_migrate() -> None:
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS marketing_portal_enabled BOOLEAN DEFAULT FALSE;
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS marketing_portal_enabled_at TIMESTAMP;
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS team_id UUID;
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS last_leaderboard_score INTEGER DEFAULT 0;
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS last_leaderboard_rank INTEGER DEFAULT 0;
                   IF to_regclass('activity') IS NOT NULL THEN
                     ALTER TABLE activity ADD COLUMN IF NOT EXISTS assigned_by_id UUID;
                     ALTER TABLE activity ADD COLUMN IF NOT EXISTS team_id UUID;
+                  END IF;
+                  IF to_regclass('builderwebsiteproperty') IS NOT NULL THEN
+                    ALTER TABLE builderwebsiteproperty ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+                    ALTER TABLE builderwebsiteproperty ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;
                   END IF;
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'open';
                   ALTER TABLE deal ADD COLUMN IF NOT EXISTS inventory_status VARCHAR DEFAULT 'available';

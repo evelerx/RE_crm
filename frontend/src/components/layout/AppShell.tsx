@@ -9,13 +9,14 @@ import { routeBreadcrumb, routeTitle } from "./navigation";
 type AppShellProps = {
   isAdmin: boolean;
   isOwnerLike: boolean;
+  isEnterpriseParticipant?: boolean;
   userName: string;
   userRole: string;
   onLogout: () => void;
   children: ReactNode;
 };
 
-export default function AppShell({ isAdmin, isOwnerLike, userName, userRole, onLogout, children }: AppShellProps) {
+export default function AppShell({ isAdmin, isOwnerLike, isEnterpriseParticipant = false, userName, userRole, onLogout, children }: AppShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const mainRef = useRef<HTMLElement | null>(null);
@@ -44,6 +45,7 @@ export default function AppShell({ isAdmin, isOwnerLike, userName, userRole, onL
       <AppSidebar
         isAdmin={isAdmin}
         isOwnerLike={isOwnerLike}
+        isEnterpriseParticipant={isEnterpriseParticipant}
         userName={userName}
         userRole={userRole}
         onLogout={onLogout}

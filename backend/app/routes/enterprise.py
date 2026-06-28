@@ -73,6 +73,7 @@ from ..services.builder_websites import (
     public_url_for_slug,
     replace_website_properties,
 )
+from ..services.notifications import create_notification
 from ..services.openrouter import OpenRouterError, chat_completion
 
 
@@ -1492,6 +1493,15 @@ def create_team_task(
         detail=payload.title.strip(),
         target_user_id=employee.id,
         enterprise_owner_id=user.id,
+    )
+    create_notification(
+        session,
+        user_id=employee.id,
+        enterprise_owner_id=user.id,
+        kind="task_assigned",
+        title="New task assigned",
+        body=payload.title.strip(),
+        link="/today",
     )
     session.commit()
     session.refresh(task)

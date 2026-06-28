@@ -16,6 +16,7 @@ import BuilderPublicPage from "./pages/BuilderPublicPage";
 import CalculatorPage from "./pages/CalculatorPage";
 import CallsPage from "./pages/CallsPage";
 import ContactsPage from "./pages/ContactsPage";
+import ConversationsPage from "./pages/ConversationsPage";
 import DealDetailPage from "./pages/DealDetailPage";
 import DealsGridPage from "./pages/DealsGridPage";
 import EnterprisePage from "./pages/EnterprisePage";
@@ -58,6 +59,7 @@ function CrmRoutes({ isAdmin }: { isAdmin: boolean }) {
       <Route path="/inventory" element={<PropertiesPage />} />
       <Route path="/whatsapp" element={<WhatsAppPage />} />
       <Route path="/inbox" element={<InboxPage />} />
+      <Route path="/conversations" element={<ConversationsPage />} />
       <Route path="/calls" element={<CallsPage />} />
       <Route path="/ads" element={<MarketingPage />} />
       <Route path="/automations" element={<AutomationsPage />} />
@@ -101,6 +103,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [enterpriseBadge, setEnterpriseBadge] = useState<string | null>(null);
   const [isOwnerLikeAccount, setIsOwnerLikeAccount] = useState(false);
+  const [isEnterpriseParticipantAccount, setIsEnterpriseParticipantAccount] = useState(false);
   const [userName, setUserName] = useState("Northstone user");
   const [userRole, setUserRole] = useState("CRM access");
   const [reraCompleted, setReraCompleted] = useState(true);
@@ -115,6 +118,7 @@ export default function App() {
         setIsAdmin(false);
         setEnterpriseBadge(null);
         setIsOwnerLikeAccount(false);
+        setIsEnterpriseParticipantAccount(false);
         setUserName("Northstone user");
         setUserRole("CRM access");
         setReraCompleted(true);
@@ -129,6 +133,7 @@ export default function App() {
       setIsAdmin(false);
       setEnterpriseBadge(null);
       setIsOwnerLikeAccount(false);
+      setIsEnterpriseParticipantAccount(false);
       setUserName("Northstone user");
       setUserRole("CRM access");
       setReraCompleted(true);
@@ -160,6 +165,7 @@ export default function App() {
         setIsAdmin(Boolean(me.is_admin));
         setEnterpriseBadge(derivedBadge);
         setIsOwnerLikeAccount(ownerMode);
+        setIsEnterpriseParticipantAccount(ownerMode || Boolean(me.enterprise_owner_id));
         setUserName(me.full_name?.trim() || getEmail() || me.email || "Northstone user");
         setUserRole(
           me.is_admin
@@ -178,6 +184,7 @@ export default function App() {
         setIsAdmin(false);
         setEnterpriseBadge(null);
         setIsOwnerLikeAccount(false);
+        setIsEnterpriseParticipantAccount(false);
         setUserName(getEmail() || "Northstone user");
         setUserRole("CRM access");
         setReraCompleted(true);
@@ -195,6 +202,7 @@ export default function App() {
     setIsAdmin(false);
     setEnterpriseBadge(null);
     setIsOwnerLikeAccount(false);
+        setIsEnterpriseParticipantAccount(false);
     setUserName("Northstone user");
     setUserRole("CRM access");
     setReraCompleted(true);
@@ -254,6 +262,7 @@ export default function App() {
   }
 
   const isOwnerLike = isAdmin || isOwnerLikeAccount;
+  const isEnterpriseParticipant = isOwnerLike || isEnterpriseParticipantAccount;
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   if (isAdminRoute) {
@@ -268,6 +277,7 @@ export default function App() {
     <AppShell
       isAdmin={isAdmin}
       isOwnerLike={isOwnerLike}
+      isEnterpriseParticipant={isEnterpriseParticipant}
       userName={userName}
       userRole={isAdmin ? "Admin" : enterpriseBadge ? `${enterpriseBadge} workspace` : userRole}
       onLogout={handleLogout}

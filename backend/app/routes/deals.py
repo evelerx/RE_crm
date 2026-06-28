@@ -19,6 +19,7 @@ from ..enterprise_scope import (
     user_read_filter,
 )
 from ..models import Activity, Contact, Deal, DealClosureEvent, DealImage, DealStageEvent, Profile, User
+from ..services.notifications import create_notification
 from ..schemas import (
     BulkStageUpdateRequest,
     DealCloseRequest,
@@ -219,6 +220,20 @@ def _closing_display_name(session: Session, user: User) -> str:
     if profile and (profile.full_name or "").strip():
         return profile.full_name.strip()
     return user.email
+
+
+def _notify_deal_closed(session: Session, deal: Deal, closer: User, scope_owner_id: UUID, closer_display_name: str) -> None:
+    if is_enterprise_owner(closer) or scope_owner_id == closer.id:
+        return  # owner closing their own deal - no one else to tell
+    create_notification(
+        session,
+        user_id=scope_owner_id,
+        enterprise_owner_id=scope_owner_id,
+        kind="deal_closed",
+        title=f"{closer_display_name} closed a deal",
+        body=deal.title or "Untitled deal",
+        link="/deals",
+    )
 
 
 def _primary_images_map(session: Session, deal_ids: list[UUID]) -> dict[UUID, str]:
@@ -580,6 +595,7 @@ def bulk_stage(
                         enterprise_owner_id=_scope_owner_id(user),
                     )
                 )
+                _notify_deal_closed(session, d, user, _scope_owner_id(user), display_name)
             session.add(d)
             log_audit_event(
                 session,
@@ -642,6 +658,7 @@ def close_deal(
             enterprise_owner_id=_scope_owner_id(user),
         )
     )
+    _notify_deal_closed(session, deal, user, _scope_owner_id(user), display_name)
     log_audit_event(
         session,
         actor=user,
@@ -831,6 +848,7 @@ def update_deal(
                 enterprise_owner_id=_scope_owner_id(user),
             )
         )
+        _notify_deal_closed(session, deal, user, _scope_owner_id(user), display_name)
     deal.updated_at = now
 
     session.add(deal)

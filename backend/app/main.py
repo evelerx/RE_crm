@@ -32,6 +32,7 @@ from .routes import (
     meta,
     marketing,
     next_actions,
+    notifications,
     profile,
     public,
     sequences,
@@ -132,6 +133,7 @@ app.include_router(admin.router, dependencies=deps)
 app.include_router(profile.router, dependencies=deps)
 app.include_router(llm.router, dependencies=deps)
 app.include_router(next_actions.router, dependencies=deps)
+app.include_router(notifications.router, dependencies=deps)
 app.include_router(csvio.router, dependencies=deps)
 app.include_router(insights.router, dependencies=deps)
 app.include_router(leaderboard.router, dependencies=deps)

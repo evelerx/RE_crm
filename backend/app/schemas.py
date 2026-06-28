@@ -391,6 +391,20 @@ class ChatUnreadSummary(BaseModel):
     contacts_with_unread: int
 
 
+class NotificationRead(BaseModel):
+    id: UUID
+    kind: str
+    title: str
+    body: str = ""
+    link: str = ""
+    read_at: Optional[datetime] = None
+    created_at: datetime
+
+
+class NotificationUnreadSummary(BaseModel):
+    unread_count: int
+
+
 class ProfileUpsert(BaseModel):
     full_name: str = ""
     phone: Optional[str] = None

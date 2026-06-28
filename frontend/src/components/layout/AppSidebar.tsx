@@ -7,6 +7,7 @@ import { crmNavGroups } from "./navigation";
 type AppSidebarProps = {
   isAdmin: boolean;
   isOwnerLike: boolean;
+  isEnterpriseParticipant?: boolean;
   userName: string;
   userRole: string;
   onLogout: () => void;
@@ -16,8 +17,11 @@ function SidebarIcon({ icon }: { icon: string }) {
   return <span className="sidebarIconGlyph" aria-hidden="true">{icon}</span>;
 }
 
-export default function AppSidebar({ isAdmin, isOwnerLike, userName, userRole, onLogout }: AppSidebarProps) {
-  const groups = useMemo(() => crmNavGroups({ isAdmin, isOwnerLike }), [isAdmin, isOwnerLike]);
+export default function AppSidebar({ isAdmin, isOwnerLike, isEnterpriseParticipant = false, userName, userRole, onLogout }: AppSidebarProps) {
+  const groups = useMemo(
+    () => crmNavGroups({ isAdmin, isOwnerLike, isEnterpriseParticipant }),
+    [isAdmin, isOwnerLike, isEnterpriseParticipant],
+  );
   const location = useLocation();
   const initials = (userName || "U")
     .split(" ")

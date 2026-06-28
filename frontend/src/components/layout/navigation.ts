@@ -12,7 +12,7 @@ export type NavGroup = {
   items: NavItem[];
 };
 
-export function crmNavGroups(options: { isAdmin: boolean; isOwnerLike: boolean }) {
+export function crmNavGroups(options: { isAdmin: boolean; isOwnerLike: boolean; isEnterpriseParticipant?: boolean }) {
   const groups: NavGroup[] = [
     {
       label: "Workspace",
@@ -51,6 +51,7 @@ export function crmNavGroups(options: { isAdmin: boolean; isOwnerLike: boolean }
       label: "Enterprise",
       items: [
         { label: "Team IDs", to: "/enterprise#team-ids", icon: "TM" },
+        { label: "Conversations", to: "/conversations", icon: "CV" },
         { label: "AI Docs", to: "/enterprise#ai-builder-documents", icon: "DC" },
         { label: "Builder Site", to: "/enterprise#ai-builder-website", icon: "WB" },
         { label: "Automations", to: "/automations", icon: "AT" },
@@ -59,6 +60,11 @@ export function crmNavGroups(options: { isAdmin: boolean; isOwnerLike: boolean }
         { label: "Targets", to: "/targets", icon: "TG" },
         { label: "Sequences", to: "/sequences", icon: "SQ" },
       ],
+    });
+  } else if (options.isEnterpriseParticipant) {
+    groups.push({
+      label: "Enterprise",
+      items: [{ label: "Conversations", to: "/conversations", icon: "CV" }],
     });
   }
 
@@ -149,6 +155,7 @@ export function routeTitle(pathname: string) {
   if (pathname.startsWith("/properties")) return "Properties";
   if (pathname.startsWith("/whatsapp")) return "WhatsApp";
   if (pathname.startsWith("/inbox")) return "Inbox";
+  if (pathname.startsWith("/conversations")) return "Conversations";
   if (pathname.startsWith("/calls")) return "Calls";
   if (pathname.startsWith("/ads")) return "Ads";
   if (pathname.startsWith("/leaderboard")) return "Leaderboard";
@@ -174,6 +181,7 @@ export function routeBreadcrumb(pathname: string) {
   if (pathname.startsWith("/properties")) return "Workspace / Inventory";
   if (pathname.startsWith("/whatsapp")) return "Channels / WhatsApp";
   if (pathname.startsWith("/inbox")) return "Channels / Inbox";
+  if (pathname.startsWith("/conversations")) return "Enterprise / Conversations";
   if (pathname.startsWith("/calls")) return "Channels / Calls";
   if (pathname.startsWith("/ads")) return "Channels / Ads";
   if (pathname.startsWith("/leaderboard")) return "Intelligence / Leaderboard";

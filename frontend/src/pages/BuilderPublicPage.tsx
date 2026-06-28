@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { api } from "../api/client";
 
 type BuilderSiteProperty = {
@@ -45,7 +45,8 @@ function splitList(value: string) {
 }
 
 export default function BuilderPublicPage() {
-  const { slug = "" } = useParams();
+  const location = useLocation();
+  const slug = location.pathname.replace(/^\/builders\//, "").split("/")[0] || "";
   const [site, setSite] = useState<BuilderSite | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

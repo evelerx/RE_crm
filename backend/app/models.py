@@ -44,6 +44,8 @@ class User(SQLModel, table=True):
     marketing_portal_enabled: bool = False
     marketing_portal_enabled_at: Optional[datetime] = None
     team_id: Optional[UUID] = Field(default=None, foreign_key="team.id", index=True)
+    last_leaderboard_score: int = 0
+    last_leaderboard_rank: int = 0
 
 
 class Team(SQLModel, table=True):
@@ -69,6 +71,18 @@ class ChatMessage(SQLModel, table=True):
     body: str = ""
     attachment_url: str = ""
     attachment_filename: str = ""
+    read_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class Notification(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    user_id: UUID = Field(foreign_key="user.id", index=True)
+    enterprise_owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id", index=True)
+    kind: str = Field(index=True)  # deal_closed | task_assigned | message | leaderboard_rank | leaderboard_score
+    title: str = ""
+    body: str = ""
+    link: str = ""
     read_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
@@ -289,6 +303,8 @@ class BuilderWebsiteProperty(SQLModel, table=True):
     price_label: str = ""
     description: str = ""
     image_urls: str = ""
+    sort_order: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
 class FollowUpSequence(SQLModel, table=True):
