@@ -1570,7 +1570,10 @@ export default function AdminPage() {
 
         <div className="card" style={{ marginTop: 16 }}>
           <div className="cardTitle" style={{ fontSize: 14 }}>Assign manager to owner</div>
-          <div className="muted small">Owner must already have an active marketing subscription. The manager will automatically receive all future requests from this owner.</div>
+          <div className="muted small">
+            Owner must already have an active marketing subscription (set in Marketing Access above).
+            All future requests from that owner will auto-route to this manager.
+          </div>
           <div className="grid2" style={{ marginTop: 10 }}>
             <label>
               Marketing Manager
@@ -1582,23 +1585,38 @@ export default function AdminPage() {
               </select>
             </label>
             <label>
-              Owner email or ID
-              <input value={portalAssignOwnerId} onChange={(e) => setPortalAssignOwnerId(e.target.value)} placeholder="Owner's user ID (UUID)" />
+              Owner (builder / enterprise / solo)
+              <select value={portalAssignOwnerId} onChange={(e) => setPortalAssignOwnerId(e.target.value)}>
+                <option value="">Select owner</option>
+                {rows
+                  .filter((row) => !row.enterprise_owner_id && !row.is_admin_account && row.marketing_portal_enabled)
+                  .map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.company ? `${row.company} — ` : ""}{row.email} ({row.subscription_plan || row.plan || "free"})
+                    </option>
+                  ))}
+              </select>
             </label>
           </div>
+          {!rows.some((row) => !row.enterprise_owner_id && !row.is_admin_account && row.marketing_portal_enabled) ? (
+            <div className="muted small" style={{ marginTop: 6 }}>
+              No owners with marketing portal enabled yet — go to Marketing Access above to enable it for a user first.
+            </div>
+          ) : null}
           <button
             className="btn"
             style={{ marginTop: 10 }}
-            disabled={!portalAssignUserId || !portalAssignOwnerId.trim()}
+            disabled={!portalAssignUserId || !portalAssignOwnerId}
             onClick={async () => {
+              setPortalUserMsg(null);
               try {
-                await assignPortalUserToOwner(portalAssignUserId, portalAssignOwnerId.trim());
+                await assignPortalUserToOwner(portalAssignUserId, portalAssignOwnerId);
                 setPortalAssignUserId("");
                 setPortalAssignOwnerId("");
                 setPortalUsers(await listPortalUsers());
-                setPortalUserMsg("Manager assigned to owner.");
+                setPortalUserMsg("✓ Manager assigned successfully.");
               } catch (err) {
-                setPortalUserMsg(err instanceof Error ? err.message : "Assignment failed");
+                setPortalUserMsg(`Error: ${err instanceof Error ? err.message : "Assignment failed"}`);
               }
             }}
           >
