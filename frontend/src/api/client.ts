@@ -419,6 +419,37 @@ export async function setAdminMarketingAccess(payload: {
   });
 }
 
+export type PortalUser = {
+  id: string;
+  agency_id: string;
+  name: string;
+  email: string;
+  role: "marketing_manager" | "marketing_executive" | string;
+  status: "active" | "inactive" | string;
+  created_at: string;
+  assigned_owners: { owner_id: string; email: string; name: string; company: string }[];
+};
+
+export async function listPortalUsers() {
+  return api<PortalUser[]>("/admin/marketing/portal-users");
+}
+
+export async function createPortalUser(payload: { name: string; email: string; password: string; role: string }) {
+  return api<PortalUser>("/admin/marketing/portal-users", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function updatePortalUser(userId: string, payload: Partial<{ name: string; role: string; status: string; password: string }>) {
+  return api<PortalUser>(`/admin/marketing/portal-users/${userId}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export async function assignPortalUserToOwner(userId: string, ownerId: string) {
+  return api<{ ok: boolean }>(`/admin/marketing/portal-users/${userId}/assign-owner`, { method: "POST", body: JSON.stringify({ owner_id: ownerId }) });
+}
+
+export async function removePortalUserAssignment(userId: string, ownerId: string) {
+  return api<{ ok: boolean }>(`/admin/marketing/portal-users/${userId}/assign-owner/${ownerId}`, { method: "DELETE" });
+}
+
 export async function sendWhatsAppMedia(contactId: string, caption: string, file: File) {
   const formData = new FormData();
   formData.append("contact_id", contactId);
@@ -470,4 +501,92 @@ export async function saveDefaultSequence(payload: {
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+// ── Agency Marketing Portal ─────────────────────────────────────────────────
+const AGENCY_TOKEN_KEY = "northstonecrm_agency_token";
+
+function getAgencyToken() {
+  try { return localStorage.getItem(AGENCY_TOKEN_KEY) ?? ""; } catch { return ""; }
+}
+
+async function agencyApi<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set("Content-Type", "application/json");
+  const token = getAgencyToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers,  });
+  await throwIfNotOk(res);
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
+
+export type AgencyLoginResponse = {
+  agency_token: string;
+  user: {
+    id: string;
+    agency_id: string;
+    name: string;
+    email: string;
+    role: string;
+    status: string;
+    created_at: string;
+  };
+  agency_name: string;
+};
+
+export async function agencyLogin(email: string, password: string) {
+  return agencyApi<AgencyLoginResponse>("/agency/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function agencyMe() {
+  return agencyApi<AgencyLoginResponse>("/agency/auth/me");
+}
+
+export type AgencyDashboard = {
+  total_requests: number;
+  pending_review: number;
+  in_progress: number;
+  completed_this_month: number;
+  tasks_overdue: number;
+  executive_workload: { executive: AgencyLoginResponse["user"]; active_tasks: number; overdue: number; completed: number }[];
+};
+
+export async function agencyManagerDashboard() {
+  return agencyApi<AgencyDashboard>("/agency/manager/dashboard");
+}
+
+export async function agencyManagerRequests(status?: string) {
+  const q = status ? `?status=${status}` : "";
+  return agencyApi<import("../types/marketing").MarketingRequestSummary[]>(`/agency/manager/requests${q}`);
+}
+
+export async function agencyManagerRequestDetail(id: string) {
+  return agencyApi<import("../types/marketing").MarketingRequestDetail>(`/agency/manager/requests/${id}`);
+}
+
+export async function agencyManagerUpdateStatus(id: string, status: string, reason?: string) {
+  return agencyApi<import("../types/marketing").MarketingRequestDetail>(`/agency/manager/requests/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, reason }),
+  });
+}
+
+export async function agencyManagerComment(requestId: string, message: string) {
+  return agencyApi<import("../types/marketing").Comment>(`/agency/manager/requests/${requestId}/comments`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
+}
+
+export async function agencyExecutiveDashboard() {
+  return agencyApi<{ active_tasks: number; overdue: number; completed_today: number; tasks: unknown[] }>("/agency/executive/dashboard");
+}
+
+export async function agencyExecutiveTasks(status?: string) {
+  const q = status ? `?status=${status}` : "";
+  return agencyApi<unknown[]>(`/agency/executive/tasks${q}`);
 }

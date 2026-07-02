@@ -15,6 +15,8 @@ import AutomationsPage from "./pages/AutomationsPage";
 import BuilderPublicPage from "./pages/BuilderPublicPage";
 import CalculatorPage from "./pages/CalculatorPage";
 import CallsPage from "./pages/CallsPage";
+import AgencyDashboardPage from "./pages/AgencyDashboardPage";
+import AgencyLoginPage from "./pages/AgencyLoginPage";
 import ContactsPage from "./pages/ContactsPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import DealDetailPage from "./pages/DealDetailPage";
@@ -249,6 +251,13 @@ export default function App() {
 
   if (location.pathname.startsWith("/builders/")) {
     return <BuilderPublicPage />;
+  }
+
+  if (location.pathname.startsWith("/agency")) {
+    if (location.pathname === "/agency/login" || location.pathname === "/agency/login/") {
+      return <AgencyLoginPage />;
+    }
+    return <AgencyDashboardPage />;
   }
 
   if (!authed) {

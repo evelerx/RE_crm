@@ -295,10 +295,10 @@ def allowed_marketing_addons_for_plan(plan: str) -> list[str]:
     """Return addon options a CRM plan is allowed to purchase/use."""
 
     normalized = (plan or "free").strip().lower()
-    if normalized == "builder":
+    if normalized in {"builder", "enterprise"}:
         return ["marketing_assist", "managed_marketing", "ai_brand"]
-    if normalized == "enterprise":
-        return ["marketing_assist", "managed_marketing"]
+    if normalized in {"free", "solo"}:
+        return ["marketing_assist", "managed_marketing", "ai_brand"]
     return []
 
 

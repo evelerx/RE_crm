@@ -1,6 +1,6 @@
 // MODIFIED: Phase 5 — Admin portal efficiency overhaul — Adds admin navigation, quick stats, user management, debounced search, pagination, and audited support actions.
 import { useEffect, useMemo, useState } from "react";
-import { api, ApiError, getRbacMatrix, saveRbacMatrix, setAdminMarketingAccess } from "../api/client";
+import { api, ApiError, getRbacMatrix, saveRbacMatrix, setAdminMarketingAccess, listPortalUsers, createPortalUser, updatePortalUser, assignPortalUserToOwner, removePortalUserAssignment, type PortalUser } from "../api/client";
 import AdminAccountsPanel from "../components/marketing/AdminAccountsPanel";
 import RevenueGraph from "../components/RevenueGraph";
 import SubscriberDataTable from "../components/SubscriberDataTable";
@@ -427,6 +427,12 @@ export default function AdminPage() {
   const [selectedEnterprise, setSelectedEnterprise] = useState<EnterpriseDetail | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<OwnerWorkspace | null>(null);
   const [demoRequests, setDemoRequests] = useState<DemoRequestRow[]>([]);
+  const [portalUsers, setPortalUsers] = useState<PortalUser[]>([]);
+  const [newPortalUser, setNewPortalUser] = useState({ name: "", email: "", password: "", role: "marketing_manager" });
+  const [portalUserBusy, setPortalUserBusy] = useState(false);
+  const [portalUserMsg, setPortalUserMsg] = useState<string | null>(null);
+  const [portalAssignOwnerId, setPortalAssignOwnerId] = useState("");
+  const [portalAssignUserId, setPortalAssignUserId] = useState("");
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [auditLimit, setAuditLimit] = useState(30);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -628,6 +634,7 @@ export default function AdminPage() {
       setDemoRequests(demoRows);
       setRuntimeConfig(runtime);
       setRbacMatrix(rbacData.matrix || DEFAULT_RBAC_MATRIX);
+      listPortalUsers().then(setPortalUsers).catch(() => {});
       setLastKpiRefreshAt(new Date());
       setAdminEmail(adminMe.email || "");
       setConfigForm((prev) => ({
@@ -1511,6 +1518,158 @@ export default function AdminPage() {
       <section id="admin-marketing-accounts" className="adminAnchorTarget">
         <AdminAccountsPanel owners={marketingPortalOwners} />
       </section>
+
+      <section id="admin-marketing-portal" className="card premiumPanel adminAnchorTarget">
+        <div className="cardTitle">Marketing Portal Users</div>
+        <div className="muted">Create and manage marketing agency staff who log in via the separate Marketing Portal. Assign managers to specific builder/enterprise/solo owners who have an active marketing subscription.</div>
+
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="cardTitle" style={{ fontSize: 14 }}>Create portal user</div>
+          <div className="grid2" style={{ marginTop: 10 }}>
+            <label>
+              Full name
+              <input value={newPortalUser.name} onChange={(e) => setNewPortalUser((p) => ({ ...p, name: e.target.value }))} placeholder="Marketing Manager Name" />
+            </label>
+            <label>
+              Email
+              <input value={newPortalUser.email} onChange={(e) => setNewPortalUser((p) => ({ ...p, email: e.target.value }))} placeholder="manager@agency.com" />
+            </label>
+            <label>
+              Password
+              <input type="password" value={newPortalUser.password} onChange={(e) => setNewPortalUser((p) => ({ ...p, password: e.target.value }))} placeholder="Min 6 characters" />
+            </label>
+            <label>
+              Role
+              <select value={newPortalUser.role} onChange={(e) => setNewPortalUser((p) => ({ ...p, role: e.target.value }))}>
+                <option value="marketing_manager">Marketing Manager</option>
+                <option value="marketing_executive">Marketing Executive</option>
+              </select>
+            </label>
+          </div>
+          {portalUserMsg ? <div className="bannerInfo" style={{ marginTop: 8 }}>{portalUserMsg}</div> : null}
+          <button
+            className="btn"
+            style={{ marginTop: 10 }}
+            disabled={portalUserBusy || !newPortalUser.email.trim() || !newPortalUser.password.trim()}
+            onClick={async () => {
+              setPortalUserBusy(true);
+              setPortalUserMsg(null);
+              try {
+                await createPortalUser(newPortalUser);
+                setPortalUserMsg("Portal user created.");
+                setNewPortalUser({ name: "", email: "", password: "", role: "marketing_manager" });
+                setPortalUsers(await listPortalUsers());
+              } catch (err) {
+                setPortalUserMsg(err instanceof Error ? err.message : "Could not create portal user");
+              } finally { setPortalUserBusy(false); }
+            }}
+          >
+            {portalUserBusy ? "Creating..." : "Create portal user"}
+          </button>
+        </div>
+
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="cardTitle" style={{ fontSize: 14 }}>Assign manager to owner</div>
+          <div className="muted small">Owner must already have an active marketing subscription. The manager will automatically receive all future requests from this owner.</div>
+          <div className="grid2" style={{ marginTop: 10 }}>
+            <label>
+              Marketing Manager
+              <select value={portalAssignUserId} onChange={(e) => setPortalAssignUserId(e.target.value)}>
+                <option value="">Select manager</option>
+                {portalUsers.filter((u) => u.role === "marketing_manager" && u.status === "active").map((u) => (
+                  <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Owner email or ID
+              <input value={portalAssignOwnerId} onChange={(e) => setPortalAssignOwnerId(e.target.value)} placeholder="Owner's user ID (UUID)" />
+            </label>
+          </div>
+          <button
+            className="btn"
+            style={{ marginTop: 10 }}
+            disabled={!portalAssignUserId || !portalAssignOwnerId.trim()}
+            onClick={async () => {
+              try {
+                await assignPortalUserToOwner(portalAssignUserId, portalAssignOwnerId.trim());
+                setPortalAssignUserId("");
+                setPortalAssignOwnerId("");
+                setPortalUsers(await listPortalUsers());
+                setPortalUserMsg("Manager assigned to owner.");
+              } catch (err) {
+                setPortalUserMsg(err instanceof Error ? err.message : "Assignment failed");
+              }
+            }}
+          >
+            Assign
+          </button>
+        </div>
+
+        <div className="tableWrap" style={{ marginTop: 16 }}>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Assigned to</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {portalUsers.length === 0 ? (
+                <tr><td colSpan={6} className="muted">No portal users yet.</td></tr>
+              ) : portalUsers.map((u) => (
+                <tr key={u.id}>
+                  <td>{u.name || "-"}</td>
+                  <td>{u.email}</td>
+                  <td><span className="pill">{u.role === "marketing_manager" ? "Manager" : "Executive"}</span></td>
+                  <td><span className={`pill ${u.status === "active" ? "adminPill" : ""}`}>{u.status}</span></td>
+                  <td>
+                    {u.assigned_owners.length > 0
+                      ? u.assigned_owners.map((o) => <div key={o.owner_id} className="muted small">{o.company || o.email}</div>)
+                      : <span className="muted small">Unassigned</span>}
+                  </td>
+                  <td>
+                    <div className="row">
+                      <button
+                        className="btn ghost"
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await updatePortalUser(u.id, { status: u.status === "active" ? "inactive" : "active" });
+                            setPortalUsers(await listPortalUsers());
+                          } catch (err) { setPortalUserMsg(err instanceof Error ? err.message : "Failed"); }
+                        }}
+                      >
+                        {u.status === "active" ? "Deactivate" : "Activate"}
+                      </button>
+                      {u.assigned_owners.map((o) => (
+                        <button
+                          key={o.owner_id}
+                          className="btn ghost"
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await removePortalUserAssignment(u.id, o.owner_id);
+                              setPortalUsers(await listPortalUsers());
+                            } catch (err) { setPortalUserMsg(err instanceof Error ? err.message : "Failed"); }
+                          }}
+                        >
+                          Unassign {o.company || o.email}
+                        </button>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section id="admin-subscriptions">
         <SubscriberDataTable />
       </section>

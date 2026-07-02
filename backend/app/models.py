@@ -380,6 +380,7 @@ class MarketingAddonSubscription(SQLModel, table=True):
     monthly_amount: float = 18000
     currency: str = "INR"
     razorpay_payment_id: Optional[str] = None
+    default_manager_id: Optional[UUID] = Field(default=None, foreign_key="agencyuser.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 

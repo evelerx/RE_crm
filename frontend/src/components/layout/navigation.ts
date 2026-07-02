@@ -107,6 +107,7 @@ export const adminNavGroups: NavGroup[] = [
       { label: "Revenue", to: "/admin#admin-revenue", icon: "RV" },
       { label: "Marketing Access", to: "/admin#admin-marketing-access", icon: "MA" },
       { label: "Marketing Accounts", to: "/admin#admin-marketing-accounts", icon: "MK" },
+      { label: "Marketing Portal", to: "/admin#admin-marketing-portal", icon: "MP" },
     ],
   },
   {

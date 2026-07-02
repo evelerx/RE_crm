@@ -11,7 +11,9 @@ from sqlmodel import Session, select
 from ..db import get_session
 from ..audit import log_audit_event
 from ..marketing_support import addon_price_map, allowed_marketing_addons_for_plan, ensure_marketing_account_seed, normalize_marketing_addon_type, profile_summary, utc_now_naive
-from ..models import MarketingAccount, MarketingAccountAllotment, MarketingAddonSubscription, MarketingRequest, User
+from ..auth import hash_password, normalize_email
+from ..marketing_support import ensure_marketing_agency, serialize_agency_user
+from ..models import AgencyUser, MarketingAccount, MarketingAccountAllotment, MarketingAddonSubscription, MarketingRequest, User
 from ..schemas import (
     AdminSetMarketingAccessRequest,
     MarketingAccountAllotRequest,
@@ -420,3 +422,150 @@ def admin_update_marketing_addon(
     session.commit()
     session.refresh(addon)
     return {"ok": True, "id": str(addon.id), "status": addon.status, "end_date": addon.end_date}
+
+
+# ─── Marketing Portal Users (Agency staff management) ──────────────────────
+
+@router.get("/portal-users")
+def list_portal_users(
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> list[dict]:
+    """List all agency marketing portal users."""
+    agency = ensure_marketing_agency(session)
+    users = session.exec(select(AgencyUser).where(AgencyUser.agency_id == agency.id).order_by(AgencyUser.created_at.desc())).all()
+    result = []
+    for user in users:
+        addons = session.exec(
+            select(MarketingAddonSubscription).where(MarketingAddonSubscription.default_manager_id == user.id)
+        ).all()
+        assigned_owners: list[dict] = []
+        for addon in addons:
+            owner = session.get(User, addon.enterprise_owner_id)
+            if owner:
+                company, city, name = profile_summary(session, owner.id)
+                assigned_owners.append({"owner_id": str(owner.id), "email": owner.email, "name": name, "company": company})
+        row = serialize_agency_user(user)
+        row_dict = {
+            "id": str(row.id),
+            "agency_id": str(row.agency_id),
+            "name": row.name,
+            "email": row.email,
+            "role": row.role,
+            "status": row.status,
+            "created_at": row.created_at.isoformat() if row.created_at else "",
+            "assigned_owners": assigned_owners,
+        }
+        result.append(row_dict)
+    return result
+
+
+@router.post("/portal-users")
+def create_portal_user(
+    payload: dict = Body(...),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> dict:
+    """Create a new agency marketing portal user."""
+    email = normalize_email(str(payload.get("email", "")).strip())
+    name = str(payload.get("name", "")).strip()
+    password = str(payload.get("password", "")).strip()
+    role = str(payload.get("role", "marketing_manager")).strip()
+    if not email or not password or len(password) < 6:
+        raise HTTPException(status_code=400, detail="Email and password (min 6 chars) required")
+    if role not in {"marketing_manager", "marketing_executive"}:
+        raise HTTPException(status_code=400, detail="Role must be marketing_manager or marketing_executive")
+    existing = session.exec(select(AgencyUser).where(AgencyUser.email == email)).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already in use for a portal user")
+    agency = ensure_marketing_agency(session)
+    user = AgencyUser(agency_id=agency.id, name=name, email=email, password_hash=hash_password(password), role=role, status="active")
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    row = serialize_agency_user(user)
+    return {"id": str(row.id), "name": row.name, "email": row.email, "role": row.role, "status": row.status}
+
+
+@router.patch("/portal-users/{user_id}")
+def update_portal_user(
+    user_id: UUID,
+    payload: dict = Body(...),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> dict:
+    """Update a portal user — name, role, status or reset password."""
+    user = session.get(AgencyUser, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Portal user not found")
+    if "name" in payload:
+        user.name = str(payload["name"]).strip()
+    if "role" in payload and payload["role"] in {"marketing_manager", "marketing_executive"}:
+        user.role = payload["role"]
+    if "status" in payload and payload["status"] in {"active", "inactive"}:
+        user.status = payload["status"]
+    if "password" in payload and payload["password"]:
+        pw = str(payload["password"]).strip()
+        if len(pw) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        user.password_hash = hash_password(pw)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    row = serialize_agency_user(user)
+    return {"id": str(row.id), "name": row.name, "email": row.email, "role": row.role, "status": row.status}
+
+
+@router.post("/portal-users/{user_id}/assign-owner")
+def assign_portal_user_to_owner(
+    user_id: UUID,
+    payload: dict = Body(...),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> dict:
+    """Assign a marketing manager to a CRM owner so their requests auto-route to this manager."""
+    portal_user = session.get(AgencyUser, user_id)
+    if not portal_user:
+        raise HTTPException(status_code=404, detail="Portal user not found")
+    if portal_user.role != "marketing_manager":
+        raise HTTPException(status_code=400, detail="Only marketing managers can be assigned to owners")
+    owner_id_raw = payload.get("owner_id", "")
+    if not owner_id_raw:
+        raise HTTPException(status_code=400, detail="owner_id required")
+    from uuid import UUID as _UUID
+    try:
+        owner_id = _UUID(str(owner_id_raw))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid owner_id")
+    addon = session.exec(
+        select(MarketingAddonSubscription).where(MarketingAddonSubscription.enterprise_owner_id == owner_id)
+    ).first()
+    if not addon:
+        raise HTTPException(status_code=404, detail="No active marketing subscription found for this owner — enable marketing access first")
+    addon.default_manager_id = portal_user.id
+    addon.updated_at = utc_now_naive()
+    session.add(addon)
+    session.commit()
+    return {"ok": True, "manager_id": str(portal_user.id), "owner_id": str(owner_id)}
+
+
+@router.delete("/portal-users/{user_id}/assign-owner/{owner_id}")
+def remove_portal_user_assignment(
+    user_id: UUID,
+    owner_id: UUID,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> dict:
+    """Remove assignment between a marketing manager and a CRM owner."""
+    addon = session.exec(
+        select(MarketingAddonSubscription)
+        .where(MarketingAddonSubscription.enterprise_owner_id == owner_id)
+        .where(MarketingAddonSubscription.default_manager_id == user_id)
+    ).first()
+    if not addon:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    addon.default_manager_id = None
+    addon.updated_at = utc_now_naive()
+    session.add(addon)
+    session.commit()
+    return {"ok": True, "unassigned": True}

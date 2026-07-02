@@ -336,13 +336,18 @@ def create_marketing_request(
     """Create a new owner marketing request."""
     validate_addon_request_scope(addon, payload.channel, payload.objective)
     agency = ensure_marketing_agency(session)
-    manager = session.exec(
-        select(AgencyUser)
-        .where(AgencyUser.agency_id == agency.id)
-        .where(AgencyUser.role == "marketing_manager")
-        .where(AgencyUser.status == "active")
-        .order_by(AgencyUser.created_at.asc())
-    ).first()
+    # Prefer the owner-specific assigned manager, fall back to any available manager
+    default_mgr_id = getattr(addon, "default_manager_id", None)
+    if default_mgr_id:
+        manager = session.get(AgencyUser, default_mgr_id)
+    else:
+        manager = session.exec(
+            select(AgencyUser)
+            .where(AgencyUser.agency_id == agency.id)
+            .where(AgencyUser.role == "marketing_manager")
+            .where(AgencyUser.status == "active")
+            .order_by(AgencyUser.created_at.asc())
+        ).first()
     row = MarketingRequest(
         request_code=next_marketing_request_code(session),
         enterprise_owner_id=addon.enterprise_owner_id,

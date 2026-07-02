@@ -40,3 +40,15 @@ export function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(LEGACY_TOKEN_KEY);
 }
+
+// Agency portal (separate JWT from main CRM)
+const AGENCY_TOKEN_KEY = "northstonecrm_agency_token";
+export function getAgencyToken() {
+  try { return localStorage.getItem(AGENCY_TOKEN_KEY) ?? ""; } catch { return ""; }
+}
+export function setAgencySession(token: string) {
+  localStorage.setItem(AGENCY_TOKEN_KEY, token);
+}
+export function clearAgencySession() {
+  localStorage.removeItem(AGENCY_TOKEN_KEY);
+}
