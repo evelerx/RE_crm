@@ -46,6 +46,7 @@ type MeResponse = {
   enterprise_company_name?: string;
   enterprise_member_role?: string;
   rera_completed?: boolean;
+  billing_type?: string;
 };
 
 function CrmRoutes({ isAdmin }: { isAdmin: boolean }) {
@@ -109,6 +110,7 @@ export default function App() {
   const [userName, setUserName] = useState("Northstone user");
   const [userRole, setUserRole] = useState("CRM access");
   const [reraCompleted, setReraCompleted] = useState(true);
+  const [billingType, setBillingType] = useState<string>("monthly");
   const adminIdleTimerRef = useRef<number | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -181,6 +183,7 @@ export default function App() {
                 : "Solo closer"
         );
         setReraCompleted(Boolean(me.is_admin || me.rera_completed));
+        setBillingType(me.billing_type || "monthly");
       } catch {
         if (cancelled) return;
         setIsAdmin(false);
@@ -287,6 +290,7 @@ export default function App() {
       isAdmin={isAdmin}
       isOwnerLike={isOwnerLike}
       isEnterpriseParticipant={isEnterpriseParticipant}
+      billingType={billingType}
       userName={userName}
       userRole={isAdmin ? "Admin" : enterpriseBadge ? `${enterpriseBadge} workspace` : userRole}
       onLogout={handleLogout}

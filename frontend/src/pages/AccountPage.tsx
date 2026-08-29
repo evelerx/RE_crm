@@ -284,11 +284,7 @@ export default function AccountPage() {
         </div>
       </div>
 
-      {profile && !profile.rera_id.trim() ? (
-        <div className="alert">
-          RERA ID is required before you can use the full website. Save it below to unlock the rest of the platform.
-        </div>
-      ) : null}
+      {/* RERA mandatory banner disabled — optional for now */}
 
       {profile ? (
         <section className="card premiumPanel">

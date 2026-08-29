@@ -46,6 +46,7 @@ class User(SQLModel, table=True):
     team_id: Optional[UUID] = Field(default=None, foreign_key="team.id", index=True)
     last_leaderboard_score: int = 0
     last_leaderboard_rank: int = 0
+    billing_type: str = "monthly"  # monthly | annual | lifetime
 
 
 class Team(SQLModel, table=True):

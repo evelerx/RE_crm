@@ -2939,6 +2939,18 @@ textarea.textarea {
   color: #fff;
 }
 
+.shellNavItemLocked {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+.shellNavLockBadge {
+  margin-left: auto;
+  font-size: 10px;
+  line-height: 1;
+}
+
 .shellUserPill {
   display: flex;
   align-items: center;

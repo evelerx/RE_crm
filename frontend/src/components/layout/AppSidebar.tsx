@@ -4,10 +4,21 @@ import { Link, useLocation } from "react-router-dom";
 
 import { crmNavGroups } from "./navigation";
 
+const LIFETIME_LOCKED_PATHS = new Set([
+  "/whatsapp",
+  "/calls",
+  "/apps",
+  "/ads",
+  "/conversations",
+  "/enterprise#ai-workbench",
+  "/enterprise#ai-deal-intelligence",
+]);
+
 type AppSidebarProps = {
   isAdmin: boolean;
   isOwnerLike: boolean;
   isEnterpriseParticipant?: boolean;
+  billingType?: string;
   userName: string;
   userRole: string;
   onLogout: () => void;
@@ -17,12 +28,13 @@ function SidebarIcon({ icon }: { icon: string }) {
   return <span className="sidebarIconGlyph" aria-hidden="true">{icon}</span>;
 }
 
-export default function AppSidebar({ isAdmin, isOwnerLike, isEnterpriseParticipant = false, userName, userRole, onLogout }: AppSidebarProps) {
+export default function AppSidebar({ isAdmin, isOwnerLike, isEnterpriseParticipant = false, billingType = "monthly", userName, userRole, onLogout }: AppSidebarProps) {
   const groups = useMemo(
     () => crmNavGroups({ isAdmin, isOwnerLike, isEnterpriseParticipant }),
     [isAdmin, isOwnerLike, isEnterpriseParticipant],
   );
   const location = useLocation();
+  const isLifetime = billingType === "lifetime";
   const initials = (userName || "U")
     .split(" ")
     .filter(Boolean)
@@ -56,6 +68,24 @@ export default function AppSidebar({ isAdmin, isOwnerLike, isEnterpriseParticipa
                   : itemPath === "/"
                     ? currentPath === "/"
                     : currentPath === itemPath && !currentHash;
+
+                const locked = isLifetime && LIFETIME_LOCKED_PATHS.has(item.to);
+
+                if (locked) {
+                  return (
+                    <span
+                      key={`${group.label}-${item.label}`}
+                      className="shellNavItem shellNavItemLocked"
+                      title={`${item.label} — available on Monthly / Annual plan`}
+                    >
+                      <span className="shellNavIcon">
+                        <SidebarIcon icon={item.icon} />
+                      </span>
+                      <span className="shellNavText">{item.label}</span>
+                      <span className="shellNavLockBadge" aria-label="locked">🔒</span>
+                    </span>
+                  );
+                }
 
                 return (
                   <Link

@@ -486,6 +486,7 @@ def me(
         "enterprise_company_name": enterprise_company_name,
         "enterprise_member_role": getattr(user, "enterprise_member_role", "") or "",
         "rera_completed": _rera_completed(session, user) if not is_admin else True,
+        "billing_type": getattr(user, "billing_type", "monthly") or "monthly",
         "profile_completion": profile_progress,
         "ai_enabled": ai_enabled,
         "ai_model": ai_model,

@@ -528,6 +528,7 @@ def _postgres_best_effort_migrate() -> None:
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS team_id UUID;
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS last_leaderboard_score INTEGER DEFAULT 0;
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS last_leaderboard_rank INTEGER DEFAULT 0;
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS billing_type VARCHAR DEFAULT 'monthly';
                   IF to_regclass('activity') IS NOT NULL THEN
                     ALTER TABLE activity ADD COLUMN IF NOT EXISTS assigned_by_id UUID;
                     ALTER TABLE activity ADD COLUMN IF NOT EXISTS team_id UUID;

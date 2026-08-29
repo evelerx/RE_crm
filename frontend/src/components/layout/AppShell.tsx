@@ -10,13 +10,14 @@ type AppShellProps = {
   isAdmin: boolean;
   isOwnerLike: boolean;
   isEnterpriseParticipant?: boolean;
+  billingType?: string;
   userName: string;
   userRole: string;
   onLogout: () => void;
   children: ReactNode;
 };
 
-export default function AppShell({ isAdmin, isOwnerLike, isEnterpriseParticipant = false, userName, userRole, onLogout, children }: AppShellProps) {
+export default function AppShell({ isAdmin, isOwnerLike, isEnterpriseParticipant = false, billingType = "monthly", userName, userRole, onLogout, children }: AppShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const mainRef = useRef<HTMLElement | null>(null);
@@ -46,6 +47,7 @@ export default function AppShell({ isAdmin, isOwnerLike, isEnterpriseParticipant
         isAdmin={isAdmin}
         isOwnerLike={isOwnerLike}
         isEnterpriseParticipant={isEnterpriseParticipant}
+        billingType={billingType}
         userName={userName}
         userRole={userRole}
         onLogout={onLogout}
