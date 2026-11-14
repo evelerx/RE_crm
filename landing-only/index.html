@@ -25,7 +25,7 @@ New sections added:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; form-action 'self' https://api.northstonecrm.com; connect-src 'self' https://api.northstonecrm.com https://api.razorpay.com https://lumberjack.razorpay.com; frame-src https://api.razorpay.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.razorpay.com; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; form-action 'self' https://api.northstonecrm.com https://formspree.io; connect-src 'self' https://api.northstonecrm.com https://formspree.io https://api.razorpay.com https://lumberjack.razorpay.com; frame-src https://api.razorpay.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.razorpay.com; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests">
   <title>Northstone CRM | Real Estate CRM for Builders and Brokers</title>
   <meta name="description" content="Northstone CRM helps real-estate brokers, builder teams, and enterprise owners track leads, manage deals, use AI follow-ups, publish builder websites, and close more business.">
   <meta name="robots" content="index,follow">
@@ -1321,7 +1321,8 @@ New sections added:
   <script>
     (() => {
       "use strict";
-      const API_BASE = "https://api.northstonecrm.com"; // SECURITY FIX: HTTPS-only production endpoint prevents insecure form submission.
+      const API_BASE = "https://api.northstonecrm.com"; // SECURITY FIX: HTTPS-only production endpoint prevents insecure checkout submission.
+      const FORMSPREE_ENQUIRY_ENDPOINT = "https://formspree.io/f/xgakodly";
       const menuButton = document.querySelector(".menu-toggle");
       const mobileMenu = document.getElementById("mobileMenu");
       const pricingState = {
@@ -1689,11 +1690,24 @@ New sections added:
       });
 
       async function submitLead(payload) {
-        // SECURITY FIX: Only posts a minimal validated lead payload to a fixed HTTPS API route.
-        const response = await fetch(`${API_BASE}/public/request-demo`, {
+        // The public enquiry form uses the dedicated Formspree endpoint so enquiries remain deliverable
+        // while the CRM API is being moved between hosting providers. No credentials are exposed here.
+        const response = await fetch(FORMSPREE_ENQUIRY_ENDPOINT, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name: payload.full_name,
+            email: payload.email,
+            phone: payload.phone,
+            company: payload.company_name,
+            city: payload.city,
+            plan: payload.preferred_plan,
+            team_size: payload.team_size,
+            message: payload.message
+          })
         });
         if (!response.ok) throw new Error("Lead request failed");
       }
