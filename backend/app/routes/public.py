@@ -16,6 +16,7 @@ from ..auth import get_or_create_user, get_user_by_email, hash_password, normali
 from ..db import get_session
 from ..models import BuilderWebsite, BuilderWebsiteProperty, Payment, Profile, User
 from ..services.builder_websites import builder_website_image_list, ensure_builder_website, public_url_for_slug
+from ..services.inquiry_email import InquiryEmailError, send_demo_notification
 from ..schemas import (
     BuilderWebsitePropertyRead,
     BuilderWebsiteRead,
@@ -447,7 +448,38 @@ def request_demo(payload: PublicDemoRequest, session: Session = Depends(get_sess
         target_user_id=user.id,
     )
     _commit_or_http(session, "Could not store the demo request")
-    return PublicDemoResponse(ok=True, email=email)
+    try:
+        notification_id = send_demo_notification(
+            payload,
+            api_key=settings.resend_api_key.strip(),
+            from_email=settings.inquiry_from_email.strip(),
+            recipient_email=settings.inquiry_recipient_email.strip(),
+        )
+    except InquiryEmailError as exc:
+        log_audit_event(
+            session,
+            actor=None,
+            kind="public.request_demo_email_failed",
+            summary=f"Enquiry email delivery failed for {email}",
+            detail=str(exc),
+            target_user_id=user.id,
+        )
+        _commit_or_http(session, "Could not record the enquiry delivery failure")
+        raise HTTPException(
+            status_code=503,
+            detail="We received your enquiry, but could not notify the Northstone team by email. Please try again shortly.",
+        ) from exc
+
+    log_audit_event(
+        session,
+        actor=None,
+        kind="public.request_demo_email_sent",
+        summary=f"Enquiry email sent for {email}",
+        detail=f"recipient={settings.inquiry_recipient_email.strip()}; notification_id={notification_id}",
+        target_user_id=user.id,
+    )
+    _commit_or_http(session, "Could not record the enquiry email delivery")
+    return PublicDemoResponse(ok=True, email=email, notification_id=notification_id)
 
 
 @router.post("/webhooks/razorpay")

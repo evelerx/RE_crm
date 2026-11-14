@@ -199,6 +199,7 @@ class PublicDemoRequest(BaseModel):
 class PublicDemoResponse(BaseModel):
     ok: bool
     email: str
+    notification_id: str
 
 
 class AdminResetPasswordRequest(BaseModel):

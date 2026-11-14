@@ -1236,6 +1236,21 @@ New sections added:
               <label for="contactPlan">Subscription for demo</label>
             </div>
           </div>
+          <div class="field-grid">
+            <div class="floating-field"><input id="contactCompany" name="company" type="text" autocomplete="organization" required maxlength="160"><label for="contactCompany">Company name</label></div>
+            <div class="floating-field"><input id="contactCity" name="city" type="text" autocomplete="address-level2" required maxlength="120"><label for="contactCity">City</label></div>
+          </div>
+          <div class="floating-field">
+            <select id="contactTeamSize" name="teamSize" required>
+              <option value="1">1 person</option>
+              <option value="2">2–5 people</option>
+              <option value="10">6–10 people</option>
+              <option value="25">11–25 people</option>
+              <option value="50">26–50 people</option>
+              <option value="100">50+ people</option>
+            </select>
+            <label for="contactTeamSize">Team size</label>
+          </div>
           <div class="floating-field"><textarea id="contactMessage" name="message" required maxlength="800"></textarea><label for="contactMessage">Message</label></div>
           <div class="form-actions">
             <button class="btn btn-primary" type="submit">Submit</button>
@@ -1699,17 +1714,30 @@ New sections added:
           const email = cleanText(contactForm.email.value, 120);
           const phone = cleanText(contactForm.phone.value, 24);
           const plan = cleanText(contactForm.plan.value, 60);
+          const companyName = cleanText(contactForm.company.value, 160);
+          const city = cleanText(contactForm.city.value, 120);
+          const teamSize = Number.parseInt(String(contactForm.teamSize.value || "0"), 10);
           const message = cleanText(contactForm.message.value, 800);
-          if (!name || !validEmail(email) || !phone || !plan || !message) {
-            setMessage(messageNode, "Please add your name, valid email, phone number, subscription choice, and message.", "error");
+          if (!name || !validEmail(email) || !phone || !plan || !companyName || !city || !Number.isInteger(teamSize) || teamSize < 1 || message.length < 10) {
+            setMessage(messageNode, "Please complete every field and enter a message of at least 10 characters.", "error");
             return;
           }
           try {
-            await submitLead({ name, email, phone, plan, message });
+            const preferredPlan = plan === "Lifetime Access" ? "custom" : plan.toLowerCase();
+            await submitLead({
+              full_name: name,
+              email,
+              phone,
+              company_name: companyName,
+              city,
+              preferred_plan: preferredPlan,
+              team_size: teamSize,
+              message: `[${plan}] ${message}`
+            });
             contactForm.reset();
-            setMessage(messageNode, "We'll reach out within 24 hours.", "success");
+            setMessage(messageNode, "Your enquiry was sent to the Northstone team. We'll reach out within 24 hours.", "success");
           } catch (error) {
-            setMessage(messageNode, "We'll reach out within 24 hours.", "success");
+            setMessage(messageNode, "We could not send your enquiry right now. Please try again shortly.", "error");
           }
         });
       }
