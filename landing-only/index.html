@@ -1130,13 +1130,13 @@ New sections added:
         <div style="background:#eef4ff;border:1px solid #c9d7eb;border-radius:16px;padding:36px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:24px;">
           <div>
             <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#1257d6;margin-bottom:8px;">Lifetime Access</div>
-            <div style="font-size:20px;font-weight:700;color:#101828;margin-bottom:8px;">Looking for a one-time payment?</div>
-            <div style="font-size:14px;color:#475467;max-width:480px;line-height:1.6;">Northstone offers lifetime CRM access for teams that prefer to pay once. Core pipeline, deals, contacts, ROI, and builder features — no monthly billing. AI, WhatsApp, and automation remain on active plans. Pricing is discussed directly based on your team size.</div>
+            <div style="font-size:24px;font-weight:700;color:#101828;margin-bottom:8px;">Firm Operations Suite</div>
+            <div style="font-size:14px;color:#475467;max-width:610px;line-height:1.6;">A one-time CRM investment for real-estate firms and builders. Includes 20 employee IDs, pipeline, contacts, properties, inventory workflow, dashboard, leaderboard, ROI tools, WhatsApp inbox, Google Workspace setup readiness, and a connected marketing portal.</div>
+            <div style="font-size:28px;font-weight:800;color:#101828;margin-top:16px;">₹2.99 lakh <span style="font-size:14px;font-weight:700;color:#475467;">+ GST</span></div>
+            <div style="font-size:13px;color:#475467;margin-top:4px;">Lifetime software access. ₹20,000/year maintenance begins after the first year. Extra employee IDs, storage, third-party usage, and custom development are priced separately.</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:10px;min-width:200px;align-items:flex-start;">
-            <a href="tel:+919834241892" style="display:inline-flex;align-items:center;gap:10px;background:#1257d6;color:#fff;padding:12px 20px;border-radius:10px;font-weight:600;font-size:14px;text-decoration:none;">
-              +91 98342 41892
-            </a>
+            <button class="btn btn-primary lifetime-plan-btn" type="button">Discuss Lifetime Access ↗</button>
           </div>
         </div>
       </div>
@@ -1228,6 +1228,7 @@ New sections added:
                 <option value="Solo">Solo</option>
                 <option value="Enterprise">Enterprise</option>
                 <option value="Builder">Builder</option>
+                <option value="Lifetime Access">Lifetime Access</option>
                 <option value="Custom">Custom</option>
                 <option value="CRM + Marketing Assist">CRM + Marketing Assist</option>
                 <option value="CRM + Managed Marketing">CRM + Managed Marketing</option>
@@ -1369,6 +1370,15 @@ New sections added:
         setContactPlan(
           "Enterprise",
           `I want to discuss the Enterprise plan for my real-estate business. We currently need ${pricingState.enterpriseExtraIds} extra IDs beyond the 5 included IDs.`
+        );
+        const contactSection = document.getElementById("contact");
+        if (contactSection) contactSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function redirectLifetimeInquiry() {
+        setContactPlan(
+          "Lifetime Access",
+          "I want to discuss the Lifetime Firm Operations Suite (₹2.99 lakh + GST, including 20 employee IDs). Please share the onboarding process and options for extra employee IDs, storage, and integrations."
         );
         const contactSection = document.getElementById("contact");
         if (contactSection) contactSection.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1657,6 +1667,10 @@ New sections added:
         button.addEventListener("click", () => {
           redirectEnterpriseInquiry();
         });
+      });
+
+      document.querySelectorAll(".lifetime-plan-btn").forEach((button) => {
+        button.addEventListener("click", redirectLifetimeInquiry);
       });
 
       async function submitLead(payload) {
