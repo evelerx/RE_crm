@@ -577,6 +577,24 @@ New sections added:
     .faq-panel { padding: 0 22px 20px; color: var(--muted); }
     .faq-panel[hidden] { display: none; }
 
+    .legal-library {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+      margin-top: 30px;
+    }
+    .legal-document {
+      display: grid;
+      gap: 16px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: #fff;
+      box-shadow: 0 12px 30px rgba(16, 24, 40, 0.06);
+    }
+    .legal-document h3 { font-size: 1.35rem; }
+    .legal-document .btn { justify-self: start; }
+
     .cta-banner {
       padding: 48px;
       border-radius: var(--radius-xl);
@@ -706,7 +724,7 @@ New sections added:
 
     @media (max-width: 1024px) {
       .hero-grid, .contact-grid { grid-template-columns: 1fr; }
-      .feature-grid, .pricing-grid, .marketing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .feature-grid, .pricing-grid, .marketing-grid, .legal-library { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .estimator-grid { grid-template-columns: 1fr; }
       .proof-strip { grid-template-columns: repeat(2, 1fr); }
     }
@@ -719,7 +737,7 @@ New sections added:
       .menu-toggle { display: inline-block; }
       .brand span small { display: none; }
       .hero-actions .btn, .form-actions .btn, .cta-banner .btn { width: 100%; }
-      .two-col, .feature-grid, .steps, .pricing-grid, .marketing-grid, .field-grid, .footer-grid, .footer-links, .estimator-grid { grid-template-columns: 1fr; }
+      .two-col, .feature-grid, .steps, .pricing-grid, .marketing-grid, .field-grid, .footer-grid, .footer-links, .estimator-grid, .legal-library { grid-template-columns: 1fr; }
       .testimonial-grid {
         display: flex;
         overflow-x: auto;
@@ -813,6 +831,7 @@ New sections added:
         <a href="#pricing">Pricing</a>
         <a href="#addons">Add-ons</a>
         <a href="#faq">FAQ</a>
+        <a href="#legal">Legal</a>
         <a href="#contact">Contact</a>
       </div>
       <a class="btn btn-primary" href="#contact">Request a Demo</a>
@@ -826,6 +845,7 @@ New sections added:
       <a href="#pricing">Pricing</a>
       <a href="#addons">Add-ons</a>
       <a href="#faq">FAQ</a>
+      <a href="#legal">Legal</a>
       <a href="#contact">Contact</a>
       <a class="btn btn-primary" href="#contact">Get Started Free</a>
     </div>
@@ -1131,9 +1151,9 @@ New sections added:
           <div>
             <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#1257d6;margin-bottom:8px;">Lifetime Access</div>
             <div style="font-size:24px;font-weight:700;color:#101828;margin-bottom:8px;">Firm Operations Suite</div>
-            <div style="font-size:14px;color:#475467;max-width:610px;line-height:1.6;">A one-time CRM investment for real-estate firms and builders. Includes 20 employee IDs, pipeline, contacts, properties, inventory workflow, dashboard, leaderboard, ROI tools, WhatsApp inbox, Google Workspace setup readiness, and a connected marketing portal.</div>
-            <div style="font-size:28px;font-weight:800;color:#101828;margin-top:16px;">₹2.99 lakh <span style="font-size:14px;font-weight:700;color:#475467;">+ GST</span></div>
-            <div style="font-size:13px;color:#475467;margin-top:4px;">Lifetime software access. ₹20,000/year maintenance begins after the first year. Extra employee IDs, storage, third-party usage, and custom development are priced separately.</div>
+            <div style="font-size:14px;color:#475467;max-width:610px;line-height:1.6;">A one-time CRM investment for the first 50 eligible real-estate firms and builders. Includes one Manager ID, 20 Employee IDs, 25 GB shared storage, pipeline, contacts, properties, inventory workflow, dashboard, leaderboard, ROI tools, and Google Workspace setup readiness. The marketing portal is separately quoted.</div>
+            <div style="font-size:28px;font-weight:800;color:#101828;margin-top:16px;">₹2.99 lakh</div>
+            <div style="font-size:13px;color:#475467;margin-top:4px;">The first year of maintenance is included. The first ₹20,000 annual maintenance fee is due on the second activation anniversary. Extra employee IDs, storage and third-party usage are charged separately.</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:10px;min-width:200px;align-items:flex-start;">
             <button class="btn btn-primary lifetime-plan-btn" type="button">Discuss Lifetime Access ↗</button>
@@ -1175,18 +1195,27 @@ New sections added:
       </div>
     </section>
 
-    <section class="section" id="privacy">
-      <div class="container two-col">
-        <article class="card">
-          <span class="eyebrow">Privacy Policy</span>
-          <h2 class="mt-16">Your business data stays controlled.</h2>
-          <p class="mt-14">Northstone is designed so sales records, team access, AI assignment, and builder content are handled through authenticated CRM workflows. Public landing forms collect only basic inquiry details required to respond.</p>
-        </article>
-        <article class="card" id="terms">
-          <span class="eyebrow">Terms</span>
-          <h2 class="mt-16">Use Northstone responsibly.</h2>
-          <p class="mt-14">Subscriptions, managed marketing, payment activation, and integrations are confirmed during onboarding. We do not place payment scripts or secret keys inside this public landing page.</p>
-        </article>
+    <section class="section" id="legal" aria-labelledby="legal-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Legal documents</span>
+          <h2 id="legal-title">Clear terms for every customer.</h2>
+          <p>Review the documents that explain how Northstone CRM is operated and the rules that apply when you use the service.</p>
+        </div>
+        <div class="legal-library">
+          <article class="legal-document">
+            <span class="eyebrow">Legal and compliance</span>
+            <h3>Northstone Legal and Compliance Handbook</h3>
+            <p>Our internal operating framework covering data security, privacy, commercial controls, partner responsibilities, governance, and compliance practices.</p>
+            <a class="btn btn-secondary" href="/legal/northstone-legal-and-compliance-handbook.docx" target="_blank" rel="noopener noreferrer">Open legal handbook</a>
+          </article>
+          <article class="legal-document">
+            <span class="eyebrow">Terms and conditions</span>
+            <h3>Northstone Terms and Conditions</h3>
+            <p>Customer terms covering plans, fees, refunds, service access, acceptable use, data handling, support, marketing portal use, and dispute resolution.</p>
+            <a class="btn btn-secondary" href="/legal/northstone-terms-and-conditions.docx" target="_blank" rel="noopener noreferrer">Open terms and conditions</a>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -1313,7 +1342,7 @@ New sections added:
       <div class="footer-links">
         <div><h3>Product</h3><a href="#features">Features</a><a href="#builder">Builder websites</a><a href="#addons">Marketing Add-ons</a><a href="#how-it-works">How it works</a></div>
         <div><h3>Company</h3><a href="#pricing">Pricing</a><a href="#about">About</a><a href="#contact">Contact</a></div>
-        <div><h3>Legal</h3><a href="/privacy">Privacy Policy</a><a href="/terms">Terms</a><a href="https://app.northstonecrm.com/login" target="_blank" rel="noopener noreferrer">CRM Login</a></div>
+        <div><h3>Legal</h3><a href="#legal">Legal documents</a><a href="/legal/northstone-legal-and-compliance-handbook.docx" target="_blank" rel="noopener noreferrer">Legal handbook</a><a href="/legal/northstone-terms-and-conditions.docx" target="_blank" rel="noopener noreferrer">Terms and conditions</a><a href="/privacy">Privacy Policy</a><a href="https://app.northstonecrm.com/login" target="_blank" rel="noopener noreferrer">CRM Login</a></div>
       </div>
     </div>
   </footer>
@@ -1394,7 +1423,7 @@ New sections added:
       function redirectLifetimeInquiry() {
         setContactPlan(
           "Lifetime Access",
-          "I want to discuss the Lifetime Firm Operations Suite (₹2.99 lakh + GST, including 20 employee IDs). Please share the onboarding process and options for extra employee IDs, storage, and integrations."
+          "I want to discuss the Lifetime Firm Operations Suite (INR 2.99 lakh, including 20 employee IDs). Please share the onboarding process and options for extra employee IDs, storage, and integrations."
         );
         const contactSection = document.getElementById("contact");
         if (contactSection) contactSection.scrollIntoView({ behavior: "smooth", block: "start" });
