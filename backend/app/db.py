@@ -21,15 +21,18 @@ from .models import (
     DealImage,
     DealStageEvent,
     FollowUpSequence,
+    Notification,
     PasswordResetToken,
     Profile,
     RbacMatrixSetting,
+    RecycleBinItem,
     SupportChatMessage,
     TargetGoal,
     Team,
     TeamMembership,
     User,
     WhatsAppMessage,
+    WorkspacePolicy,
 )
 from .settings import app_base_dir, settings
 
@@ -481,6 +484,14 @@ def _sqlite_best_effort_migrate() -> None:
                 _sqlite_add_column(conn, "user", "last_leaderboard_score INTEGER DEFAULT 0")
             if "last_leaderboard_rank" not in cols:
                 _sqlite_add_column(conn, "user", "last_leaderboard_rank INTEGER DEFAULT 0")
+            if "membership_status" not in cols:
+                _sqlite_add_column(conn, "user", "membership_status VARCHAR DEFAULT 'active'")
+            if "deactivated_at" not in cols:
+                _sqlite_add_column(conn, "user", "deactivated_at DATETIME")
+            if "transfer_deadline_at" not in cols:
+                _sqlite_add_column(conn, "user", "transfer_deadline_at DATETIME")
+            if "last_inactivity_warning_at" not in cols:
+                _sqlite_add_column(conn, "user", "last_inactivity_warning_at DATETIME")
 
 
 def _postgres_best_effort_migrate() -> None:
@@ -529,6 +540,10 @@ def _postgres_best_effort_migrate() -> None:
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS last_leaderboard_score INTEGER DEFAULT 0;
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS last_leaderboard_rank INTEGER DEFAULT 0;
                   ALTER TABLE "user" ADD COLUMN IF NOT EXISTS billing_type VARCHAR DEFAULT 'monthly';
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS membership_status VARCHAR DEFAULT 'active';
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMP;
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS transfer_deadline_at TIMESTAMP;
+                  ALTER TABLE "user" ADD COLUMN IF NOT EXISTS last_inactivity_warning_at TIMESTAMP;
                   IF to_regclass('activity') IS NOT NULL THEN
                     ALTER TABLE activity ADD COLUMN IF NOT EXISTS assigned_by_id UUID;
                     ALTER TABLE activity ADD COLUMN IF NOT EXISTS team_id UUID;
@@ -593,11 +608,58 @@ _last_purge: datetime | None = None
 _PURGE_INTERVAL_SECONDS = 600  # run at most once every 10 minutes per process
 
 
+def _run_workspace_maintenance(session: Session, now: datetime) -> None:
+    """Issue the agreed 4/6/8-day manager reminders and finish expired transfers.
+
+    This is intentionally idempotent and runs with the existing lightweight
+    maintenance cadence. It does not require a fragile in-process scheduler.
+    """
+    employees = session.exec(select(User).where(User.enterprise_owner_id.is_not(None))).all()
+    changed = False
+    for employee in employees:
+        owner_id = employee.enterprise_owner_id
+        if not owner_id:
+            continue
+        if (employee.membership_status or "active") == "deactivated":
+            if employee.transfer_deadline_at and employee.transfer_deadline_at <= now:
+                for model in (Deal, Contact, Activity):
+                    for row in session.exec(select(model).where(model.owner_id == employee.id)).all():
+                        row.owner_id = owner_id
+                        session.add(row)
+                employee.transfer_deadline_at = None
+                session.add(employee)
+                changed = True
+            continue
+        last_seen = employee.last_seen_at or employee.last_login_at or employee.created_at
+        if last_seen.tzinfo is not None:
+            last_seen = last_seen.astimezone(timezone.utc).replace(tzinfo=None)
+        inactive_days = (now - last_seen).days
+        if inactive_days < 4 or (inactive_days - 4) % 2:
+            continue
+        last_warning = employee.last_inactivity_warning_at
+        if last_warning and (now - last_warning).total_seconds() < 36 * 3600:
+            continue
+        session.add(Notification(
+            user_id=owner_id,
+            enterprise_owner_id=owner_id,
+            kind="employee_inactive",
+            title=f"{employee.email} has been inactive for {inactive_days} days",
+            body="Review this employee's access or follow up with them. You can dismiss this notice from the inbox.",
+            link="/enterprise",
+        ))
+        employee.last_inactivity_warning_at = now
+        session.add(employee)
+        changed = True
+    if changed:
+        session.commit()
+
+
 def get_session():
     global _last_purge
     with Session(engine) as session:
         now = _utc_now_naive()
         if _last_purge is None or (now - _last_purge).total_seconds() >= _PURGE_INTERVAL_SECONDS:
             purge_expired_demo_accounts(session)
+            _run_workspace_maintenance(session, now)
             _last_purge = now
         yield session

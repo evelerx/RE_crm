@@ -309,13 +309,35 @@ class EnterpriseEmployeeCreateRequest(BaseModel):
     password: str = Field(min_length=8)
     full_name: str = ""
     company: str = ""
-    role_label: str = Field(default="broker", pattern="^(broker|cp|employee)$")
+    role_label: str = Field(default="employee", pattern="^(manager|broker|cp|employee)$")
     team_id: Optional[UUID] = None
 
 
 class EnterpriseEmployeeBlacklistRequest(BaseModel):
     reason: str = ""
     blacklisted: bool = True
+
+
+class EnterpriseEmployeeDeactivateRequest(BaseModel):
+    reason: str = Field(default="", max_length=1000)
+
+
+class WorkspaceStorageRead(BaseModel):
+    included_seats: int
+    active_seats: int
+    storage_limit_bytes: int
+    storage_used_bytes: int
+    storage_warning_bytes: int
+    upload_allowed: bool
+    next_warning_at_bytes: Optional[int] = None
+
+
+class RecycleBinItemRead(BaseModel):
+    id: UUID
+    entity_type: str
+    entity_id: UUID
+    deleted_at: datetime
+    purge_at: datetime
 
 
 class TeamCreateRequest(BaseModel):

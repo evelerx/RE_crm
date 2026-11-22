@@ -25,6 +25,7 @@ from .routes import (
     csvio,
     deals,
     enterprise,
+    governance,
     integrations,
     insights,
     leaderboard,
@@ -138,6 +139,7 @@ app.include_router(csvio.router, dependencies=deps)
 app.include_router(insights.router, dependencies=deps)
 app.include_router(leaderboard.router, dependencies=deps)
 app.include_router(enterprise.router, dependencies=deps)
+app.include_router(governance.router, dependencies=deps)
 app.include_router(sequences.router, dependencies=deps)
 app.include_router(targets.router, dependencies=deps)
 app.include_router(whatsapp.router, dependencies=deps)

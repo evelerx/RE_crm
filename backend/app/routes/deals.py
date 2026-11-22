@@ -15,10 +15,13 @@ from ..enterprise_scope import (
     get_enterprise_owner_id,
     is_enterprise_owner,
     is_enterprise_member,
+    is_workspace_manager,
     user_can_access_record,
+    user_can_edit_record,
     user_read_filter,
 )
 from ..models import Activity, Contact, Deal, DealClosureEvent, DealImage, DealStageEvent, Profile, User
+from .governance import _policy, _storage_used
 from ..services.notifications import create_notification
 from ..schemas import (
     BulkStageUpdateRequest,
@@ -513,6 +516,7 @@ def score_deal_direct(
     deal = session.get(Deal, deal_id)
     if not deal or not user_can_access_record(deal, user):
         raise HTTPException(status_code=404, detail="Deal not found")
+
     return _score_single_deal(session, deal)
 
 
@@ -693,6 +697,17 @@ async def upload_deal_images(
 ):
     """Upload one or more property images for a deal."""
 
+    owner_id = get_enterprise_owner_id(user) or user.id
+    policy = _policy(session, owner_id)
+    current_storage = _storage_used(session, owner_id)
+    incoming_size = 0
+    for upload in files:
+        content = await upload.read()
+        await upload.seek(0)
+        incoming_size += len(content)
+    if current_storage + incoming_size > policy.storage_limit_bytes:
+        raise HTTPException(status_code=413, detail="Your included 25 GB storage limit has been reached. Add storage to upload more files.")
+
     deal = session.get(Deal, deal_id)
     if not deal or not user_can_access_record(deal, user):
         raise HTTPException(status_code=404, detail="Deal not found")
@@ -804,7 +819,7 @@ def update_deal(
     user: User = Depends(get_current_user),
 ):
     deal = session.get(Deal, deal_id)
-    if not deal or not user_can_access_record(deal, user):
+    if not deal or not user_can_edit_record(deal, user):
         raise HTTPException(status_code=404, detail="Deal not found")
 
     data = payload.model_dump(exclude_unset=True)
@@ -919,6 +934,8 @@ def delete_deal(
     deal = session.get(Deal, deal_id)
     if not deal or not user_can_access_record(deal, user):
         raise HTTPException(status_code=404, detail="Deal not found")
+    if not is_workspace_manager(user):
+        raise HTTPException(status_code=403, detail="Only the workspace manager can delete CRM records")
     log_audit_event(
         session,
         actor=user,

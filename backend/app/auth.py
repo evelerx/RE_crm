@@ -145,6 +145,8 @@ def get_current_user(
         if reason:
             msg = f"You are blacklisted by admin: {reason}"
         raise HTTPException(status_code=403, detail=msg)
+    if (getattr(user, "membership_status", "active") or "active").strip().lower() != "active":
+        raise HTTPException(status_code=403, detail="Your workspace access has been deactivated. Contact your manager.")
     locked_until = _normalize_db_datetime(getattr(user, "locked_until", None))
     if locked_until and locked_until > _utc_now_naive():
         raise HTTPException(status_code=423, detail=f"Account temporarily locked until {locked_until.isoformat()}Z")

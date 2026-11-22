@@ -40,6 +40,19 @@ def is_enterprise_member(user: User) -> bool:
     return owner_id is not None and owner_id != user.id
 
 
+def member_role(user: User) -> str:
+    return (getattr(user, "enterprise_member_role", "") or "").strip().lower()
+
+
+def is_workspace_manager(user: User) -> bool:
+    """Owners and explicitly assigned managers administer an organization."""
+    return is_enterprise_owner(user) or (is_enterprise_member(user) and member_role(user) == "manager")
+
+
+def is_active_member(user: User) -> bool:
+    return (getattr(user, "membership_status", "active") or "active").strip().lower() == "active"
+
+
 def org_owner_filter(model: Any, enterprise_owner_id: UUID):
     return or_(
         model.enterprise_owner_id == enterprise_owner_id,
@@ -48,18 +61,30 @@ def org_owner_filter(model: Any, enterprise_owner_id: UUID):
 
 
 def user_read_filter(model: Any, user: User):
-    if is_enterprise_owner(user):
-        return org_owner_filter(model, user.id)
+    owner_id = get_enterprise_owner_id(user)
+    if owner_id:
+        # A shared CRM needs a shared view. Editing/deleting is checked separately
+        # by the mutating routes, so a staff member cannot alter another member's work.
+        return org_owner_filter(model, owner_id)
     return model.owner_id == user.id
 
 
 def user_can_access_record(record: Any, user: User) -> bool:
     if getattr(record, "owner_id", None) == user.id:
         return True
-    if is_enterprise_owner(user):
-        enterprise_owner_id = get_enterprise_owner_id(user)
-        return getattr(record, "enterprise_owner_id", None) == enterprise_owner_id
+    enterprise_owner_id = get_enterprise_owner_id(user)
+    if enterprise_owner_id:
+        return getattr(record, "enterprise_owner_id", None) == enterprise_owner_id or (
+            getattr(record, "enterprise_owner_id", None) is None and getattr(record, "owner_id", None) == enterprise_owner_id
+        )
     return False
+
+
+def user_can_edit_record(record: Any, user: User) -> bool:
+    """Employees may edit their own operational records; managers control the workspace."""
+    if not user_can_access_record(record, user):
+        return False
+    return is_workspace_manager(user) or getattr(record, "owner_id", None) == user.id
 
 
 def assign_enterprise_fields(record: Any, user: User) -> None:

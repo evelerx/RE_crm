@@ -247,7 +247,7 @@ export default function EnterprisePage() {
   const [employeePassword, setEmployeePassword] = useState("");
   const [employeeName, setEmployeeName] = useState("");
   const [employeeCompany, setEmployeeCompany] = useState("");
-  const [employeeRole, setEmployeeRole] = useState<"broker" | "cp" | "employee">("broker");
+  const [employeeRole, setEmployeeRole] = useState<"manager" | "broker" | "cp" | "employee">("employee");
   const [employeeTeamId, setEmployeeTeamId] = useState("");
   const [employeeBusy, setEmployeeBusy] = useState(false);
   const [employeeMsg, setEmployeeMsg] = useState<string | null>(null);
@@ -745,7 +745,7 @@ export default function EnterprisePage() {
               setEmployeePassword("");
               setEmployeeName("");
               setEmployeeCompany("");
-              setEmployeeRole("broker");
+              setEmployeeRole("employee");
               setEmployeeTeamId("");
               await load();
             } catch (err) {
@@ -778,7 +778,8 @@ export default function EnterprisePage() {
           <div className="grid2">
             <label>
               Role
-              <select value={employeeRole} onChange={(e) => setEmployeeRole((e.target.value as "broker" | "cp" | "employee") ?? "broker")}>
+              <select value={employeeRole} onChange={(e) => setEmployeeRole((e.target.value as "manager" | "broker" | "cp" | "employee") ?? "employee")}>
+                <option value="manager">Manager (full workspace control)</option>
                 <option value="broker">Broker</option>
                 <option value="cp">CP</option>
                 <option value="employee">Employee</option>

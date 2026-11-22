@@ -47,6 +47,37 @@ class User(SQLModel, table=True):
     last_leaderboard_score: int = 0
     last_leaderboard_rank: int = 0
     billing_type: str = "monthly"  # monthly | annual | lifetime
+    # Workspace membership is deliberately separate from billing status.  A manager
+    # can safely deactivate a staff account without deleting its CRM records.
+    membership_status: str = "active"  # pending | active | deactivated
+    deactivated_at: Optional[datetime] = None
+    transfer_deadline_at: Optional[datetime] = None
+    last_inactivity_warning_at: Optional[datetime] = None
+
+
+class WorkspacePolicy(SQLModel, table=True):
+    """Per-customer operational limits for the included Northstone workspace."""
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    enterprise_owner_id: UUID = Field(foreign_key="user.id", index=True, unique=True)
+    included_seats: int = 21
+    storage_limit_bytes: int = 25 * 1024 * 1024 * 1024
+    storage_warning_bytes: int = 22 * 1024 * 1024 * 1024
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class RecycleBinItem(SQLModel, table=True):
+    """Short-lived deletion record. Payload is retained for a five-day restore window."""
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    enterprise_owner_id: UUID = Field(foreign_key="user.id", index=True)
+    deleted_by_user_id: UUID = Field(foreign_key="user.id", index=True)
+    entity_type: str = Field(index=True)  # contact | deal | activity
+    entity_id: UUID = Field(index=True)
+    payload_json: str = "{}"
+    deleted_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    purge_at: datetime = Field(index=True)
 
 
 class Team(SQLModel, table=True):

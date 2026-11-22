@@ -7,7 +7,7 @@ from sqlmodel import Session, col, select
 
 from ..auth import get_current_user
 from ..db import get_session
-from ..enterprise_scope import assign_enterprise_fields, user_can_access_record, user_read_filter
+from ..enterprise_scope import assign_enterprise_fields, is_workspace_manager, user_can_access_record, user_can_edit_record, user_read_filter
 from ..models import Contact, User
 from ..schemas import ContactCreate, ContactRead, ContactUpdate
 
@@ -62,7 +62,7 @@ def update_contact(
     user: User = Depends(get_current_user),
 ):
     contact = session.get(Contact, contact_id)
-    if not contact or not user_can_access_record(contact, user):
+    if not contact or not user_can_edit_record(contact, user):
         raise HTTPException(status_code=404, detail="Contact not found")
 
     data = payload.model_dump(exclude_unset=True)
@@ -85,6 +85,8 @@ def delete_contact(
     contact = session.get(Contact, contact_id)
     if not contact or not user_can_access_record(contact, user):
         raise HTTPException(status_code=404, detail="Contact not found")
+    if not is_workspace_manager(user):
+        raise HTTPException(status_code=403, detail="Only the workspace manager can delete CRM records")
     session.delete(contact)
     session.commit()
     return {"deleted": True}

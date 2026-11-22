@@ -7,7 +7,7 @@ from sqlmodel import Session, col, select
 
 from ..auth import get_current_user
 from ..db import get_session
-from ..enterprise_scope import assign_enterprise_fields, user_can_access_record, user_read_filter
+from ..enterprise_scope import assign_enterprise_fields, is_workspace_manager, user_can_access_record, user_can_edit_record, user_read_filter
 from ..models import Activity, Contact, Deal, User
 from ..schemas import ActivityCreate, ActivityRead, ActivityUpdate
 
@@ -69,7 +69,7 @@ def update_activity(
     user: User = Depends(get_current_user),
 ):
     activity = session.get(Activity, activity_id)
-    if not activity or not user_can_access_record(activity, user):
+    if not activity or not user_can_edit_record(activity, user):
         raise HTTPException(status_code=404, detail="Activity not found")
 
     data = payload.model_dump(exclude_unset=True)
@@ -99,6 +99,8 @@ def delete_activity(
     activity = session.get(Activity, activity_id)
     if not activity or not user_can_access_record(activity, user):
         raise HTTPException(status_code=404, detail="Activity not found")
+    if not is_workspace_manager(user):
+        raise HTTPException(status_code=403, detail="Only the workspace manager can delete CRM records")
     session.delete(activity)
     session.commit()
     return {"deleted": True}
