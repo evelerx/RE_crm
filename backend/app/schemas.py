@@ -340,6 +340,19 @@ class RecycleBinItemRead(BaseModel):
     purge_at: datetime
 
 
+class WorkspaceDocumentRead(BaseModel):
+    id: UUID
+    deal_id: Optional[UUID] = None
+    contact_id: Optional[UUID] = None
+    name: str
+    category: str
+    content_type: str
+    size_bytes: int
+    file_url: str
+    uploaded_by_user_id: UUID
+    created_at: datetime
+
+
 class TeamCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=400)

@@ -21,6 +21,7 @@ import ContactsPage from "./pages/ContactsPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import DealDetailPage from "./pages/DealDetailPage";
 import DealsGridPage from "./pages/DealsGridPage";
+import DocumentsPage from "./pages/DocumentsPage";
 import EnterprisePage from "./pages/EnterprisePage";
 import InboxPage from "./pages/InboxPage";
 import InsightsPage from "./pages/InsightsPage";
@@ -57,6 +58,7 @@ function CrmRoutes({ isAdmin }: { isAdmin: boolean }) {
       <Route path="/" element={isAdmin ? <AdminOwnerPipelinePage /> : <PipelinePage />} />
       <Route path="/deals" element={isAdmin ? <AdminOwnerDealsPage /> : <DealsGridPage />} />
       <Route path="/deals/:dealId" element={<DealDetailPage />} />
+      <Route path="/documents" element={<DocumentsPage />} />
       <Route path="/contacts" element={isAdmin ? <AdminOwnerContactsPage /> : <ContactsPage />} />
       <Route path="/properties" element={<PropertiesPage />} />
       <Route path="/inventory" element={<PropertiesPage />} />

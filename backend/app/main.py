@@ -24,6 +24,7 @@ from .routes import (
     contacts,
     csvio,
     deals,
+    documents,
     enterprise,
     governance,
     integrations,
@@ -126,6 +127,7 @@ app.include_router(integrations.router)
 deps = [Depends(require_api_key)]
 app.include_router(contacts.router, dependencies=deps)
 app.include_router(deals.router, dependencies=deps)
+app.include_router(documents.router, dependencies=deps)
 app.include_router(activities.router, dependencies=deps)
 app.include_router(billing.router, dependencies=deps)
 app.include_router(chat.router, dependencies=deps)

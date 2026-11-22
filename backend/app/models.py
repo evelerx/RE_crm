@@ -241,6 +241,22 @@ class DealImage(SQLModel, table=True):
     is_primary: bool = False
 
 
+class WorkspaceDocument(SQLModel, table=True):
+    """File attached to a CRM item, kept in the customer's shared workspace."""
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    enterprise_owner_id: UUID = Field(foreign_key="user.id", index=True)
+    uploaded_by_user_id: UUID = Field(foreign_key="user.id", index=True)
+    deal_id: Optional[UUID] = Field(default=None, foreign_key="deal.id", index=True)
+    contact_id: Optional[UUID] = Field(default=None, foreign_key="contact.id", index=True)
+    name: str
+    category: str = Field(default="general", index=True)
+    content_type: str = "application/octet-stream"
+    size_bytes: int = 0
+    file_url: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
 class WhatsAppMessage(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     owner_id: UUID = Field(foreign_key="user.id", index=True)

@@ -32,6 +32,7 @@ from .models import (
     TeamMembership,
     User,
     WhatsAppMessage,
+    WorkspaceDocument,
     WorkspacePolicy,
 )
 from .settings import app_base_dir, settings

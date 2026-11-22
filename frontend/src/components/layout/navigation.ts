@@ -22,6 +22,7 @@ export function crmNavGroups(options: { isAdmin: boolean; isOwnerLike: boolean; 
         { label: "Contacts", to: "/contacts", icon: "CT" },
         { label: "Deals", to: "/deals", icon: "DL" },
         { label: "Properties", to: "/properties", icon: "PR" },
+        { label: "Documents", to: "/documents", icon: "DC" },
       ],
     },
     {
@@ -153,6 +154,7 @@ export function routeTitle(pathname: string) {
   if (pathname === "/") return "Pipeline";
   if (pathname.startsWith("/deals")) return "Deals";
   if (pathname.startsWith("/contacts")) return "Contacts";
+  if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/properties")) return "Properties";
   if (pathname.startsWith("/whatsapp")) return "WhatsApp";
   if (pathname.startsWith("/inbox")) return "Inbox";
@@ -179,6 +181,7 @@ export function routeBreadcrumb(pathname: string) {
   if (pathname.startsWith("/admin")) return "Admin / Control Center";
   if (pathname.startsWith("/deals")) return "Workspace / Deals";
   if (pathname.startsWith("/contacts")) return "Workspace / Contacts";
+  if (pathname.startsWith("/documents")) return "Workspace / Documents";
   if (pathname.startsWith("/properties")) return "Workspace / Inventory";
   if (pathname.startsWith("/whatsapp")) return "Channels / WhatsApp";
   if (pathname.startsWith("/inbox")) return "Channels / Inbox";

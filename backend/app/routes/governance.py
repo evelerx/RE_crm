@@ -16,7 +16,7 @@ from ..audit import log_audit_event
 from ..auth import require_enterprise_member
 from ..db import get_session
 from ..enterprise_scope import get_enterprise_owner_id, is_workspace_manager
-from ..models import Activity, Contact, Deal, DealImage, Notification, RecycleBinItem, User, WorkspacePolicy
+from ..models import Activity, Contact, Deal, DealImage, Notification, RecycleBinItem, User, WorkspaceDocument, WorkspacePolicy
 from ..schemas import EnterpriseEmployeeDeactivateRequest, RecycleBinItemRead, WorkspaceStorageRead
 from ..services.notifications import create_notification
 
@@ -60,6 +60,15 @@ def _storage_used(session: Session, owner_id: UUID) -> int:
             total += path.stat().st_size
         except OSError:
             continue
+    documents = session.exec(select(WorkspaceDocument).where(WorkspaceDocument.enterprise_owner_id == owner_id)).all()
+    for document in documents:
+        # Count actual file bytes when possible; retained metadata still protects
+        # the quota if a deployment has temporarily lost its mounted file volume.
+        path = root / "uploads" / document.file_url.removeprefix("/uploads/")
+        try:
+            total += path.stat().st_size
+        except OSError:
+            total += int(document.size_bytes or 0)
     return total
 
 
