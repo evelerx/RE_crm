@@ -1,5 +1,5 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
-import { api, apiForm } from "../api/client";
+import { api, apiBlob, apiForm } from "../api/client";
 
 type DocumentRow = {
   id: string;
@@ -26,11 +26,6 @@ const categories = ["general", "proposal", "agreement", "identity", "property", 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(bytes >= 100 * 1024 * 1024 ? 0 : 1)} MB`;
-}
-
-function apiFileUrl(url: string) {
-  const base = import.meta.env.VITE_API_BASE_URL || "https://api.northstonecrm.com";
-  return `${base.replace(/\/$/, "")}${url}`;
 }
 
 export default function DocumentsPage() {
@@ -82,6 +77,18 @@ export default function DocumentsPage() {
     }
   };
 
+  const openDocument = async (document: DocumentRow) => {
+    setError(null);
+    try {
+      const blob = await apiBlob(`/documents/${document.id}/download`);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not open document");
+    }
+  };
+
   return (
     <div className="page docsPage">
       <div className="pageHeader">
@@ -126,7 +133,7 @@ export default function DocumentsPage() {
         </div>
         {visibleDocuments.length ? <div className="docsGrid">
           {visibleDocuments.map((document) => (
-            <a className="docsItem" href={apiFileUrl(document.file_url)} target="_blank" rel="noreferrer" key={document.id}>
+            <button className="docsItem" type="button" onClick={() => void openDocument(document)} key={document.id}>
               <div className="docsIcon">{document.category.slice(0, 2).toUpperCase()}</div>
               <div className="docsInfo">
                 <b>{document.name}</b>
@@ -134,7 +141,7 @@ export default function DocumentsPage() {
                 <span>{new Date(document.created_at).toLocaleDateString()}</span>
               </div>
               <span className="docsOpen">Open ↗</span>
-            </a>
+            </button>
           ))}
         </div> : <div className="emptyState">No documents match this view. Upload a file to begin your workspace library.</div>}
       </section>

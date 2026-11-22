@@ -222,3 +222,27 @@ create index if not exists ix_builderdocument_created_by_user_id on builderdocum
 create index if not exists ix_builderdocument_doc_type on builderdocument(doc_type);
 create index if not exists ix_builderdocument_status on builderdocument(status);
 create index if not exists ix_builderdocument_created_at on builderdocument(created_at);
+
+-- Private object storage for customer CRM documents. Files are served only by
+-- the authenticated Northstone backend using its service-role key.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'northstone-documents',
+  'northstone-documents',
+  false,
+  26214400,
+  array[
+    'application/pdf', 'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain', 'text/csv', 'image/jpeg', 'image/png', 'image/webp',
+    'image/gif', 'application/zip'
+  ]::text[]
+)
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;

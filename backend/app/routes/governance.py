@@ -61,14 +61,7 @@ def _storage_used(session: Session, owner_id: UUID) -> int:
         except OSError:
             continue
     documents = session.exec(select(WorkspaceDocument).where(WorkspaceDocument.enterprise_owner_id == owner_id)).all()
-    for document in documents:
-        # Count actual file bytes when possible; retained metadata still protects
-        # the quota if a deployment has temporarily lost its mounted file volume.
-        path = root / "uploads" / document.file_url.removeprefix("/uploads/")
-        try:
-            total += path.stat().st_size
-        except OSError:
-            total += int(document.size_bytes or 0)
+    total += sum(int(document.size_bytes or 0) for document in documents)
     return total
 
 
