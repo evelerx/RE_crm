@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import quote
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -12,10 +13,10 @@ from ..auth import get_current_user
 from ..db import get_session
 from ..enterprise_scope import get_enterprise_owner_id, is_workspace_manager, user_can_access_record
 from ..models import Contact, Deal, User, WorkspaceDocument
-from ..schemas import WorkspaceDocumentRead
+from ..schemas import WorkspaceDocumentRead, WorkspaceStorageRead
 from ..services.document_storage import delete_document as delete_stored_document
 from ..services.document_storage import download_document, storage_configured, upload_document as upload_stored_document
-from .governance import _policy, _storage_used
+from .governance import _active_seats, _next_warning, _policy, _storage_used
 
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -26,6 +27,13 @@ ALLOWED_CATEGORIES = {"general", "proposal", "agreement", "identity", "property"
 
 def _owner_id(user: User) -> UUID:
     return get_enterprise_owner_id(user) or user.id
+
+
+def _content_disposition(name: str) -> str:
+    # HTTP headers must be latin-1; non-ASCII names (Hindi, emoji, etc.) go in the
+    # RFC 5987 filename* parameter with an ASCII fallback.
+    fallback = name.encode("ascii", "ignore").decode().replace('"', "").replace("\\", "").strip() or "document"
+    return f"inline; filename=\"{fallback}\"; filename*=UTF-8''{quote(name, safe='')}"
 
 
 def _read(row: WorkspaceDocument) -> WorkspaceDocumentRead:
@@ -40,6 +48,24 @@ def list_documents(session: Session = Depends(get_session), user: User = Depends
         .where(WorkspaceDocument.enterprise_owner_id == owner_id)
         .order_by(col(WorkspaceDocument.created_at).desc())
     ).all()
+
+
+@router.get("/storage", response_model=WorkspaceStorageRead)
+def document_storage_status(session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    """Storage meter for the Documents page. Unlike /governance/storage this also
+    works for solo (non-enterprise) accounts, whose workspace is just themselves."""
+    owner_id = _owner_id(user)
+    policy = _policy(session, owner_id)
+    used = _storage_used(session, owner_id)
+    return WorkspaceStorageRead(
+        included_seats=policy.included_seats,
+        active_seats=_active_seats(session, owner_id),
+        storage_limit_bytes=policy.storage_limit_bytes,
+        storage_used_bytes=used,
+        storage_warning_bytes=policy.storage_warning_bytes,
+        upload_allowed=used < policy.storage_limit_bytes,
+        next_warning_at_bytes=_next_warning(used, policy),
+    )
 
 
 @router.post("", response_model=WorkspaceDocumentRead)
@@ -109,7 +135,7 @@ def delete_document(document_id: UUID, session: Session = Depends(get_session), 
     row = session.get(WorkspaceDocument, document_id)
     if not row or row.enterprise_owner_id != owner_id:
         raise HTTPException(status_code=404, detail="Document not found")
-    if not is_workspace_manager(user):
+    if owner_id != user.id and not is_workspace_manager(user):
         raise HTTPException(status_code=403, detail="Only the workspace manager can delete documents")
     if row.file_url.startswith("/uploads/"):
         (Path(__file__).resolve().parents[2] / "uploads" / row.file_url.removeprefix("/uploads/")).unlink(missing_ok=True)
@@ -136,5 +162,5 @@ def download_workspace_document(document_id: UUID, session: Session = Depends(ge
     return Response(
         content=content,
         media_type=content_type,
-        headers={"Content-Disposition": f'inline; filename="{row.name.replace(chr(34), "")}"', "Cache-Control": "private, no-store"},
+        headers={"Content-Disposition": _content_disposition(row.name), "Cache-Control": "private, no-store"},
     )

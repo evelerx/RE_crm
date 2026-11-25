@@ -41,7 +41,7 @@ export default function DocumentsPage() {
   const load = async () => {
     const [docs, status] = await Promise.all([
       api<DocumentRow[]>("/documents"),
-      api<StorageStatus>("/governance/storage"),
+      api<StorageStatus>("/documents/storage"),
     ]);
     setDocuments(docs);
     setStorage(status);
@@ -79,13 +79,35 @@ export default function DocumentsPage() {
 
   const openDocument = async (document: DocumentRow) => {
     setError(null);
+    // Open the tab synchronously inside the click so popup blockers allow it;
+    // window.open after an await is treated as an unsolicited popup.
+    const tab = window.open("", "_blank");
     try {
       const blob = await apiBlob(`/documents/${document.id}/download`);
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
+      if (tab) {
+        tab.location.href = url;
+      } else {
+        const link = window.document.createElement("a");
+        link.href = url;
+        link.download = document.name;
+        link.click();
+      }
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
+      tab?.close();
       setError(err instanceof Error ? err.message : "Could not open document");
+    }
+  };
+
+  const deleteDocument = async (document: DocumentRow) => {
+    if (!window.confirm(`Permanently delete "${document.name}"?`)) return;
+    setError(null);
+    try {
+      await api(`/documents/${document.id}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete document");
     }
   };
 
@@ -133,15 +155,18 @@ export default function DocumentsPage() {
         </div>
         {visibleDocuments.length ? <div className="docsGrid">
           {visibleDocuments.map((document) => (
-            <button className="docsItem" type="button" onClick={() => void openDocument(document)} key={document.id}>
+            <div className="docsItem" key={document.id}>
               <div className="docsIcon">{document.category.slice(0, 2).toUpperCase()}</div>
               <div className="docsInfo">
                 <b>{document.name}</b>
                 <span>{document.category} · {formatBytes(document.size_bytes)}</span>
                 <span>{new Date(document.created_at).toLocaleDateString()}</span>
               </div>
-              <span className="docsOpen">Open ↗</span>
-            </button>
+              <div className="docsActions">
+                <button className="docsOpen" type="button" onClick={() => void openDocument(document)}>Open ↗</button>
+                <button className="docsDelete" type="button" onClick={() => void deleteDocument(document)}>Delete</button>
+              </div>
+            </div>
           ))}
         </div> : <div className="emptyState">No documents match this view. Upload a file to begin your workspace library.</div>}
       </section>
