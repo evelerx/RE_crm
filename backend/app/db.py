@@ -549,6 +549,10 @@ def _postgres_best_effort_migrate() -> None:
                     ALTER TABLE activity ADD COLUMN IF NOT EXISTS assigned_by_id UUID;
                     ALTER TABLE activity ADD COLUMN IF NOT EXISTS team_id UUID;
                   END IF;
+                  IF to_regclass('workspacepolicy') IS NOT NULL THEN
+                    ALTER TABLE workspacepolicy ALTER COLUMN storage_limit_bytes TYPE BIGINT;
+                    ALTER TABLE workspacepolicy ALTER COLUMN storage_warning_bytes TYPE BIGINT;
+                  END IF;
                   IF to_regclass('builderwebsiteproperty') IS NOT NULL THEN
                     ALTER TABLE builderwebsiteproperty ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
                     ALTER TABLE builderwebsiteproperty ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;

@@ -5,6 +5,7 @@ from datetime import date, datetime
 from typing import Optional
 from uuid import UUID, uuid4
 
+from sqlalchemy import BigInteger, Column
 from sqlmodel import Field, SQLModel
 
 
@@ -61,8 +62,9 @@ class WorkspacePolicy(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     enterprise_owner_id: UUID = Field(foreign_key="user.id", index=True, unique=True)
     included_seats: int = 21
-    storage_limit_bytes: int = 25 * 1024 * 1024 * 1024
-    storage_warning_bytes: int = 22 * 1024 * 1024 * 1024
+    # BIGINT: 25 GB in bytes overflows Postgres INTEGER (max ~2.1 billion).
+    storage_limit_bytes: int = Field(default=25 * 1024 * 1024 * 1024, sa_column=Column(BigInteger, nullable=False))
+    storage_warning_bytes: int = Field(default=22 * 1024 * 1024 * 1024, sa_column=Column(BigInteger, nullable=False))
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
